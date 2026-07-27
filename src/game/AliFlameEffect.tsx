@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Group, Mesh, MeshBasicMaterial, PointLight } from 'three'
+import { Group, Mesh, MeshBasicMaterial } from 'three'
 import { useGameStore } from '../store/gameStore'
 import { AliFlameTrailVisual } from './AliFlameTrailVisual'
 import { ALI_FLAME_ARCS } from './heroCombatGeometry'
@@ -9,7 +9,6 @@ export function AliFlameEffect() {
   const root = useRef<Group>(null)
   const arcs = useRef<Mesh[]>([])
   const materials = useRef<MeshBasicMaterial[]>([])
-  const light = useRef<PointLight>(null)
   const elapsed = useRef(2)
   const previousAnimation = useRef(useGameStore.getState().animationStates.ali)
 
@@ -34,13 +33,12 @@ export function AliFlameEffect() {
       arc.position.y = ALI_FLAME_ARCS[index]!.position[1] + progress * 0.22
       materials.current[index]!.opacity = envelope * (0.9 - index * 0.13)
     })
-    if (light.current) light.current.intensity = 10 * envelope
     if (progress >= 1) root.current.visible = false
   })
 
   return (
     <group ref={root} visible={false} name="ali-sword-flame-trail">
-      <AliFlameTrailVisual arcs={arcs} materials={materials} light={light} />
+      <AliFlameTrailVisual arcs={arcs} materials={materials} />
     </group>
   )
 }

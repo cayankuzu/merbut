@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { AdditiveBlending, Group, MathUtils, Mesh, MeshBasicMaterial, PointLight } from 'three'
+import { AdditiveBlending, Group, MathUtils, Mesh, MeshBasicMaterial } from 'three'
 import { AliFlameTrailVisual } from '../game/AliFlameTrailVisual'
 import { FireballVisual } from '../game/FireballVisual'
 import { ALI_FLAME_ARCS, JACK_SLASHES } from '../game/heroCombatGeometry'
@@ -39,7 +39,6 @@ interface MenuAttackEffectProps {
 
 export function MenuAttackEffect({ accent, direction, kind, originY, presentationScale = 1, trigger, variant }: MenuAttackEffectProps) {
   const root = useRef<Group>(null)
-  const light = useRef<PointLight>(null)
   const aliArcs = useRef<Mesh[]>([])
   const aliMaterials = useRef<MeshBasicMaterial[]>([])
   const jackMeshes = useRef<Mesh[]>([])
@@ -71,7 +70,6 @@ export function MenuAttackEffect({ accent, direction, kind, originY, presentatio
     const progress = elapsed.current / duration
     if (progress >= 1) {
       group.visible = false
-      if (light.current) light.current.intensity = 0
       return
     }
 
@@ -86,7 +84,6 @@ export function MenuAttackEffect({ accent, direction, kind, originY, presentatio
         arc.position.y = ALI_FLAME_ARCS[index]!.position[1] + progress * 0.22
         if (aliMaterials.current[index]) aliMaterials.current[index]!.opacity = envelope * (0.9 - index * 0.13)
       })
-      if (light.current) light.current.intensity = 10 * envelope
       return
     }
     if (kind === 'jack-slash') {
@@ -141,7 +138,6 @@ export function MenuAttackEffect({ accent, direction, kind, originY, presentatio
       const material = (node as Mesh).material
       if (material instanceof MeshBasicMaterial) material.opacity = opacity
     })
-    if (light.current) light.current.intensity = pulse * (kind === 'flame' ? 8 : 5)
   })
 
   const slashEffect = (
@@ -214,13 +210,12 @@ export function MenuAttackEffect({ accent, direction, kind, originY, presentatio
 
   return (
     <group ref={root} visible={false}>
-      {kind === 'ali-slash' ? <AliFlameTrailVisual arcs={aliArcs} materials={aliMaterials} light={light} /> : null}
+      {kind === 'ali-slash' ? <AliFlameTrailVisual arcs={aliArcs} materials={aliMaterials} /> : null}
       {kind === 'ali-fireball' ? <FireballVisual directionX={direction} /> : null}
       {kind === 'jack-slash' ? <JackSlashVisual meshes={jackMeshes} materials={jackMaterials} /> : null}
       {kind === 'jack-shield' ? <JackShieldVisual /> : null}
       {impactKind ? <CombatImpactVisual kind={impactKind} /> : null}
       {projectileKind ? <EnemyProjectileVisual kind={projectileKind} /> : null}
-      {!kind.startsWith('ali-') && !kind.startsWith('jack-') && !impactKind && !projectileKind ? <pointLight ref={light} color={accent} intensity={0} distance={4.5} /> : null}
       {kind === 'slash' ? slashEffect : kind === 'projectile' ? projectileEffect : kind === 'shockwave' ? shockwaveEffect : kind === 'flame' ? flameEffect : null}
     </group>
   )
