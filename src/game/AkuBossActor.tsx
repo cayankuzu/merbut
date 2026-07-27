@@ -146,8 +146,8 @@ export function AkuBossActor({ id }: AkuBossActorProps) {
     const current = useSessionStore.getState().enemies.find((candidate) => candidate.id === id)
     if (!root.current || !normalRoot.current || !monsterRoot.current || !minisRoot.current || !current) return
     const now = performance.now()
-    root.current.position.x = MathUtils.damp(root.current.position.x, current.x, 15, Math.min(delta, 0.05))
-    root.current.rotation.y = MathUtils.damp(root.current.rotation.y, current.direction > 0 ? Math.PI / 2 : -Math.PI / 2, 14, Math.min(delta, 0.05))
+    root.current.position.x = MathUtils.damp(root.current.position.x, current.x, 15, Math.min(delta, 0.1))
+    root.current.rotation.y = MathUtils.damp(root.current.rotation.y, current.direction > 0 ? Math.PI / 2 : -Math.PI / 2, 14, Math.min(delta, 0.1))
     const arriving = bossPhase === 'prayer' ? 0 : bossPhase === 'aku-arrival' ? Math.min(1, (now - useSessionStore.getState().bossPhaseStartedAt - 2_200) / 900) : 1
     const split = current.special === 'aku-split' && current.animation !== 'dead'
     const mimicking = current.special === 'aku-shapeshift' && current.mimicKind !== null

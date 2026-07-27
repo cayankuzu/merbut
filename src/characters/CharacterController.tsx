@@ -97,7 +97,7 @@ export function CharacterController({ definition }: CharacterControllerProps) {
 
   useFrame((_, frameDelta) => {
     const value = motion.current
-    const delta = Math.min(frameDelta, 0.05)
+    const delta = Math.min(frameDelta, 0.1)
     const { bindings } = definition
     const now = performance.now()
     const session = useSessionStore.getState()
@@ -162,7 +162,7 @@ export function CharacterController({ definition }: CharacterControllerProps) {
       value.attackRemaining = ATTACK_DURATION
     }
 
-    value.accumulator = Math.min(value.accumulator + delta, 0.1)
+    value.accumulator = Math.min(value.accumulator + delta, 0.15)
     let movementAxis: -1 | 0 | 1 = 0
 
     while (value.accumulator >= GAME_CONFIG.movement.fixedStep) {

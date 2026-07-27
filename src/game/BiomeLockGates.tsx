@@ -17,7 +17,7 @@ export function BiomeLockGates() {
     gates.current.forEach((gate, index) => {
       const opened = finalArenaOpen || (currentBiome === index && session.lockedRight >= getBiomeGateX(index))
       const target = opened ? -4.2 : 0
-      gate.position.y = MathUtils.damp(gate.position.y, target, 7.5, Math.min(delta, .05))
+      gate.position.y = MathUtils.damp(gate.position.y, target, 7.5, Math.min(delta, .1))
     })
   })
   return (

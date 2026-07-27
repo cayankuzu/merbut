@@ -30,7 +30,7 @@ export function DustParticles() {
     if (!group.current) return
     const cameraX = useGameStore.getState().cameraX
     const blend = getBiomeBlend(cameraX)
-    const smoothing = 1 - Math.exp(-Math.min(delta, 0.05) * 2.4)
+    const smoothing = 1 - Math.exp(-Math.min(delta, 0.1) * 2.4)
 
     group.current.position.x = cameraX
     group.current.position.y = Math.sin(clock.elapsedTime * 0.22) * 0.08

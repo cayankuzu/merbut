@@ -320,7 +320,7 @@ export function GameDirector() {
   const previousAttacks = useRef({ ali: false, jack: false })
 
   useFrame((_, rawDelta) => {
-    const delta = Math.min(rawDelta, 0.05)
+    const delta = Math.min(rawDelta, 0.1)
     const now = performance.now()
     const session = useSessionStore.getState()
     if (!['countdown', 'boss-intro', 'final-intro', 'playing', 'ending'].includes(session.phase)) return

@@ -71,9 +71,9 @@ export function EnemyActor({ id }: EnemyActorProps) {
   useFrame((_, delta) => {
     const current = useSessionStore.getState().enemies.find((candidate) => candidate.id === id)
     if (!root.current || !current) return
-    root.current.position.x = MathUtils.damp(root.current.position.x, current.x, 16, Math.min(delta, 0.05))
+    root.current.position.x = MathUtils.damp(root.current.position.x, current.x, 16, Math.min(delta, 0.1))
     const targetRotation = current.direction > 0 ? Math.PI / 2 : -Math.PI / 2
-    root.current.rotation.y = MathUtils.damp(root.current.rotation.y, targetRotation, 14, Math.min(delta, 0.05))
+    root.current.rotation.y = MathUtils.damp(root.current.rotation.y, targetRotation, 14, Math.min(delta, 0.1))
     if (modelRoot.current) {
       const deadProgress = current.animation === 'dead' ? Math.min(1, (performance.now() - current.deadAt) / 900) : 0
       modelRoot.current.rotation.z = MathUtils.damp(modelRoot.current.rotation.z, -deadProgress * 1.28, 8, delta)

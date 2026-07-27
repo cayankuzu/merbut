@@ -91,8 +91,8 @@ export function EvilJackBossActor({ id }: EvilJackBossActorProps) {
   useFrame((_, delta) => {
     const current = useSessionStore.getState().enemies.find((candidate) => candidate.id === id)
     if (!root.current || !modelRoot.current || !current) return
-    root.current.position.x = MathUtils.damp(root.current.position.x, current.x, 16, Math.min(delta, 0.05))
-    root.current.rotation.y = MathUtils.damp(root.current.rotation.y, current.direction > 0 ? Math.PI / 2 : -Math.PI / 2, 14, Math.min(delta, 0.05))
+    root.current.position.x = MathUtils.damp(root.current.position.x, current.x, 16, Math.min(delta, 0.1))
+    root.current.rotation.y = MathUtils.damp(root.current.rotation.y, current.direction > 0 ? Math.PI / 2 : -Math.PI / 2, 14, Math.min(delta, 0.1))
     const arrivalScale = bossPhase === 'offering' || bossPhase === 'drinking' ? 0 : 1
     const targetScale = current.scale * arrivalScale * (current.animation === 'dead' ? 0.86 : 1)
     modelRoot.current.scale.setScalar(MathUtils.damp(modelRoot.current.scale.x, targetScale, 7, delta))

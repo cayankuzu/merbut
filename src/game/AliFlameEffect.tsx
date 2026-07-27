@@ -26,7 +26,7 @@ export function AliFlameEffect() {
     }
     previousAnimation.current = animation
     if (!root.current || elapsed.current > 1) return
-    elapsed.current += Math.min(delta, 0.05)
+    elapsed.current += Math.min(delta, 0.1)
     const progress = Math.min(1, elapsed.current)
     const envelope = Math.sin(Math.PI * Math.min(1, progress * 1.12))
     arcs.current.forEach((arc, index) => {

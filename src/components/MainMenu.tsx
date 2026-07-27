@@ -17,7 +17,7 @@ export function MainMenu() {
     if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current)
   }, [])
   useEffect(() => {
-    const timer = window.setTimeout(() => setStageReady(true), 3_500)
+    const timer = window.setTimeout(() => setStageReady(true), 120)
     return () => window.clearTimeout(timer)
   }, [])
   if (showCharacters) return <CharacterGallery onClose={() => setShowCharacters(false)} />

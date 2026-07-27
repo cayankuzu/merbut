@@ -45,7 +45,7 @@ export function BiomeLighting() {
   useFrame((_, delta) => {
     const cameraX = useGameStore.getState().cameraX
     const blend = getBiomeBlend(cameraX)
-    const smoothing = 1 - Math.exp(-Math.min(delta, 0.05) * 2.8)
+    const smoothing = 1 - Math.exp(-Math.min(delta, 0.1) * 2.8)
 
     targetFog.set(blend.from.fogColor).lerp(nextFog.set(blend.to.fogColor), blend.mix)
     targetSky.set(blend.from.skyColor).lerp(nextSky.set(blend.to.skyColor), blend.mix)
@@ -73,7 +73,7 @@ export function BiomeLighting() {
         position={[-4, 9, 7]}
         intensity={2.15}
         color="#ffe0bb"
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={[1024, 1024]}
         shadow-camera-left={-13}
         shadow-camera-right={13}
         shadow-camera-top={11}

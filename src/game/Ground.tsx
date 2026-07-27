@@ -101,7 +101,7 @@ const WORLD_ENDS = [
 ] as const
 
 function createGroundGeometry() {
-  const geometry = new PlaneGeometry(GROUND_WIDTH, GROUND_DEPTH, 336, 56)
+  const geometry = new PlaneGeometry(GROUND_WIDTH, GROUND_DEPTH, 168, 28)
   const positions = geometry.attributes.position
   const colors: number[] = []
   const fromDark = new Color()

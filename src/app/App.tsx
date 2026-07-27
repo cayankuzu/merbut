@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { GameInterface } from '../components/GameInterface'
 import { LoadingScreen } from '../components/LoadingScreen'
 import { SessionController } from '../components/SessionController'
@@ -27,6 +27,8 @@ declare global {
 }
 
 export default function App() {
+  const [assetsReady, setAssetsReady] = useState(false)
+  const handleAssetsReady = useCallback(() => setAssetsReady(true), [])
   const debugEnabled = new URLSearchParams(window.location.search).get('debug') === '1'
   const paused = useSessionStore((state) => state.phase === 'paused')
   useEffect(() => {
@@ -44,18 +46,20 @@ export default function App() {
   return (
     <>
       <main className={`game-shell${paused ? ' is-paused' : ''}`}>
-        <Background />
-        <GameScene />
-        <div className="scene-grade" aria-hidden="true" />
-        <SessionController />
-        <AudioDirector />
-        <GameInterface />
-        <LoadingScreen />
-        {debugEnabled ? (
-          <Suspense fallback={null}>
-            <DebugCalibrationPanel />
-          </Suspense>
-        ) : null}
+        {assetsReady ? <>
+          <Background />
+          <GameScene />
+          <div className="scene-grade" aria-hidden="true" />
+          <SessionController />
+          <AudioDirector />
+          <GameInterface />
+          {debugEnabled ? (
+            <Suspense fallback={null}>
+              <DebugCalibrationPanel />
+            </Suspense>
+          ) : null}
+        </> : null}
+        <LoadingScreen onReady={handleAssetsReady} />
       </main>
       <footer className="merbut-copyright" aria-label="Telif hakkı ve yapımcı bilgisi">
         <span>© {new Date().getFullYear()} MERBUT</span>

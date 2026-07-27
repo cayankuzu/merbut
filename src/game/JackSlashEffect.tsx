@@ -30,7 +30,7 @@ export function JackSlashEffect() {
     previousAnimation.current = animation
 
     if (!group.current || elapsed.current > 1) return
-    elapsed.current += Math.min(delta, 0.05)
+    elapsed.current += Math.min(delta, 0.1)
     const progress = Math.min(1, elapsed.current)
     const reveal = Math.min(1, progress / 0.14)
     const opacity = reveal * Math.pow(1 - progress, 1.7)

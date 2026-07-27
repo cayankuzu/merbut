@@ -23,7 +23,8 @@ export function FollowingContactShadows({ groundHeight }: FollowingContactShadow
         opacity={0.42}
         blur={2.1}
         far={5.8}
-        resolution={512}
+        frames={1}
+        resolution={256}
         color="#111017"
       />
     </group>

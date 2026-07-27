@@ -34,7 +34,7 @@ export function GameCamera() {
 
     const session = useSessionStore.getState()
     const portalCinematic = session.phase === 'ending' && ['portal', 'falling', 'continued'].includes(session.bossPhase)
-    const smoothingDelta = Math.min(delta, 0.05)
+    const smoothingDelta = Math.min(delta, 0.1)
     if (portalCinematic) {
       const portalX = session.endingPortalX
       camera.up.set(0, 0, -1)

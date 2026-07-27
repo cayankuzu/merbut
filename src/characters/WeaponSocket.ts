@@ -105,7 +105,7 @@ export function updateWeaponSocket(
   const target = followHandRotation
     ? getHandRotationInRootSpace(attachment, targetSocketRotation).multiply(attachment.rotationOffset)
     : attachment.stableRotation
-  const blend = 1 - Math.exp(-Math.min(delta, 0.05) * (followHandRotation ? 22 : 14))
+  const blend = 1 - Math.exp(-Math.min(delta, 0.1) * (followHandRotation ? 22 : 14))
   attachment.socket.quaternion.slerp(target, blend)
 }
 
