@@ -24,7 +24,7 @@ body,
 
 #root {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) 28px;
+  grid-template-rows: minmax(0, 1fr) 40px;
 }
 
 body {
@@ -63,12 +63,13 @@ button {
   gap: 9px;
   width: 100%;
   min-width: 0;
-  height: 28px;
+  height: 40px;
   margin: 0;
   padding: 0 14px;
-  color: rgba(255, 239, 216, 0.62);
-  font: 750 7px/1 ui-monospace, SFMono-Regular, Consolas, monospace;
-  letter-spacing: 0.14em;
+  overflow: hidden;
+  color: rgba(255, 239, 216, 0.72);
+  font: 750 9px/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+  letter-spacing: 0.12em;
   text-align: center;
   white-space: nowrap;
   pointer-events: none;
@@ -78,6 +79,8 @@ button {
     #080306;
   box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.2);
   text-shadow: 0 1px 8px #000;
+  isolation: isolate;
+  contain: layout paint;
 }
 
 .merbut-copyright i {
@@ -398,7 +401,7 @@ button {
 }
 
 .loading-screen {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 20;
   display: flex;
