@@ -42,19 +42,28 @@ export default function App() {
   }, [])
 
   return (
-    <main className={`game-shell${paused ? ' is-paused' : ''}`}>
-      <Background />
-      <GameScene />
-      <div className="scene-grade" aria-hidden="true" />
-      <SessionController />
-      <AudioDirector />
-      <GameInterface />
-      <LoadingScreen />
-      {debugEnabled ? (
-        <Suspense fallback={null}>
-          <DebugCalibrationPanel />
-        </Suspense>
-      ) : null}
-    </main>
+    <>
+      <main className={`game-shell${paused ? ' is-paused' : ''}`}>
+        <Background />
+        <GameScene />
+        <div className="scene-grade" aria-hidden="true" />
+        <SessionController />
+        <AudioDirector />
+        <GameInterface />
+        <LoadingScreen />
+        {debugEnabled ? (
+          <Suspense fallback={null}>
+            <DebugCalibrationPanel />
+          </Suspense>
+        ) : null}
+      </main>
+      <footer className="merbut-copyright" aria-label="Telif hakkı ve yapımcı bilgisi">
+        <span>© {new Date().getFullYear()} MERBUT</span>
+        <i aria-hidden="true" />
+        <span>TÜM HAKLARI SAKLIDIR</span>
+        <i aria-hidden="true" />
+        <span><strong>MeMoDe</strong> tarafından</span>
+      </footer>
+    </>
   )
 }

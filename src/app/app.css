@@ -22,6 +22,11 @@ body,
   overflow: hidden;
 }
 
+#root {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 28px;
+}
+
 body {
   min-width: 960px;
   min-height: 600px;
@@ -41,8 +46,52 @@ button {
 }
 
 .game-shell {
+  position: relative !important;
+  inset: auto;
+  min-height: 0;
+  overflow: hidden;
   isolation: isolate;
   background: #18050b;
+}
+
+.merbut-copyright {
+  position: relative;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  margin: 0;
+  padding: 0 14px;
+  color: rgba(255, 239, 216, 0.62);
+  font: 750 7px/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+  letter-spacing: 0.14em;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  border-top: 1px solid rgba(255, 220, 166, 0.14);
+  background:
+    linear-gradient(90deg, rgba(247, 198, 95, 0.025), transparent 28% 72%, rgba(255, 76, 135, 0.035)),
+    #080306;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 1px 8px #000;
+}
+
+.merbut-copyright i {
+  width: 3px;
+  height: 3px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--ali), var(--jack));
+  box-shadow: 0 0 7px rgba(255, 76, 135, 0.48);
+}
+
+.merbut-copyright strong {
+  color: rgba(255, 224, 168, 0.88);
+  font-weight: 900;
 }
 
 .scene-backdrop {
