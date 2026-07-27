@@ -7,6 +7,7 @@ import { MenuBattleStage, type MenuStageAction } from './MenuBattleStage'
 
 export function MainMenu() {
   const [showCharacters, setShowCharacters] = useState(false)
+  const [stageReady, setStageReady] = useState(false)
   const [transition, setTransition] = useState<MenuStageAction>('idle')
   const transitionTimer = useRef<number | null>(null)
   const showControls = useSessionStore((state) => state.showControls)
@@ -14,6 +15,10 @@ export function MainMenu() {
   const closeSettings = useAudioStore((state) => state.closePanel)
   useEffect(() => () => {
     if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current)
+  }, [])
+  useEffect(() => {
+    const timer = window.setTimeout(() => setStageReady(true), 1_250)
+    return () => window.clearTimeout(timer)
   }, [])
   if (showCharacters) return <CharacterGallery onClose={() => setShowCharacters(false)} />
 
@@ -34,7 +39,7 @@ export function MainMenu() {
   }
   return (
     <section className={`menu-screen menu-screen--battle is-${transition}`} aria-label="Ana menü">
-      <MenuBattleStage action={transition} />
+      {stageReady ? <MenuBattleStage action={transition} /> : <div className="menu-battle-stage menu-battle-stage--placeholder" aria-hidden="true" />}
       <div className="menu-screen__core">
         <h1>MERBUT</h1>
         <div className="menu-screen__actions">

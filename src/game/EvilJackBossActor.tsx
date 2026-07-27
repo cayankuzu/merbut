@@ -106,5 +106,3 @@ export function EvilJackBossActor({ id }: EvilJackBossActorProps) {
     </group>
   )
 }
-
-Object.values(ASSET_PATHS.bosses.evilJack).forEach((asset) => useGLTF.preload(asset))

@@ -71,7 +71,7 @@ export function RosterCharacterPreview3D({ preview, rotation, pan, zoom, label }
   const camera = getPreviewCamera(preview)
   return (
     <div className="roster-model" aria-label={`${label} döndürülebilir 3B modeli`}>
-      <Canvas dpr={[1, 1.4]} camera={{ position: [0, camera.height, camera.distance], fov: 34 }} gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}>
+      <Canvas dpr={[0.8, 1.1]} camera={{ position: [0, camera.height, camera.distance], fov: 34 }} gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}>
         <ambientLight intensity={1.5} />
         <directionalLight position={[4, 6, 4]} intensity={3.5} color="#fff0d6" />
         <pointLight position={[-3, 1.5, 2]} intensity={3} color="#ff3d73" />

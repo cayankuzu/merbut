@@ -45,7 +45,7 @@ export function CharacterPreview3D({ id, compact = false }: CharacterPreview3DPr
     <div className={`character-preview${compact ? ' character-preview--compact' : ''}`} aria-label={`${id === 'ali' ? 'Hz. Ali' : 'Samuray Jack'} dönen 3B figürü`}>
       <Canvas
         frameloop={paused ? 'never' : 'always'}
-        dpr={[1, 1.35]}
+        dpr={[0.75, 1]}
         camera={{ position: [0, compact ? 1.18 : 1.25, compact ? 5 : 5.25], fov: compact ? 32 : 34 }}
         gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}
       >

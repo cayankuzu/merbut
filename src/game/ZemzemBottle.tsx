@@ -24,5 +24,3 @@ export function ZemzemBottle({ id, x }: { id: string; x: number }) {
     </group>
   )
 }
-
-useGLTF.preload(ASSET_PATHS.items.zemzem)

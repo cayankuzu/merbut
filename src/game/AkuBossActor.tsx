@@ -192,6 +192,3 @@ export function AkuBossActor({ id }: AkuBossActorProps) {
     </group>
   )
 }
-
-Object.values(ASSET_PATHS.bosses.aku.normal).forEach((asset) => useGLTF.preload(asset))
-Object.values(ASSET_PATHS.bosses.aku.monster).forEach((asset) => useGLTF.preload(asset))

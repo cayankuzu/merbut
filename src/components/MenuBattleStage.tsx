@@ -61,19 +61,19 @@ const ENEMY_SHOWCASE: readonly EnemyShowcaseDefinition[] = [
   {
     id: 'aku-shadow', name: 'Aku’nun Gölgesi', row: 1, column: 0, rowCount: 3,
     base: ASSET_PATHS.bosses.evilJack.walk,
-    motions: [ASSET_PATHS.bosses.evilJack.slash, ASSET_PATHS.bosses.evilJack.doubleCombo, ASSET_PATHS.bosses.evilJack.tripleCombo],
+    motions: repeatMotion(ASSET_PATHS.bosses.evilJack.slash),
     modelScale: 2.35, displayScale: 1.16, accent: '#ff315f', effect: 'impact-boss',
   },
   {
     id: 'aku', name: 'Aku', row: 1, column: 1, rowCount: 3,
     base: ASSET_PATHS.bosses.aku.normal.walk,
-    motions: [ASSET_PATHS.bosses.aku.normal.attack, ASSET_PATHS.bosses.aku.normal.heavy, ASSET_PATHS.bosses.aku.normal.ranged],
+    motions: repeatMotion(ASSET_PATHS.bosses.aku.normal.attack),
     modelScale: 3.05, displayScale: 1.12, accent: '#75ff70', effect: 'projectile-aku-fire',
   },
   {
     id: 'aku-monster', name: 'Aku · Canavar', row: 1, column: 2, rowCount: 3,
     base: ASSET_PATHS.bosses.aku.monster.idle,
-    motions: [ASSET_PATHS.bosses.aku.monster.slash, ASSET_PATHS.bosses.aku.monster.bladeSpin, ASSET_PATHS.bosses.aku.monster.ranged],
+    motions: repeatMotion(ASSET_PATHS.bosses.aku.monster.slash),
     modelScale: 3.05, displayScale: 1.15, accent: '#ff244f', effect: 'impact-boss',
   },
 ] as const
@@ -86,11 +86,6 @@ function pickDifferentIndex(length: number, current: number) {
   if (length <= 1) return 0
   return (current + 1 + Math.floor(Math.random() * (length - 1))) % length
 }
-
-ENEMY_SHOWCASE.forEach((enemy) => {
-  useGLTF.preload(enemy.base)
-  enemy.motions.forEach((motion) => useGLTF.preload(motion))
-})
 
 type RootMotionAnchors = ReadonlyMap<string, readonly [number, number, number]>
 
@@ -355,7 +350,7 @@ export function MenuBattleStage({ action = 'idle', variant = 'menu' }: { action?
 
   return (
     <div className={`menu-battle-stage menu-battle-stage--${variant} is-${action}`} aria-label="Hz. Ali, Samuray Jack ve Aku lejyonu dikey sütunlarda savaş pozunda">
-      <Canvas orthographic dpr={[1, 1.35]} camera={{ position: [0, CAMERA_CENTER_Y, 14], rotation: [0, 0, 0], zoom: splash ? 75 : 94 }} gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}>
+      <Canvas orthographic dpr={[0.8, 1.1]} camera={{ position: [0, CAMERA_CENTER_Y, 14], rotation: [0, 0, 0], zoom: splash ? 75 : 94 }} gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}>
         <ambientLight intensity={splash ? 2.28 : 1.72} />
         <directionalLight position={[-4, 8, 8]} intensity={splash ? 5.4 : 4.2} color="#ffe0b0" />
         <pointLight position={[-5, 1, 4]} intensity={splash ? 10 : 7.5} color="#ffb541" distance={13} />

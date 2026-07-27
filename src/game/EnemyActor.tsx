@@ -96,8 +96,3 @@ export function EnemyActor({ id }: EnemyActorProps) {
     </group>
   )
 }
-
-for (let index = 1; index <= 5; index += 1) {
-  useGLTF.preload(`/assets/models/enemies/monster-${index}/walk.glb`)
-  useGLTF.preload(`/assets/models/enemies/monster-${index}/attack.glb`)
-}

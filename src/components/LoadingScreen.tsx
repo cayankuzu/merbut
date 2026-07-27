@@ -1,24 +1,38 @@
 import { useEffect, useState } from 'react'
-import { useProgress } from '@react-three/drei'
 import { MerbutMark } from './MerbutMark'
-import { MenuBattleStage } from './MenuBattleStage'
+
+const INTRO_DURATION_MS = 900
+const EXIT_DELAY_MS = 180
 
 export function LoadingScreen() {
-  const { active, progress, total, loaded } = useProgress()
+  const [progress, setProgress] = useState(0)
   const [finished, setFinished] = useState(false)
 
   useEffect(() => {
-    if (total === 0 || active || loaded < total) return
-    const timeout = window.setTimeout(() => setFinished(true), 1_200)
-    return () => window.clearTimeout(timeout)
-  }, [active, loaded, total])
+    const startedAt = performance.now()
+    let frame = 0
+    let exitTimer = 0
+    const update = (now: number) => {
+      const nextProgress = Math.min(100, Math.round(((now - startedAt) / INTRO_DURATION_MS) * 100))
+      setProgress(nextProgress)
+      if (nextProgress < 100) {
+        frame = window.requestAnimationFrame(update)
+        return
+      }
+      exitTimer = window.setTimeout(() => setFinished(true), EXIT_DELAY_MS)
+    }
+    frame = window.requestAnimationFrame(update)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      window.clearTimeout(exitTimer)
+    }
+  }, [])
 
   if (finished) return null
 
   const roundedProgress = Math.round(progress)
   return (
     <div className="loading-screen" role="status" aria-label={`Merbut yüzde ${roundedProgress} hazır`}>
-      <MenuBattleStage variant="splash" />
       <div className="loading-screen__frame" aria-hidden="true" />
       <div className="loading-screen__core">
         <p className="loading-screen__eyebrow"><i /> YEDİ DİYAR · TEK KADER <i /></p>

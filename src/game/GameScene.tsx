@@ -5,13 +5,14 @@ import { GameWorld } from './GameWorld'
 import { useSessionStore } from '../store/sessionStore'
 
 export function GameScene() {
-  const paused = useSessionStore((state) => state.phase === 'paused')
+  const phase = useSessionStore((state) => state.phase)
+  const active = phase === 'countdown' || phase === 'boss-intro' || phase === 'final-intro' || phase === 'playing' || phase === 'ending'
   return (
     <Canvas
       className="game-canvas"
       shadows
-      dpr={[1, 1.5]}
-      frameloop={paused ? 'demand' : 'always'}
+      dpr={[0.85, 1.25]}
+      frameloop={active ? 'always' : 'demand'}
       gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
       onCreated={({ gl }) => {
         gl.shadowMap.type = PCFShadowMap

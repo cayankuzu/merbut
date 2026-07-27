@@ -60,6 +60,7 @@ export function Background() {
               alt=""
               decoding="async"
               draggable={false}
+              loading={index < 2 ? 'eager' : 'lazy'}
             />
             <img
               className="scene-backdrop__image"
@@ -67,7 +68,8 @@ export function Background() {
               alt=""
               decoding="async"
               draggable={false}
-              fetchPriority={index < 2 ? 'high' : 'auto'}
+              fetchPriority={index < 2 ? 'high' : 'low'}
+              loading={index < 2 ? 'eager' : 'lazy'}
             />
           </div>
           )

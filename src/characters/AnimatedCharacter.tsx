@@ -90,12 +90,3 @@ export function AnimatedCharacter({ definition, animationState }: AnimatedCharac
     </group>
   )
 }
-
-for (const character of ['ali', 'jack'] as const) {
-  const base = `/assets/models/${character}`
-  useGLTF.preload(`${base}/${character}-idle.glb`)
-  useGLTF.preload(`${base}/${character}-walk.glb`)
-  useGLTF.preload(`${base}/${character}-jump.glb`)
-  useGLTF.preload(`${base}/${character}-attack.glb`)
-  useGLTF.preload(`${base}/${character}-sword.glb`)
-}

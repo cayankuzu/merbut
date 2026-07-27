@@ -12,7 +12,8 @@
     "test": "node ./node_modules/vitest/vitest.mjs run",
     "test:e2e": "node ./node_modules/@playwright/test/cli.js test",
     "preview": "node ./node_modules/vite/bin/vite.js preview",
-    "prepare:aku": "node scripts/prepare-aku-assets.mjs"
+    "prepare:aku": "node scripts/prepare-aku-assets.mjs",
+    "optimize:web-assets": "node scripts/optimize-web-assets.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
@@ -27,6 +28,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@gltf-transform/cli": "^4.4.2",
     "@playwright/test": "^1.62.0",
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",
