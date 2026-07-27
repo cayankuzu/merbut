@@ -22,6 +22,32 @@ interface CharacterControllerProps {
 const ATTACK_DURATION = 1.5333 / 1.25
 const FULL_TURN = Math.PI * 2
 
+function PlayerWorldHealth({ definition, visible }: { definition: CharacterDefinition; visible: boolean }) {
+  const dead = useSessionStore((state) => state.players[definition.id].dead)
+  const [vitals, setVitals] = useState(() => {
+    const player = useSessionStore.getState().players[definition.id]
+    return { health: player.health, maxHealth: player.maxHealth }
+  })
+  useEffect(() => {
+    if (!visible || dead) return
+    const update = () => {
+      const player = useSessionStore.getState().players[definition.id]
+      setVitals((current) => current.health === player.health && current.maxHealth === player.maxHealth
+        ? current
+        : { health: player.health, maxHealth: player.maxHealth })
+    }
+    update()
+    const timer = window.setInterval(update, 100)
+    return () => window.clearInterval(timer)
+  }, [dead, definition.id, visible])
+  if (!visible || dead) return null
+  return (
+    <group position={[0, 3.18, 0]}>
+      <WorldHealthBar label={definition.displayName} health={vitals.health} maxHealth={vitals.maxHealth} accent={definition.accent} player />
+    </group>
+  )
+}
+
 function nearestEquivalentAngle(target: number, current: number) {
   return current + MathUtils.euclideanModulo(target - current + Math.PI, FULL_TURN) - Math.PI
 }
@@ -49,13 +75,14 @@ export function CharacterController({ definition }: CharacterControllerProps) {
   const resetToken = useGameStore((state) => state.resetToken)
   const sessionToken = useSessionStore((state) => state.sessionToken)
   const phase = useSessionStore((state) => state.phase)
-  const playerStatus = useSessionStore((state) => state.players[definition.id])
   const showWorldHud = ['countdown', 'boss-intro', 'final-intro', 'playing', 'paused'].includes(phase)
   const prayerActive = useSessionStore((state) => (state.phase === 'final-intro' || state.phase === 'playing') && state.enemies.some((enemy) => enemy.bossType === 'aku' && enemy.animation !== 'dead'))
   const setPlayerPosition = useGameStore((state) => state.setPlayerPosition)
   const setPlayerRotation = useGameStore((state) => state.setPlayerRotation)
   const setPlayerAnimation = useGameStore((state) => state.setPlayerAnimation)
   const setTogetherWarning = useGameStore((state) => state.setTogetherWarning)
+  const teleportRequest = useGameStore((state) => state.teleports[definition.id])
+  const appliedTeleportToken = useRef(0)
   const [animationState, setAnimationState] = useState<AnimationState>('idle')
   const activeAnimation = useRef<AnimationState>('idle')
   const motion = useRef<MotionState>({
@@ -94,6 +121,21 @@ export function CharacterController({ definition }: CharacterControllerProps) {
     setPlayerRotation(definition.id, 0)
     keyboard.clear()
   }, [definition.id, definition.startPosition, groundHeight, keyboard, resetToken, sessionToken, setPlayerAnimation, setPlayerRotation])
+
+  useEffect(() => {
+    if (teleportRequest.token <= appliedTeleportToken.current) return
+    appliedTeleportToken.current = teleportRequest.token
+    const value = motion.current
+    value.x = teleportRequest.x
+    value.y = groundHeight
+    value.velocityX = 0
+    value.velocityY = 0
+    value.grounded = true
+    value.airJumpsRemaining = GAME_CONFIG.movement.airJumps
+    value.accumulator = 0
+    root.current?.position.set(teleportRequest.x, groundHeight, 0)
+    setPlayerPosition(definition.id, [teleportRequest.x, groundHeight, 0])
+  }, [definition.id, groundHeight, setPlayerPosition, teleportRequest])
 
   useFrame((_, frameDelta) => {
     const value = motion.current
@@ -285,17 +327,7 @@ export function CharacterController({ definition }: CharacterControllerProps) {
       <group ref={facingGroup}>
         <AnimatedCharacter definition={definition} animationState={animationState} />
       </group>
-      {!playerStatus.dead && showWorldHud ? (
-        <group position={[0, 3.18, 0]}>
-          <WorldHealthBar
-            label={definition.displayName}
-            health={playerStatus.health}
-            maxHealth={playerStatus.maxHealth}
-            accent={definition.accent}
-            player
-          />
-        </group>
-      ) : null}
+      <PlayerWorldHealth definition={definition} visible={showWorldHud} />
       <PrayerHalo active={prayerActive} id={definition.id} />
       <TimeFreezeAura id={definition.id} />
     </group>

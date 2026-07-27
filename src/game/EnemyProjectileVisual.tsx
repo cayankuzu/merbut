@@ -4,7 +4,6 @@ import { TimeSpiralDisc } from './TimeSpiralDisc'
 export function EnemyProjectileVisual({ kind, travelled = 0 }: { kind: EnemyProjectileState['kind']; travelled?: number }) {
   return (
     <>
-      <pointLight color={kind === 'stone' ? '#9dff9a' : kind === 'time-portal' ? '#fffdf5' : kind === 'aku-fire' ? '#ff9c32' : '#ff164f'} intensity={8} distance={5} />
       {kind === 'time-portal' ? (
         <group rotation={[0, 0, travelled * 1.8]}>
           <TimeSpiralDisc radius={0.68} opacity={0.98} speed={8.4} />

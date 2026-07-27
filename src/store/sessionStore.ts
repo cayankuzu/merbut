@@ -14,12 +14,14 @@ import type {
   MeteorState,
   PickupState,
   PlayerStatus,
+  PortalAlertState,
   ProjectileState,
 } from '../types/session'
 
 const ABILITY_DURATION = 6_000
 const ABILITY_MAX_CHARGE = 100
 const WORLD_START = -4.8
+const MAX_ACTIVE_IMPACTS = 28
 type PauseablePhase = 'countdown' | 'boss-intro' | 'final-intro' | 'playing' | 'ending'
 
 const createPlayer = (difficulty: Difficulty): PlayerStatus => {
@@ -60,6 +62,7 @@ interface SessionState {
   meteors: MeteorState[]
   pickups: PickupState[]
   feed: FeedItem[]
+  portalAlert: PortalAlertState | null
   spawnedWaves: string[]
   sessionToken: number
   pausedAt: number
@@ -97,6 +100,7 @@ interface SessionState {
   addPickup: (pickup: PickupState) => void
   collectPickup: (pickupId: string, playerId: CharacterId, now: number) => void
   addFeed: (text: string, tone: FeedItem['tone'], now: number) => void
+  showPortalAlert: (title: string, detail: string, now: number) => void
   startBossEncounter: (bossId: string, now: number) => void
   startFinalEncounter: (bossId: string, now: number) => void
   finishBossEncounter: (now: number) => void
@@ -123,6 +127,7 @@ function freshState(difficulty: Difficulty = 'normal') {
     meteors: [] as MeteorState[],
     pickups: [] as PickupState[],
     feed: [] as FeedItem[],
+    portalAlert: null as PortalAlertState | null,
     spawnedWaves: [] as string[],
     pausedAt: 0,
     bossPhase: 'none' as BossPhase,
@@ -156,6 +161,10 @@ function shiftPlayerTimers(player: PlayerStatus, delay: number): PlayerStatus {
 function recoverPlayer(player: PlayerStatus, amount: number): PlayerStatus {
   if (player.dead || amount <= 0 || player.health >= player.maxHealth) return player
   return { ...player, health: Math.min(player.maxHealth, player.health + amount) }
+}
+
+function appendImpact(impacts: CombatImpactState[], impact: CombatImpactState) {
+  return [...impacts.slice(-(MAX_ACTIVE_IMPACTS - 1)), impact]
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -194,6 +203,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         specialStartedAt: shift(enemy.specialStartedAt), specialUntil: shift(enemy.specialUntil), nextSpecialAt: shift(enemy.nextSpecialAt), nextAuraAt: shift(enemy.nextAuraAt),
       })),
       feed: state.feed.map((item) => ({ ...item, expiresAt: shift(item.expiresAt) })),
+      portalAlert: state.portalAlert ? { ...state.portalAlert, expiresAt: shift(state.portalAlert.expiresAt) } : null,
       impacts: state.impacts.map((impact) => ({ ...impact, createdAt: shift(impact.createdAt) })),
       meteors: state.meteors.map((meteor) => ({ ...meteor, createdAt: shift(meteor.createdAt), impactAt: shift(meteor.impactAt), landedAt: shift(meteor.landedAt) })),
     }
@@ -314,6 +324,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       feed: state.feed.some((item) => item.expiresAt <= now) ? state.feed.filter((item) => item.expiresAt > now) : state.feed,
       impacts: state.impacts.some((impact) => now - impact.createdAt >= impact.duration) ? state.impacts.filter((impact) => now - impact.createdAt < impact.duration) : state.impacts,
       meteors: state.meteors.some((meteor) => meteor.landedAt > 0 && now - meteor.landedAt > 800) ? state.meteors.filter((meteor) => meteor.landedAt === 0 || now - meteor.landedAt <= 800) : state.meteors,
+      portalAlert: state.portalAlert && state.portalAlert.expiresAt <= now ? null : state.portalAlert,
     }
   }),
   setCurrentBiome: (currentBiome, lockedRight, now = performance.now()) => set((state) => {
@@ -381,7 +392,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         id: nextId('impact'), kind: impactForEnemy(targetBefore), x: targetBefore.x, y: targetBefore.boss ? 1.45 : 1.05,
         createdAt: now, duration: killed ? 900 : 620, lethal: killed,
       }
-      return { enemies, players, feed, impacts: [...state.impacts, impact] }
+      return { enemies, players, feed, impacts: appendImpact(state.impacts, impact) }
     })
     return killed
   },
@@ -449,12 +460,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }))
     return true
   },
-  updateProjectiles: (projectiles) => set({ projectiles }),
-  updateEnemyProjectiles: (enemyProjectiles) => set({ enemyProjectiles }),
+  updateProjectiles: (projectiles) => set((state) => state.projectiles.length === 0 && projectiles.length === 0 ? state : { projectiles }),
+  updateEnemyProjectiles: (enemyProjectiles) => set((state) => state.enemyProjectiles.length === 0 && enemyProjectiles.length === 0 ? state : { enemyProjectiles }),
   addEnemyProjectile: (projectile) => set((state) => ({ enemyProjectiles: [...state.enemyProjectiles, projectile] })),
-  addImpact: (impact) => set((state) => ({ impacts: [...state.impacts, { ...impact, id: nextId('impact') }] })),
+  addImpact: (impact) => set((state) => ({ impacts: appendImpact(state.impacts, { ...impact, id: nextId('impact') }) })),
   addMeteors: (meteors) => set((state) => ({ meteors: [...state.meteors, ...meteors] })),
-  updateMeteors: (meteors) => set({ meteors }),
+  updateMeteors: (meteors) => set((state) => state.meteors.length === 0 && meteors.length === 0 ? state : { meteors }),
   addPickup: (pickup) => set((state) => ({ pickups: [...state.pickups, pickup] })),
   collectPickup: (pickupId, playerId, now) => set((state) => {
     const pickup = state.pickups.find((candidate) => candidate.id === pickupId)
@@ -470,11 +481,15 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         healOverTime: Math.min(rules.healAmount * 2, player.healOverTime + rules.healAmount),
         abilityCharge: Math.min(ABILITY_MAX_CHARGE, player.abilityCharge + 12 * rules.chargeGain),
       } },
-      impacts: [...state.impacts, { id: nextId('impact'), kind: 'holy', x: pickup.x, y: 1.15, createdAt: now, duration: 1_250, lethal: false }],
+      impacts: appendImpact(state.impacts, { id: nextId('impact'), kind: 'holy', x: pickup.x, y: 1.15, createdAt: now, duration: 1_250, lethal: false }),
       feed: [...state.feed, { id: nextId('feed'), text: `${name} Zemzem suyu içti — iyileşme başladı`, tone: 'pickup' as const, expiresAt: now + 5_000 }],
     }
   }),
   addFeed: (text, tone, now) => set((state) => ({ feed: [...state.feed, { id: nextId('feed'), text, tone, expiresAt: now + 4_500 }] })),
+  showPortalAlert: (title, detail, now) => set((state) => ({
+    portalAlert: { title, detail, expiresAt: now + 4_200 },
+    feed: [...state.feed, { id: nextId('feed'), text: `${title} — ${detail}`, tone: 'system' as const, expiresAt: now + 5_200 }],
+  })),
   startBossEncounter: (bossId, now) => set((state) => state.activeBossId ? state : {
     phase: 'boss-intro', bossPhase: 'offering', bossPhaseStartedAt: now, bossCountdown: 3, activeBossId: bossId,
     enemies: state.enemies.filter((enemy) => enemy.id === bossId || enemy.animation === 'dead'),

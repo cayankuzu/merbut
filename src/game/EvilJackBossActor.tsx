@@ -3,6 +3,7 @@ import { useAnimations, useGLTF } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { Group, LoopOnce, LoopRepeat, MathUtils, Object3D } from 'three'
 import { SkeletonUtils } from 'three-stdlib'
+import { useShallow } from 'zustand/react/shallow'
 import { prepareAnimationClip } from '../animation/animationLoader'
 import { validateClipTargets } from '../animation/animationRetargeting'
 import { ASSET_PATHS } from '../config/assetPaths'
@@ -23,7 +24,11 @@ function enableShadows(root: Object3D) {
 }
 
 export function EvilJackBossActor({ id }: EvilJackBossActorProps) {
-  const enemy = useSessionStore((state) => state.enemies.find((candidate) => candidate.id === id))
+  const enemy = useSessionStore(useShallow((state) => {
+    const current = state.enemies.find((candidate) => candidate.id === id)
+    return current ? { animation: current.animation, special: current.special, title: current.title } : null
+  }))
+  const initialX = useMemo(() => useSessionStore.getState().enemies.find((candidate) => candidate.id === id)?.x ?? 0, [id])
   const bossPhase = useSessionStore((state) => state.bossPhase)
   const assets = ASSET_PATHS.bosses.evilJack
   const walkFile = useGLTF(assets.walk)
@@ -101,7 +106,7 @@ export function EvilJackBossActor({ id }: EvilJackBossActorProps) {
 
   if (!enemy) return null
   return (
-    <group ref={root} position={[enemy.x, 0, 0]} name={enemy.title}>
+    <group ref={root} position={[initialX, 0, 0]} name={enemy.title}>
       <group ref={modelRoot} scale={0}><primitive object={scene} /></group>
     </group>
   )

@@ -3,6 +3,7 @@ import { useAnimations, useGLTF } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { Group, LoopOnce, LoopRepeat, MathUtils, Object3D } from 'three'
 import { SkeletonUtils } from 'three-stdlib'
+import { useShallow } from 'zustand/react/shallow'
 import { prepareAnimationClip } from '../animation/animationLoader'
 import { validateClipTargets } from '../animation/animationRetargeting'
 import { ENEMIES } from '../config/enemies'
@@ -24,7 +25,14 @@ function enableEnemyShadows(root: Object3D) {
 }
 
 export function EnemyActor({ id }: EnemyActorProps) {
-  const enemy = useSessionStore((state) => state.enemies.find((candidate) => candidate.id === id))
+  const enemy = useSessionStore(useShallow((state) => {
+    const current = state.enemies.find((candidate) => candidate.id === id)
+    return current ? {
+      kind: current.kind, title: current.title, animation: current.animation, scale: current.scale,
+      health: current.health, maxHealth: current.maxHealth, accent: current.accent, boss: current.boss,
+    } : null
+  }))
+  const initialX = useMemo(() => useSessionStore.getState().enemies.find((candidate) => candidate.id === id)?.x ?? 0, [id])
   const root = useRef<Group>(null)
   const modelRoot = useRef<Group>(null)
   const definition = ENEMIES[enemy?.kind ?? 1]
@@ -84,7 +92,7 @@ export function EnemyActor({ id }: EnemyActorProps) {
 
   if (!enemy) return null
   return (
-    <group ref={root} position={[enemy.x, 0, 0]} name={enemy.title}>
+    <group ref={root} position={[initialX, 0, 0]} name={enemy.title}>
       <group ref={modelRoot} scale={enemy.scale}>
         <primitive object={scene} />
       </group>

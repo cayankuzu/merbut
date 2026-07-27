@@ -1,11 +1,24 @@
+import { useRef } from 'react'
+import { useFrame } from '@react-three/fiber'
+import { Group } from 'three'
+import { useShallow } from 'zustand/react/shallow'
 import { useSessionStore } from '../store/sessionStore'
 import { EnemyProjectileVisual } from './EnemyProjectileVisual'
 
+function EnemyProjectileActor({ id }: { id: string }) {
+  const root = useRef<Group>(null)
+  const initial = useSessionStore.getState().enemyProjectiles.find((projectile) => projectile.id === id)
+  useFrame(() => {
+    const projectile = useSessionStore.getState().enemyProjectiles.find((candidate) => candidate.id === id)
+    if (!root.current || !projectile) return
+    root.current.position.set(projectile.x, projectile.y, 0)
+    root.current.rotation.z = projectile.travelled * (projectile.kind === 'time-portal' ? 1.8 : 0.7)
+  })
+  if (!initial) return null
+  return <group ref={root} position={[initial.x, initial.y, 0]}><EnemyProjectileVisual kind={initial.kind} /></group>
+}
+
 export function EnemyProjectileEffects() {
-  const projectiles = useSessionStore((state) => state.enemyProjectiles)
-  return <>{projectiles.map((projectile) => (
-    <group key={projectile.id} position={[projectile.x, projectile.y, 0]}>
-      <EnemyProjectileVisual kind={projectile.kind} travelled={projectile.travelled} />
-    </group>
-  ))}</>
+  const projectileIds = useSessionStore(useShallow((state) => state.enemyProjectiles.map((projectile) => projectile.id)))
+  return <>{projectileIds.map((id) => <EnemyProjectileActor id={id} key={id} />)}</>
 }

@@ -15,7 +15,6 @@ export function ZemzemBottle({ id, x }: { id: string; x: number }) {
   })
   return (
     <group ref={root} position={[x, 0.58, 0]} name={id}>
-      <pointLight color="#77f8ff" intensity={4} distance={3.2} />
       <primitive object={scene} scale={0.38} />
       <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, -0.46, 0]}>
         <torusGeometry args={[0.46, 0.035, 8, 32]} />

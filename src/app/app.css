@@ -1081,6 +1081,14 @@ button {
 .combat-flow .is-kill { color:#ffbd9f; }.combat-flow .is-pickup { color:#a9fff3; }.combat-flow .is-damage { color:#ff9aaf; }.combat-flow .is-system { color:#f6df9b; }
 .kill-feed,.event-log { display:none; }
 
+.portal-alert { position:absolute; z-index:18; top:24%; left:50%; display:grid; min-width:min(480px,74vw); place-items:center; padding:18px 28px 17px; pointer-events:none; color:#fff; border:1px solid rgba(132,239,255,.58); transform:translateX(-50%); background:radial-gradient(circle at 50% 0,rgba(92,46,255,.44),rgba(8,2,16,.92) 72%); box-shadow:0 0 0 1px rgba(255,255,255,.07) inset,0 0 52px rgba(80,84,255,.35),0 18px 60px rgba(0,0,0,.6); animation:portal-alert-enter .32s cubic-bezier(.2,.8,.2,1) both; }
+.portal-alert::before,.portal-alert::after { position:absolute; top:50%; width:74px; height:2px; content:''; background:linear-gradient(90deg,transparent,#8eeeff); box-shadow:0 0 13px #6268ff; }
+.portal-alert::before { right:100%; }.portal-alert::after { left:100%; transform:scaleX(-1); }
+.portal-alert small { color:#8eeeff; font:900 9px/1 ui-monospace,monospace; letter-spacing:.24em; }
+.portal-alert strong { margin:7px 0 5px; color:#fff9e8; font:italic 900 clamp(24px,3vw,42px)/1 'Arial Narrow',sans-serif; letter-spacing:.04em; text-shadow:0 0 18px rgba(116,178,255,.7); }
+.portal-alert span { color:rgba(237,244,255,.82); font-size:12px; font-weight:700; letter-spacing:.04em; }
+@keyframes portal-alert-enter { from { opacity:0; transform:translateX(-50%) scale(.8); filter:blur(8px); } to { opacity:1; transform:translateX(-50%) scale(1); filter:none; } }
+
 .enemy-roster { top:112px; left:22px; width:310px; padding:15px 16px 14px; border:1px solid rgba(255,120,83,.2); border-left:4px solid rgba(255,91,67,.72); background:linear-gradient(110deg,rgba(10,2,5,.92),rgba(22,6,9,.66)); box-shadow:0 16px 46px rgba(0,0,0,.28); }
 .enemy-roster > header { display:flex; align-items:center; justify-content:space-between; margin-bottom:11px; padding-bottom:10px; border-bottom:1px solid rgba(255,255,255,.1); }
 .enemy-roster > header small { margin:0; color:rgba(255,224,199,.62); font-size:9px; font-weight:900; letter-spacing:.19em; }

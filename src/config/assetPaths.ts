@@ -41,6 +41,7 @@ export const ASSET_PATHS = {
     },
     aku: {
       normal: {
+        mini: '/assets/models/bosses/aku/normal/mini.glb',
         walk: '/assets/models/bosses/aku/normal/walk.glb', run: '/assets/models/bosses/aku/normal/run.glb',
         attack: '/assets/models/bosses/aku/normal/attack.glb', heavy: '/assets/models/bosses/aku/normal/heavy.glb',
         kick: '/assets/models/bosses/aku/normal/kick.glb', triple: '/assets/models/bosses/aku/normal/triple.glb',

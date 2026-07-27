@@ -24,7 +24,6 @@ export function TimeFreezeAura({ id }: TimeFreezeAuraProps) {
 
   return (
     <group ref={root} visible={false} position={[0, 1.35, 0.72]} name={`${id}-zaman-donmasi`}>
-      <pointLight color="#f7f7ff" intensity={6} distance={4} />
       <TimeSpiralDisc radius={0.82} opacity={0.92} speed={7.2} />
       <mesh position={[0, 0, -0.035]}><torusGeometry args={[0.9, 0.055, 8, 64]} /><meshBasicMaterial color="#70eaff" toneMapped={false} /></mesh>
     </group>

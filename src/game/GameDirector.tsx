@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { BIOMES, WORLD_VISUAL_LEFT, WORLD_VISUAL_RIGHT } from '../config/biomes'
+import { BIOMES, BIOME_WORLD_WIDTH, WORLD_VISUAL_LEFT, WORLD_VISUAL_RIGHT } from '../config/biomes'
 import { DIFFICULTIES } from '../config/difficulty'
 import { BOSS_DEFINITIONS, ENEMIES, ENEMY_NAMES, type EnemyKind } from '../config/enemies'
 import { expandWaveSpawns, shouldTriggerWave, WAVES, type WaveDefinition } from '../config/waves'
@@ -10,6 +10,8 @@ import { useGameStore } from '../store/gameStore'
 import { useSessionStore } from '../store/sessionStore'
 import type { CharacterId } from '../types/character'
 import type { EnemyProjectileState, EnemySpecial, EnemyState, ImpactKind, MeteorState, ProjectileState } from '../types/session'
+import { isActiveAkuFight } from './akuCombat'
+import { getMiniAkuMotion, MINI_AKU_ATTACK_TIMES } from './akuMiniSwarm'
 
 const COMBAT_STEP = 1 / 30
 const MELEE_RANGE = { ali: 2.35, jack: 2.25 } as const
@@ -216,7 +218,9 @@ function runShadowBoss(enemy: EnemyState, now: number, positions: ReturnType<typ
 }
 
 function addAkuProjectile(enemy: EnemyState, kind: EnemyProjectileState['kind'], targetX: number) {
-  useSessionStore.getState().addEnemyProjectile({
+  const session = useSessionStore.getState()
+  if (kind === 'time-portal' && !isActiveAkuFight(session, enemy)) return
+  session.addEnemyProjectile({
     id: `aku-shot-${++projectileSequence}`,
     kind,
     sourceId: enemy.id,
@@ -226,6 +230,19 @@ function addAkuProjectile(enemy: EnemyState, kind: EnemyProjectileState['kind'],
     damage: Math.round(enemy.damage * (kind === 'time-portal' ? 0.88 : 0.72)),
     travelled: 0,
   })
+}
+
+function teleportPlayersThroughAkuPortal(now: number) {
+  const session = useSessionStore.getState()
+  const game = useGameStore.getState()
+  const midpoint = (game.positions.ali[0] + game.positions.jack[0]) / 2
+  const currentWorldBiome = Math.max(0, Math.min(BIOMES.length - 1, Math.floor((midpoint - WORLD_VISUAL_LEFT) / BIOME_WORLD_WIDTH)))
+  const destinations = BIOMES.map((_, index) => index).filter((index) => index !== currentWorldBiome)
+  const destination = destinations[Math.floor(Math.random() * destinations.length)] ?? 0
+  const destinationX = WORLD_VISUAL_LEFT + destination * BIOME_WORLD_WIDTH + BIOME_WORLD_WIDTH * 0.5
+  game.teleportPlayer('ali', destinationX - 1.05)
+  game.teleportPlayer('jack', destinationX + 1.05)
+  session.showPortalAlert('ZAMAN YARILDI', `${BIOMES[destination].title} biyomuna savruldunuz`, now)
 }
 
 function chooseAkuSpecial(form: EnemyState['bossForm']): EnemySpecial {
@@ -244,8 +261,24 @@ function hitAkuArea(enemy: EnemyState, positions: ReturnType<typeof useGameStore
   session.addImpact({ kind: enemy.special === 'aku-time-portal' ? 'portal' : 'boss', x: enemy.x, y: 1.1, createdAt: now, duration: 820, lethal: false })
 }
 
+function hitMiniAku(enemy: EnemyState, index: number, positions: ReturnType<typeof useGameStore.getState>['positions'], now: number) {
+  const session = useSessionStore.getState()
+  const preferred: CharacterId = index % 2 === 0 ? 'ali' : 'jack'
+  const targetId = session.players[preferred].dead ? nearestLivingPlayer(enemy.x) : preferred
+  if (!targetId) return
+  const motion = getMiniAkuMotion(index, MINI_AKU_ATTACK_TIMES[index]!, enemy.x, positions[targetId][0])
+  const shieldActive = session.players.jack.abilityActiveUntil > now && !session.players.jack.dead
+  for (const id of livingPlayers()) {
+    if (Math.abs(positions[id][0] - motion.x) <= 1.65 && positions[id][1] <= 1.05 && !isShielded(id, positions, shieldActive)) {
+      session.damagePlayer(id, Math.round(enemy.damage * 0.34), now)
+    }
+  }
+  session.addImpact({ kind: 'boss', x: motion.x, y: 0.72, createdAt: now, duration: 680, lethal: false })
+}
+
 function runAkuBoss(enemy: EnemyState, now: number, positions: ReturnType<typeof useGameStore.getState>['positions']) {
   const session = useSessionStore.getState()
+  if (!isActiveAkuFight(session, enemy)) return enemy
   const ratio = enemy.maxHealth > 0 ? enemy.health / enemy.maxHealth : 0
   const nextForm = enemy.bossForm === 'normal' && ratio <= 0.46
     ? 'monster'
@@ -257,7 +290,6 @@ function runAkuBoss(enemy: EnemyState, now: number, positions: ReturnType<typeof
     session.addImpact({ kind: 'portal', x: enemy.x, y: 1.4, createdAt: now, duration: 1_300, lethal: false })
     return { ...enemy, bossForm: nextForm, mimicKind: null, special: 'none' as const, specialHitMask: 0, nextSpecialAt: now + 900, animation: 'walk' as const }
   }
-  if (session.bossPhase !== 'fight') return enemy
   const rules = DIFFICULTIES[session.difficulty]
   if (enemy.special === 'none') {
     if (now < enemy.nextSpecialAt) return null
@@ -299,10 +331,13 @@ function runAkuBoss(enemy: EnemyState, now: number, positions: ReturnType<typeof
     trigger(0, 760, () => addAkuProjectile(enemy, 'aku-fire', targetX))
     if (enemy.bossForm === 'monster') trigger(1, 1_520, () => addAkuProjectile(enemy, 'aku-fire', targetX + randomBetween(-1.6, 1.6)))
   } else if (enemy.special === 'aku-time-portal') {
-    trigger(0, 1_020, () => addAkuProjectile(enemy, 'time-portal', targetX))
+    trigger(0, 1_020, () => {
+      session.showPortalAlert('ZAMAN PORTALI AÇILDI', 'Temastan kaçın — Aku sizi başka bir biyoma savurabilir', now)
+      addAkuProjectile(enemy, 'time-portal', targetX)
+    })
     if (enemy.bossForm === 'monster') trigger(1, 1_880, () => addAkuProjectile(enemy, 'time-portal', targetX + randomBetween(-2, 2)))
   } else if (enemy.special === 'aku-split') {
-    ;[650, 1_400, 2_200, 3_050].forEach((threshold, index) => trigger(index, threshold, () => hitAkuArea(enemy, positions, now, 5.6, 0.42)))
+    MINI_AKU_ATTACK_TIMES.forEach((threshold, index) => trigger(index, threshold, () => hitMiniAku(enemy, index, positions, now)))
   } else if (enemy.special === 'aku-spin' || enemy.special === 'combo-triple') {
     ;[520, 1_080, 1_680, 2_320].forEach((threshold, index) => trigger(index, threshold, () => hitAkuArea(enemy, positions, now, 3.25, 0.48)))
   } else if (enemy.special === 'aku-shapeshift') {
@@ -460,6 +495,11 @@ export function GameDirector() {
 
     const enemyShots: EnemyProjectileState[] = []
     for (const shot of useSessionStore.getState().enemyProjectiles) {
+      if (shot.kind === 'time-portal') {
+        const liveSession = useSessionStore.getState()
+        const source = liveSession.enemies.find((enemy) => enemy.id === shot.sourceId)
+        if (!isActiveAkuFight(liveSession, source)) continue
+      }
       const direction = shot.targetX >= shot.x ? 1 : -1
       const speed = shot.kind === 'stone' ? 7.6 : shot.kind === 'time-portal' ? 6.2 : shot.kind === 'aku-fire' ? 8.8 : 9.3
       const travel = speed * step
@@ -473,7 +513,10 @@ export function GameDirector() {
         const targetFeetY = targetId ? currentGame.positions[targetId][1] : 0
         const intersectsPlayerHeight = shot.y >= targetFeetY + 0.15 && shot.y <= targetFeetY + 2.25
         if (targetId && intersectsPlayerHeight && Math.abs(currentGame.positions[targetId][0] - moved.x) < 1.25) {
-          if (shot.kind === 'time-portal') current.freezePlayer(targetId, now)
+          if (shot.kind === 'time-portal') {
+            current.freezePlayer(targetId, now)
+            teleportPlayersThroughAkuPortal(now)
+          }
           current.damagePlayer(targetId, shot.damage, now)
         }
         current.addImpact({ kind: shot.kind === 'stone' ? 'stone' : shot.kind === 'time-portal' ? 'portal' : shot.kind === 'aku-fire' ? 'ember' : 'void', x: moved.x, y: shot.kind === 'time-portal' ? 0.08 : 0.45, createdAt: now, duration: shot.kind === 'time-portal' ? 1_350 : 900, lethal: false })

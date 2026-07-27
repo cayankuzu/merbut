@@ -92,6 +92,27 @@ describe('session store', () => {
     now.mockRestore()
   })
 
+  it('shows portal travel information and clears it after the alert window', () => {
+    const session = useSessionStore.getState()
+    session.showPortalAlert('ZAMAN YARILDI', 'Yeşim Harabeleri biyomuna savruldunuz', 12_000)
+    expect(useSessionStore.getState().portalAlert).toMatchObject({
+      title: 'ZAMAN YARILDI',
+      detail: 'Yeşim Harabeleri biyomuna savruldunuz',
+      expiresAt: 16_200,
+    })
+    session.tick(0.1, 16_201)
+    expect(useSessionStore.getState().portalAlert).toBeNull()
+  })
+
+  it('caps simultaneous combat impacts during chained attacks', () => {
+    const session = useSessionStore.getState()
+    for (let index = 0; index < 60; index += 1) {
+      session.addImpact({ kind: 'ember', x: index, y: 1, createdAt: 10_000, duration: 2_000, lethal: false })
+    }
+    expect(useSessionStore.getState().impacts).toHaveLength(28)
+    expect(useSessionStore.getState().impacts.at(-1)?.x).toBe(59)
+  })
+
   it('applies final prayer lifesteal and time-based regeneration to both sides', () => {
     const session = useSessionStore.getState()
     session.spawnEnemies([aku()])

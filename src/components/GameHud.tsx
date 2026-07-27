@@ -1,3 +1,4 @@
+import { memo, useEffect, useReducer } from 'react'
 import { BIOMES } from '../config/biomes'
 import { DIFFICULTIES } from '../config/difficulty'
 import type { CharacterId } from '../types/character'
@@ -5,6 +6,8 @@ import type { PlayerStatus } from '../types/session'
 import { useGameStore } from '../store/gameStore'
 import { useSessionStore } from '../store/sessionStore'
 import { CharacterPreview3D } from './CharacterPreview3D'
+
+const HudCharacterPreview = memo(CharacterPreview3D)
 
 function formatTime(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60)
@@ -22,7 +25,7 @@ function PlayerHud({ id, player, prayerActive, now }: { id: CharacterId; player:
   const skill = isAli ? 'ALEV PENCERESİ' : 'KORUYUCU KALKAN'
   return (
     <article className={`player-hud player-hud--${id}${player.dead ? ' is-dead' : ''}${prayerActive ? ' is-prayer-active' : ''}${frozen ? ' is-time-frozen' : ''}`} aria-label={`${isAli ? 'Hz. Ali' : 'Samuray Jack'} savaş bilgisi`}>
-      <CharacterPreview3D id={id} compact />
+      <HudCharacterPreview id={id} compact />
       <div className="player-hud__data">
         <header><div><small>{player.dead ? 'DÜŞTÜ' : frozen ? 'ZAMAN DONMASI' : 'KAHRAMAN'}</small><h2>{isAli ? 'Hz. Ali' : 'Samuray Jack'}</h2></div><b>{Math.ceil(player.health)}<em>/{player.maxHealth}</em></b></header>
         <div className="player-hud__health" aria-label={`Can yüzde ${Math.round(health)}`}><i style={{ width: `${health}%` }} /></div>
@@ -35,18 +38,20 @@ function PlayerHud({ id, player, prayerActive, now }: { id: CharacterId; player:
 
 export function GameHud() {
   const phase = useSessionStore((state) => state.phase)
-  const elapsed = useSessionStore((state) => state.elapsedSeconds)
-  const biome = useSessionStore((state) => state.currentBiome)
-  const biomeBannerUntil = useSessionStore((state) => state.biomeBannerUntil)
-  const difficulty = useSessionStore((state) => state.difficulty)
-  const players = useSessionStore((state) => state.players)
-  const allEnemies = useSessionStore((state) => state.enemies)
-  const spawnedWaves = useSessionStore((state) => state.spawnedWaves)
-  const feed = useSessionStore((state) => state.feed)
+  const portalAlert = useSessionStore((state) => state.portalAlert)
   const togetherWarning = useGameStore((state) => state.togetherWarning)
-  if (!['countdown', 'boss-intro', 'final-intro', 'playing', 'paused'].includes(phase)) return null
+  const [, refresh] = useReducer((value: number) => value + 1, 0)
+  const visible = ['countdown', 'boss-intro', 'final-intro', 'playing', 'paused'].includes(phase)
+  useEffect(() => {
+    if (!visible) return
+    const timer = window.setInterval(refresh, 100)
+    return () => window.clearInterval(timer)
+  }, [visible])
+  if (!visible) return null
 
   const now = performance.now()
+  const session = useSessionStore.getState()
+  const { elapsedSeconds: elapsed, currentBiome: biome, biomeBannerUntil, difficulty, players, enemies: allEnemies, spawnedWaves, feed } = session
   const enemies = allEnemies.filter((enemy) => enemy.animation !== 'dead')
   const biomeEnemies = enemies.filter((enemy) => enemy.biome === biome && !enemy.boss)
   const visibleEnemies = biomeEnemies.slice(0, 7)
@@ -66,6 +71,7 @@ export function GameHud() {
       {biomeBannerUntil > now ? <div className="biome-banner" role="status"><small>YENİ BİYOM</small><strong>{BIOMES[biome].title}</strong><i /></div> : null}
       {boss ? <div className={`boss-hud${boss.bossType === 'aku' ? ' boss-hud--aku' : ''}`}><small>{boss.bossType === 'aku' ? `FINAL BOSS · ${boss.bossForm === 'monster' ? 'CANAVAR FORMU' : 'NORMAL FORM'}` : 'BOSS · AKU’NUN GÖLGESİ'}</small><strong>{boss.title}</strong><i><b style={{ width: `${boss.health / boss.maxHealth * 100}%`, background: boss.bossForm === 'monster' ? '#b7ff45' : boss.accent }} /></i><span>{Math.ceil(boss.health)} / {boss.maxHealth}{boss.bossType === 'aku' ? ' · CAN YENİLENİYOR' : ''}</span></div> : null}
       {prayerActive ? <div className="prayer-status" role="status"><i /> DUA KUDRETİ · VURUŞLA VE ZAMANLA CAN YENİLEME</div> : null}
+      {portalAlert && portalAlert.expiresAt > now ? <div className="portal-alert" role="alert"><small>AKU · ZAMAN KIRILMASI</small><strong>{portalAlert.title}</strong><span>{portalAlert.detail}</span></div> : null}
       <div className={`together-warning${togetherWarning ? ' is-visible' : ''}`} role="alert"><span /> Birlikte kalın</div>
 
       <aside className="score-stack" aria-label="Skorlar">

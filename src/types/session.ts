@@ -116,6 +116,12 @@ export interface FeedItem {
   expiresAt: number
 }
 
+export interface PortalAlertState {
+  title: string
+  detail: string
+  expiresAt: number
+}
+
 export interface SessionSnapshot {
   difficulty: Difficulty
   bossPhase: BossPhase

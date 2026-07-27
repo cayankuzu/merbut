@@ -1,17 +1,18 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useAnimations, useGLTF } from '@react-three/drei'
-import { useFrame } from '@react-three/fiber'
-import { AdditiveBlending, Group, LoopOnce, LoopRepeat, MathUtils, Object3D } from 'three'
+import { useFrame, useThree } from '@react-three/fiber'
+import { AdditiveBlending, AnimationMixer, Group, LoopOnce, LoopRepeat, MathUtils, Object3D } from 'three'
 import { SkeletonUtils } from 'three-stdlib'
+import { useShallow } from 'zustand/react/shallow'
 import { prepareAnimationClip } from '../animation/animationLoader'
 import { validateClipTargets } from '../animation/animationRetargeting'
 import { ASSET_PATHS } from '../config/assetPaths'
 import { ENEMIES, type EnemyKind } from '../config/enemies'
+import { useGameStore } from '../store/gameStore'
 import { useSessionStore } from '../store/sessionStore'
+import { getMiniAkuMotion, MINI_AKU_OFFSETS } from './akuMiniSwarm'
 
 interface AkuBossActorProps { id: string }
-
-const MINI_OFFSETS = [-4.2, -2.7, -1.35, 1.35, 2.7, 4.2] as const
 
 function enableShadows(root: Object3D) {
   root.traverse((node) => {
@@ -21,6 +22,62 @@ function enableShadows(root: Object3D) {
       mesh.receiveShadow = true
     }
   })
+}
+
+function optimizeMiniAku(root: Object3D) {
+  root.traverse((node) => {
+    if ('isMesh' in node && node.isMesh) {
+      const mesh = node as Object3D & { castShadow: boolean; receiveShadow: boolean; frustumCulled: boolean }
+      mesh.castShadow = false
+      mesh.receiveShadow = false
+      mesh.frustumCulled = true
+    }
+  })
+}
+
+function MiniAkuModel({ bossId, index }: { bossId: string; index: number }) {
+  const assets = ASSET_PATHS.bosses.aku.normal
+  const runFile = useGLTF(assets.mini)
+  const attackFile = useGLTF(assets.attack)
+  const scene = useMemo(() => SkeletonUtils.clone(runFile.scene), [runFile.scene])
+  const clips = useMemo(() => [
+    validateClipTargets(scene, prepareAnimationClip(runFile.animations[0], 'run')),
+    validateClipTargets(scene, prepareAnimationClip(attackFile.animations[0], 'attack')),
+  ], [attackFile.animations, runFile.animations, scene])
+  const mixer = useMemo(() => new AnimationMixer(scene), [scene])
+  const actions = useMemo(() => ({
+    run: mixer.clipAction(clips[0]!),
+    attack: mixer.clipAction(clips[1]!),
+  }), [clips, mixer])
+  const active = useRef<'run' | 'attack'>('run')
+  const animationAccumulator = useRef(0)
+
+  useLayoutEffect(() => optimizeMiniAku(scene), [scene])
+  useEffect(() => {
+    actions.run?.reset().setLoop(LoopRepeat, Infinity).play()
+    return () => { mixer.stopAllAction() }
+  }, [actions, mixer, scene])
+  useFrame((_, delta) => {
+    const enemy = useSessionStore.getState().enemies.find((candidate) => candidate.id === bossId)
+    if (!enemy || enemy.special !== 'aku-split') return
+    animationAccumulator.current += Math.min(delta, 0.1)
+    if (animationAccumulator.current < 1 / 20) return
+    mixer.update(animationAccumulator.current)
+    animationAccumulator.current = 0
+    const elapsed = performance.now() - enemy.specialStartedAt
+    const target: 'run' | 'attack' = getMiniAkuMotion(index, elapsed, enemy.x, enemy.x).attacking ? 'attack' : 'run'
+    if (target === active.current) return
+    active.current = target
+    const action = actions[target]
+    if (!action) return
+    const looping = target === 'run'
+    action.enabled = true
+    action.clampWhenFinished = !looping
+    action.setLoop(looping ? LoopRepeat : LoopOnce, looping ? Infinity : 1)
+    action.reset().fadeIn(0.08).play()
+    actions[target === 'run' ? 'attack' : 'run']?.fadeOut(0.08)
+  })
+  return <primitive object={scene} />
 }
 
 function MimicModel({ kind }: { kind: EnemyKind }) {
@@ -41,8 +98,17 @@ function MimicModel({ kind }: { kind: EnemyKind }) {
 }
 
 export function AkuBossActor({ id }: AkuBossActorProps) {
-  const enemy = useSessionStore((state) => state.enemies.find((candidate) => candidate.id === id))
+  const enemy = useSessionStore(useShallow((state) => {
+    const current = state.enemies.find((candidate) => candidate.id === id)
+    return current ? {
+      animation: current.animation, special: current.special, bossForm: current.bossForm,
+      mimicKind: current.mimicKind, title: current.title,
+    } : null
+  }))
+  const initialX = useMemo(() => useSessionStore.getState().enemies.find((candidate) => candidate.id === id)?.x ?? 0, [id])
   const bossPhase = useSessionStore((state) => state.bossPhase)
+  const gl = useThree((state) => state.gl)
+  const camera = useThree((state) => state.camera)
   const normalAssets = ASSET_PATHS.bosses.aku.normal
   const monsterAssets = ASSET_PATHS.bosses.aku.monster
 
@@ -74,7 +140,6 @@ export function AkuBossActor({ id }: AkuBossActorProps) {
   const morphRing = useRef<Group>(null)
   const normalScene = useMemo(() => SkeletonUtils.clone(normalWalk.scene), [normalWalk.scene])
   const monsterScene = useMemo(() => SkeletonUtils.clone(monsterIdle.scene), [monsterIdle.scene])
-  const miniScenes = useMemo(() => MINI_OFFSETS.map(() => SkeletonUtils.clone(normalWalk.scene)), [normalWalk.scene])
   const normalClips = useMemo(() => [
     validateClipTargets(normalScene, prepareAnimationClip(normalWalk.animations[0], 'walk')),
     validateClipTargets(normalScene, prepareAnimationClip(normalRun.animations[0], 'run')),
@@ -118,8 +183,18 @@ export function AkuBossActor({ id }: AkuBossActorProps) {
   useLayoutEffect(() => {
     enableShadows(normalScene)
     enableShadows(monsterScene)
-    miniScenes.forEach(enableShadows)
-  }, [miniScenes, monsterScene, normalScene])
+  }, [monsterScene, normalScene])
+
+  useEffect(() => {
+    if (!root.current || !minisRoot.current) return
+    const miniRoot = minisRoot.current
+    miniRoot.visible = true
+    miniGroups.current.forEach((mini) => mini.scale.setScalar(0.0001))
+    void gl.compileAsync(root.current, camera).catch(() => undefined).finally(() => {
+      const current = useSessionStore.getState().enemies.find((candidate) => candidate.id === id)
+      miniRoot.visible = current?.special === 'aku-split'
+    })
+  }, [camera, gl, id])
 
   useEffect(() => {
     const entries = [
@@ -158,13 +233,18 @@ export function AkuBossActor({ id }: AkuBossActorProps) {
     monsterRoot.current.scale.setScalar(MathUtils.damp(monsterRoot.current.scale.x, monsterTarget, 8, delta))
     minisRoot.current.visible = split
     if (split) {
-      const elapsed = (now - current.specialStartedAt) / 1_000
+      const elapsed = now - current.specialStartedAt
+      const game = useGameStore.getState()
+      const players = useSessionStore.getState().players
       miniGroups.current.forEach((mini, index) => {
-        const base = MINI_OFFSETS[index]!
-        mini.position.x = base * (0.76 + Math.sin(elapsed * 3.1 + index) * 0.18)
-        mini.position.y = Math.abs(Math.sin(elapsed * 4.2 + index)) * 0.18
-        mini.rotation.y = (base < 0 ? Math.PI / 2 : -Math.PI / 2) + Math.sin(elapsed * 2 + index) * 0.25
-        mini.scale.setScalar(current.scale * 0.31 * (0.92 + Math.sin(elapsed * 5 + index) * 0.08))
+        const preferred = index % 2 === 0 ? 'ali' : 'jack'
+        const fallback = preferred === 'ali' ? 'jack' : 'ali'
+        const targetId = !players[preferred].dead ? preferred : fallback
+        const motion = getMiniAkuMotion(index, elapsed, current.x, game.positions[targetId][0])
+        mini.position.x = motion.x - current.x
+        mini.position.y = motion.y
+        mini.rotation.y = motion.direction > 0 ? Math.PI / 2 : -Math.PI / 2
+        mini.scale.setScalar(current.scale * 0.31 * (motion.attacking ? 1.08 : 1))
       })
     }
     if (morphRing.current) {
@@ -177,15 +257,14 @@ export function AkuBossActor({ id }: AkuBossActorProps) {
 
   if (!enemy) return null
   return (
-    <group ref={root} position={[enemy.x, 0, 0]} name={enemy.title}>
+    <group ref={root} position={[initialX, 0, 0]} name={enemy.title}>
       <group ref={normalRoot} scale={0}><primitive object={normalScene} /></group>
       <group ref={monsterRoot} scale={0}><primitive object={monsterScene} /></group>
       <group ref={minisRoot} visible={false}>
-        {miniScenes.map((scene, index) => <group key={MINI_OFFSETS[index]} ref={(group) => { if (group) miniGroups.current[index] = group }}><primitive object={scene} /></group>)}
+        {MINI_AKU_OFFSETS.map((offset, index) => <group key={offset} ref={(group) => { if (group) miniGroups.current[index] = group }}><MiniAkuModel bossId={id} index={index} /></group>)}
       </group>
       {enemy.special === 'aku-shapeshift' && enemy.mimicKind ? <group scale={1.12}><MimicModel kind={enemy.mimicKind} /></group> : null}
       <group ref={morphRing} visible={false} position={[0, 1.35, 0]}>
-        <pointLight color="#73ff48" intensity={8} distance={6} />
         <mesh rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[1.3, 0.055, 8, 64]} /><meshBasicMaterial color="#9cff6b" transparent opacity={0.72} blending={AdditiveBlending} depthWrite={false} /></mesh>
         <mesh rotation={[0, Math.PI / 2, 0]}><torusGeometry args={[1.55, 0.035, 7, 64]} /><meshBasicMaterial color="#130019" transparent opacity={0.8} /></mesh>
       </group>

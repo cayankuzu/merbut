@@ -7,7 +7,7 @@ export function CombatImpactVisual({ kind, lethal = false }: { kind: ImpactKind;
   const style = COMBAT_EFFECT_STYLE[kind]
   return (
     <>
-      <pointLight color={style.secondary} intensity={lethal ? 11 : 6} distance={4} />
+      <mesh scale={lethal ? 1.35 : 1}><sphereGeometry args={[0.28, 8, 6]} /><meshBasicMaterial color={style.secondary} transparent opacity={0.28} blending={AdditiveBlending} depthWrite={false} toneMapped={false} /></mesh>
       {kind === 'portal' ? (
         <group rotation={[Math.PI / 2, 0, 0]}>
           <TimeSpiralDisc radius={0.86} opacity={0.96} speed={8.2} />
