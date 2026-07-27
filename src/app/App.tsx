@@ -1,0 +1,60 @@
+import { lazy, Suspense, useEffect } from 'react'
+import { GameInterface } from '../components/GameInterface'
+import { LoadingScreen } from '../components/LoadingScreen'
+import { SessionController } from '../components/SessionController'
+import { Background } from '../game/Background'
+import { GameScene } from '../game/GameScene'
+import { useGameStore } from '../store/gameStore'
+import { useSessionStore } from '../store/sessionStore'
+import { AudioDirector } from '../audio/AudioDirector'
+import { useAudioStore } from '../audio/audioStore'
+import './app.css'
+
+const DebugCalibrationPanel = lazy(() =>
+  import('../components/DebugCalibrationPanel').then((module) => ({
+    default: module.DebugCalibrationPanel,
+  })),
+)
+
+declare global {
+  interface Window {
+    __MERBUT__?: {
+      getState: typeof useGameStore.getState
+      getSessionState: typeof useSessionStore.getState
+      getAudioState: typeof useAudioStore.getState
+    }
+  }
+}
+
+export default function App() {
+  const debugEnabled = new URLSearchParams(window.location.search).get('debug') === '1'
+  const paused = useSessionStore((state) => state.phase === 'paused')
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    window.__MERBUT__ = {
+      getState: useGameStore.getState,
+      getSessionState: useSessionStore.getState,
+      getAudioState: useAudioStore.getState,
+    }
+    return () => {
+      delete window.__MERBUT__
+    }
+  }, [])
+
+  return (
+    <main className={`game-shell${paused ? ' is-paused' : ''}`}>
+      <Background />
+      <GameScene />
+      <div className="scene-grade" aria-hidden="true" />
+      <SessionController />
+      <AudioDirector />
+      <GameInterface />
+      <LoadingScreen />
+      {debugEnabled ? (
+        <Suspense fallback={null}>
+          <DebugCalibrationPanel />
+        </Suspense>
+      ) : null}
+    </main>
+  )
+}
