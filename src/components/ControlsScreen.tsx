@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { DIFFICULTIES, type Difficulty } from '../config/difficulty'
 import { useSessionStore } from '../store/sessionStore'
 import { CharacterPreview3D } from './CharacterPreview3D'
@@ -5,22 +6,27 @@ import { CharacterPreview3D } from './CharacterPreview3D'
 const DIFFICULTY_ORDER: Difficulty[] = ['easy', 'normal', 'hard', 'soulslike']
 
 export function ControlsScreen() {
+  const [previewsReady, setPreviewsReady] = useState(false)
   const startCountdown = useSessionStore((state) => state.startCountdown)
   const returnToMenu = useSessionStore((state) => state.returnToMenu)
   const difficulty = useSessionStore((state) => state.difficulty)
   const setDifficulty = useSessionStore((state) => state.setDifficulty)
+  useEffect(() => {
+    const timer = window.setTimeout(() => setPreviewsReady(true), 180)
+    return () => window.clearTimeout(timer)
+  }, [])
   return (
     <section className="controls-screen" aria-label="Kontroller ve zorluk seçimi">
       <header><small>SAVAŞ BRİFİNGİ</small><h1>Kahramanlarını tanı</h1></header>
       <div className="controls-screen__grid">
         <article className="hero-brief hero-brief--ali">
-          <CharacterPreview3D id="ali" />
+          {previewsReady ? <CharacterPreview3D id="ali" /> : <div className="character-preview" aria-hidden="true" />}
           <div className="hero-brief__copy"><h2>Hz. Ali</h2>
             <dl><div><dt>A / D</dt><dd>Hareket</dd></div><div><dt>W</dt><dd>Zıpla</dd></div><div><dt>S</dt><dd>Kılıç izinden alevli kesiş</dd></div><div><dt>Z / X</dt><dd>360° dön</dd></div><div><dt>R</dt><dd>Dolu güçle 6 sn boyunca sınırsız alev topu</dd></div></dl>
           </div>
         </article>
         <article className="hero-brief hero-brief--jack">
-          <CharacterPreview3D id="jack" />
+          {previewsReady ? <CharacterPreview3D id="jack" /> : <div className="character-preview" aria-hidden="true" />}
           <div className="hero-brief__copy"><h2>Samuray Jack</h2>
             <dl><div><dt>← / →</dt><dd>Hareket</dd></div><div><dt>↑</dt><dd>Zıpla</dd></div><div><dt>↓</dt><dd>Beyaz kesiş</dd></div><div><dt>Ö / Ç</dt><dd>360° dön</dd></div><div><dt>L</dt><dd>Hareket ederken 6 sn koruyucu kalkan</dd></div></dl>
           </div>
