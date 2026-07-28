@@ -23,6 +23,9 @@ const guardLocalCorrection = new Quaternion()
 const guardRootWorldRotation = new Quaternion()
 const guardRootWorldScale = new Vector3()
 const socketWorldPosition = new Vector3()
+const palmAnchorWorldPosition = new Vector3()
+const forearmWorldPosition = new Vector3()
+const forearmToHand = new Vector3()
 const TORSO_BONE_NAMES = [
   'Spine2', 'Spine02', 'mixamorigSpine2',
   'Spine1', 'Spine01', 'mixamorigSpine1',
@@ -224,6 +227,24 @@ export function updateWeaponSocket(
     : attachment.stableRotation
   const blend = 1 - Math.exp(-Math.min(delta, 0.1) * (followHandRotation ? 22 : 14))
   attachment.socket.quaternion.slerp(target, blend)
+}
+
+/**
+ * Moves a wrist-based rig socket into the palm along its animated forearm-hand
+ * axis. Only the socket position changes; authored blade rotation stays intact.
+ */
+export function placeWeaponGripInPalm(attachment: WeaponAttachment, reach: number) {
+  const forearm = attachment.hand.parent
+  if (!forearm || reach === 0) return false
+  attachment.root.updateWorldMatrix(true, false)
+  forearm.updateWorldMatrix(true, false)
+  attachment.hand.updateWorldMatrix(true, false)
+  forearm.getWorldPosition(forearmWorldPosition)
+  attachment.hand.getWorldPosition(palmAnchorWorldPosition)
+  forearmToHand.copy(palmAnchorWorldPosition).sub(forearmWorldPosition)
+  palmAnchorWorldPosition.addScaledVector(forearmToHand, reach)
+  attachment.socket.position.copy(attachment.root.worldToLocal(palmAnchorWorldPosition))
+  return true
 }
 
 export function alignWeaponAttachment(

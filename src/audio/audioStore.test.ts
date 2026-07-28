@@ -18,6 +18,7 @@ describe('audio settings', () => {
   })
 
   it('starts background music in repeat mode', () => {
+    expect(useAudioStore.getState().musicPlaying).toBe(true)
     expect(useAudioStore.getState().musicLooping).toBe(true)
     useAudioStore.getState().setMusicLooping(false)
     expect(useAudioStore.getState().musicLooping).toBe(false)

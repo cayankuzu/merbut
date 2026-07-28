@@ -1,22 +1,37 @@
-import { Suspense, useEffect, useMemo, useRef } from 'react'
+import { Suspense, useEffect, useMemo, useRef, type MutableRefObject } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useAnimations, useGLTF } from '@react-three/drei'
-import { Group, LoopRepeat, MathUtils } from 'three'
+import { Box3, Group, LoopRepeat, MathUtils, PerspectiveCamera, SkinnedMesh, Vector3 } from 'three'
 import { SkeletonUtils } from 'three-stdlib'
 import { AnimatedCharacter } from '../characters/AnimatedCharacter'
 import { EvilJackCharacter } from '../characters/EvilJackCharacter'
+import { prepareAnimationClip } from '../animation/animationLoader'
+import { validateClipTargets } from '../animation/animationRetargeting'
 import { ASSET_PATHS } from '../config/assetPaths'
 import { BOSS_MODEL_SCALES } from '../config/characterTransforms'
 import type { RosterPreview } from '../config/characterRoster'
 import { ENEMIES } from '../config/enemies'
 import { CHARACTERS } from '../config/gameConfig'
+import { computeRosterPreviewFit, getRosterPreviewDistance, type RosterPreviewFit } from './rosterPreviewFit'
 
-function AnimatedAsset({ source, scale = 1.5 }: { source: string; scale?: number }) {
-  const file = useGLTF(source)
-  const scene = useMemo(() => SkeletonUtils.clone(file.scene), [file.scene])
-  const { actions } = useAnimations(file.animations, scene)
+const FIT_SAMPLE_DELAYS = [0, 0.32, 0.74] as const
+const CAMERA_PADDING = 1.12
+
+interface RosterFitState extends RosterPreviewFit {
+  ready: boolean
+}
+
+function LocomotionAsset({ animationSource, modelSource, scale = 1.5 }: { animationSource?: string; modelSource: string; scale?: number }) {
+  const modelFile = useGLTF(modelSource)
+  const animationFile = useGLTF(animationSource ?? modelSource)
+  const scene = useMemo(() => SkeletonUtils.clone(modelFile.scene), [modelFile.scene])
+  const clip = useMemo(
+    () => validateClipTargets(scene, prepareAnimationClip(animationFile.animations[0], 'walk')),
+    [animationFile.animations, scene],
+  )
+  const { actions } = useAnimations([clip], scene)
   useEffect(() => {
-    const action = Object.values(actions)[0]
+    const action = actions.walk
     action?.reset().setLoop(LoopRepeat, Infinity).play()
     return () => { action?.stop() }
   }, [actions])
@@ -24,38 +39,86 @@ function AnimatedAsset({ source, scale = 1.5 }: { source: string; scale?: number
 }
 
 function PreviewModel({ preview }: { preview: RosterPreview }) {
-  if (preview.type === 'hero') return <group position={[0, -1.32, 0]}><AnimatedCharacter definition={CHARACTERS[preview.id]} animationState="idle" /></group>
-  if (preview.type === 'enemy') return <group position={[0, -1.28, 0]}><AnimatedAsset source={ENEMIES[preview.kind].walk} scale={ENEMIES[preview.kind].scale} /></group>
-  if (preview.type === 'shadow') return <group position={[0, -1.3, 0]} scale={BOSS_MODEL_SCALES.shadow}><EvilJackCharacter action="slash" loopCombat shadows={false} /></group>
-  const source = preview.form === 'normal' ? ASSET_PATHS.bosses.aku.normal.walk : ASSET_PATHS.bosses.aku.monster.idle
-  return <group position={[0, -1.25, 0]}><AnimatedAsset source={source} scale={BOSS_MODEL_SCALES.aku} /></group>
+  if (preview.type === 'hero') return <AnimatedCharacter definition={CHARACTERS[preview.id]} animationState="walk" />
+  if (preview.type === 'enemy') return <LocomotionAsset modelSource={ENEMIES[preview.kind].walk} scale={ENEMIES[preview.kind].scale} />
+  if (preview.type === 'shadow') return <group scale={BOSS_MODEL_SCALES.shadow}><EvilJackCharacter action="walk" loopCombat shadows={false} /></group>
+  if (preview.form === 'normal') return <LocomotionAsset modelSource={ASSET_PATHS.bosses.aku.normal.walk} scale={BOSS_MODEL_SCALES.aku} />
+  return <LocomotionAsset animationSource={ASSET_PATHS.bosses.aku.monster.walk} modelSource={ASSET_PATHS.bosses.aku.monster.idle} scale={BOSS_MODEL_SCALES.aku} />
 }
 
-function RotatableRosterModel({ preview, rotation }: { preview: RosterPreview; rotation: number }) {
-  const root = useRef<Group>(null)
-  useFrame(({ clock }, delta) => {
-    if (!root.current) return
-    root.current.rotation.y = MathUtils.damp(root.current.rotation.y, rotation, 12, delta)
-    root.current.position.y = Math.sin(clock.elapsedTime * 1.5) * 0.025
+function refreshAnimatedBounds(root: Group) {
+  root.traverse((node) => {
+    if (node instanceof SkinnedMesh) node.computeBoundingBox()
   })
-  return <group ref={root} rotation={[0, rotation, 0]}><PreviewModel preview={preview} /></group>
 }
 
-function getPreviewCamera(preview: RosterPreview) {
-  if (preview.type === 'hero') return { distance: 5.5, height: 1.25 }
-  if (preview.type === 'enemy') return { distance: 5.25, height: 1.2 }
-  if (preview.type === 'shadow') return { distance: 11.5, height: 2.3 }
-  return preview.form === 'monster'
-    ? { distance: 18.5, height: 3.2 }
-    : { distance: 13.8, height: 2.5 }
+function RotatableRosterModel({ fit, preview, rotation }: { fit: MutableRefObject<RosterFitState>; preview: RosterPreview; rotation: number }) {
+  const root = useRef<Group>(null)
+  const content = useRef<Group>(null)
+  const envelope = useRef(new Box3())
+  const sample = useRef(new Box3())
+  const sampleIndex = useRef(0)
+  const mountedAt = useRef<number | null>(null)
+
+  useFrame(({ clock }, delta) => {
+    const modelRoot = root.current
+    const modelContent = content.current
+    if (!modelRoot || !modelContent) return
+
+    modelRoot.rotation.y = MathUtils.damp(modelRoot.rotation.y, rotation, 12, delta)
+    modelRoot.position.y = Math.sin(clock.elapsedTime * 1.5) * 0.025
+
+    mountedAt.current ??= clock.elapsedTime
+    const nextDelay = FIT_SAMPLE_DELAYS[sampleIndex.current]
+    if (nextDelay === undefined || clock.elapsedTime - mountedAt.current < nextDelay) return
+
+    const renderedRotation = modelRoot.rotation.y
+    const renderedHeight = modelRoot.position.y
+    const renderedContentPosition = modelContent.position.clone()
+    modelRoot.rotation.y = 0
+    modelRoot.position.y = 0
+    modelContent.position.set(0, 0, 0)
+    modelRoot.updateWorldMatrix(true, true)
+    refreshAnimatedBounds(modelContent)
+    sample.current.setFromObject(modelContent)
+
+    if (!sample.current.isEmpty()) {
+      envelope.current.union(sample.current)
+      const nextFit = computeRosterPreviewFit(envelope.current)
+      fit.current.center = nextFit.center
+      fit.current.halfHeight = nextFit.halfHeight
+      fit.current.horizontalRadius = nextFit.horizontalRadius
+      fit.current.modelOffset = nextFit.modelOffset
+      fit.current.ready = true
+    }
+
+    modelContent.position.set(...(fit.current.ready ? fit.current.modelOffset : renderedContentPosition.toArray()))
+    modelRoot.rotation.y = renderedRotation
+    modelRoot.position.y = renderedHeight
+    modelRoot.updateWorldMatrix(true, true)
+    sampleIndex.current += 1
+  })
+  return <group ref={root} rotation={[0, rotation, 0]}><group ref={content}><PreviewModel preview={preview} /></group></group>
 }
 
-function PreviewCamera({ distance, height, pan, zoom }: { distance: number; height: number; pan: readonly [number, number]; zoom: number }) {
+function PreviewCamera({ fit, pan, zoom }: { fit: MutableRefObject<RosterFitState>; pan: readonly [number, number]; zoom: number }) {
   const camera = useThree((state) => state.camera)
+  const target = useRef(new Vector3(0, 1.25, 0))
   useFrame((_, delta) => {
-    camera.position.x = MathUtils.damp(camera.position.x, pan[0], 9, delta)
-    camera.position.z = MathUtils.damp(camera.position.z, distance / zoom, 9, delta)
-    camera.position.y = MathUtils.damp(camera.position.y, height + pan[1], 9, delta)
+    if (!(camera instanceof PerspectiveCamera)) return
+    const center = fit.current.center
+    const targetX = center[0] + pan[0]
+    const targetY = center[1] + pan[1]
+    const targetZ = center[2]
+    const distance = getRosterPreviewDistance(fit.current, camera.fov, camera.aspect, CAMERA_PADDING) / zoom
+
+    target.current.x = MathUtils.damp(target.current.x, targetX, 10, delta)
+    target.current.y = MathUtils.damp(target.current.y, targetY, 10, delta)
+    target.current.z = MathUtils.damp(target.current.z, targetZ, 10, delta)
+    camera.position.x = MathUtils.damp(camera.position.x, targetX, 10, delta)
+    camera.position.y = MathUtils.damp(camera.position.y, targetY, 10, delta)
+    camera.position.z = MathUtils.damp(camera.position.z, targetZ + distance, fit.current.ready ? 9 : 14, delta)
+    camera.lookAt(target.current)
     camera.updateProjectionMatrix()
   })
   return null
@@ -70,15 +133,21 @@ interface RosterCharacterPreview3DProps {
 }
 
 export function RosterCharacterPreview3D({ preview, rotation, pan, zoom, label }: RosterCharacterPreview3DProps) {
-  const camera = getPreviewCamera(preview)
+  const fit = useRef<RosterFitState>({
+    center: [0, 1.25, 0],
+    halfHeight: 1.5,
+    horizontalRadius: 1.1,
+    modelOffset: [0, 0, 0],
+    ready: false,
+  })
   return (
     <div className="roster-model" aria-label={`${label} döndürülebilir 3B modeli`}>
-      <Canvas dpr={[0.8, 1.1]} camera={{ position: [0, camera.height, camera.distance], fov: 34 }} gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}>
+      <Canvas dpr={[0.8, 1.1]} camera={{ position: [0, 1.25, 8], fov: 34 }} gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}>
         <ambientLight intensity={1.5} />
         <directionalLight position={[4, 6, 4]} intensity={3.5} color="#fff0d6" />
         <pointLight position={[-3, 1.5, 2]} intensity={3} color="#ff3d73" />
-        <PreviewCamera distance={camera.distance} height={camera.height} pan={pan} zoom={zoom} />
-        <Suspense fallback={null}><RotatableRosterModel preview={preview} rotation={rotation} /></Suspense>
+        <PreviewCamera fit={fit} pan={pan} zoom={zoom} />
+        <Suspense fallback={null}><RotatableRosterModel fit={fit} preview={preview} rotation={rotation} /></Suspense>
       </Canvas>
     </div>
   )

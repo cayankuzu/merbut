@@ -6,11 +6,10 @@ import { useSessionStore } from '../store/sessionStore'
 import { MusicTransportControls, type MusicCommandDetail } from './MusicTransportControls'
 
 const MUSIC_URL = 'https://music.youtube.com/watch?v=Pp0xs_xpTYo&si=yebZejnX9bZByr_Z'
-const EMBED_URL = 'https://www.youtube.com/embed/Pp0xs_xpTYo?enablejsapi=1&playsinline=1&loop=1&playlist=Pp0xs_xpTYo&controls=0&rel=0'
+const EMBED_URL = 'https://www.youtube.com/embed/Pp0xs_xpTYo?enablejsapi=1&playsinline=1&autoplay=1&loop=1&playlist=Pp0xs_xpTYo&controls=0&rel=0'
 
 export function AudioSettingsPanel() {
   const iframe = useRef<HTMLIFrameElement>(null)
-  const [playerMounted, setPlayerMounted] = useState(false)
   const [playerReady, setPlayerReady] = useState(false)
   const [previewingCamera, setPreviewingCamera] = useState(false)
   const phase = useSessionStore((state) => state.phase)
@@ -61,13 +60,8 @@ export function AudioSettingsPanel() {
   }, [])
 
   useEffect(() => {
-    if (panelOpen) setPlayerMounted(true)
-  }, [panelOpen])
-
-  useEffect(() => {
     const unlockMusic = () => {
       if (!musicPlaying) return
-      setPlayerMounted(true)
       if (!playerReady) return
       command('setVolume', [Math.round(musicVolume * 100)])
       command('playVideo')
@@ -75,6 +69,16 @@ export function AudioSettingsPanel() {
     window.addEventListener('merbut-audio-unlocked', unlockMusic)
     return () => window.removeEventListener('merbut-audio-unlocked', unlockMusic)
   }, [command, musicPlaying, musicVolume, playerReady])
+
+  useEffect(() => {
+    if (!playerReady || !musicPlaying) return
+    const retries = [0, 250, 800, 1_600].map((delay) => window.setTimeout(() => {
+      command('setLoop', [musicLooping])
+      command('setVolume', [Math.round(musicVolume * 100)])
+      command('playVideo')
+    }, delay))
+    return () => retries.forEach((timer) => window.clearTimeout(timer))
+  }, [command, musicLooping, musicPlaying, musicVolume, playerReady])
 
   useEffect(() => {
     const stopPreview = () => setPreviewingCamera(false)
@@ -107,14 +111,14 @@ export function AudioSettingsPanel() {
       <div className="audio-settings__panel pause-settings" hidden={!panelOpen}>
         <header><div><small>MERBUT · AYARLAR</small><h2>Ses, müzik ve kamera</h2></div><button type="button" onClick={closePanel} aria-label="Ayarları kapat">KAPAT ×</button></header>
         <div className="audio-settings__player pause-settings__music-preview">
-          {playerMounted ? <iframe
+          <iframe
             ref={iframe}
-            src={EMBED_URL}
+            src={`${EMBED_URL}&origin=${encodeURIComponent(window.location.origin)}`}
             title="Merbut fon müziği · YouTube"
             allow="autoplay; encrypted-media; picture-in-picture"
             referrerPolicy="strict-origin-when-cross-origin"
             onLoad={() => setPlayerReady(true)}
-          /> : <div className="audio-settings__player-placeholder" aria-hidden="true" />}
+          />
           <div><small>ŞİMDİ ÇALIYOR</small><strong>MERBUT · ARKA PLAN MÜZİĞİ</strong><a href={MUSIC_URL} target="_blank" rel="noreferrer">YOUTUBE MUSIC’TE AÇ ↗</a></div>
           <div className="pause-settings__wave" aria-hidden="true">{[1, 2, 3, 4, 5, 6, 7].map((bar) => <i key={bar} />)}</div>
         </div>

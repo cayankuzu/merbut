@@ -59,7 +59,19 @@ export const useAudioStore = create<AudioState>()(persist((set) => ({
   noteEffect: (lastEffect) => set((state) => ({ lastEffect, effectCount: state.effectCount + 1 })),
 }), {
   name: 'merbut-audio-settings',
+  version: 2,
   storage: createJSONStorage(getAudioStorage),
+  migrate: (persistedState, version) => {
+    const state = (persistedState ?? {}) as Partial<AudioState>
+    if (version < 2) {
+      return {
+        ...state,
+        musicPlaying: true,
+        musicLooping: true,
+      } as AudioState
+    }
+    return state as AudioState
+  },
   partialize: (state) => ({
     sfxVolume: state.sfxVolume,
     musicVolume: state.musicVolume,

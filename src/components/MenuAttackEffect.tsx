@@ -21,6 +21,9 @@ export type MenuAttackEffectKind =
   | 'ali-fireball'
   | 'jack-slash'
   | 'jack-shield'
+  | 'shadow-slash'
+  | 'shadow-combo'
+  | 'shadow-cast'
   | 'impact-ember'
   | 'impact-void'
   | 'impact-quake'
@@ -49,6 +52,8 @@ export function MenuAttackEffect({ accent, direction, durationMs, kind, originY,
   const aliMaterials = useRef<MeshBasicMaterial[]>([])
   const jackMeshes = useRef<Mesh[]>([])
   const jackMaterials = useRef<MeshBasicMaterial[]>([])
+  const shadowArcs = useRef<Mesh[]>([])
+  const shadowMaterials = useRef<MeshBasicMaterial[]>([])
   const elapsed = useRef(Number.POSITIVE_INFINITY)
   const impactKind = kind.startsWith('impact-') ? kind.slice('impact-'.length) as ImpactKind : null
   const projectileKind = kind.startsWith('projectile-')
@@ -110,6 +115,30 @@ export function MenuAttackEffect({ accent, direction, durationMs, kind, originY,
       group.rotation.y += delta * 0.72
       group.rotation.z = 0
       group.scale.setScalar(presentationScale)
+      return
+    }
+    if (kind === 'shadow-slash' || kind === 'shadow-combo') {
+      // Evil Jack carries the blade below his torso; anchor these trails to
+      // that weapon lane instead of the generic chest-centred impact origin.
+      group.position.set(direction * 0.78, effectOriginY - 0.78, 0.32)
+      group.rotation.set(0, direction < 0 ? Math.PI : 0, direction * (0.42 - progress * 0.18))
+      group.scale.setScalar(presentationScale * (0.92 + eased * 0.34))
+      shadowArcs.current.forEach((arc, index) => {
+        const delay = kind === 'shadow-combo' ? index * 0.13 : index * 0.045
+        const phase = MathUtils.clamp((progress - delay) / 0.54, 0, 1)
+        const envelope = Math.sin(phase * Math.PI)
+        arc.rotation.z = direction * (index * 0.2 - 0.18 + phase * 0.34)
+        arc.scale.setScalar(0.82 + phase * (kind === 'shadow-combo' ? 0.72 : 0.48))
+        if (shadowMaterials.current[index]) {
+          shadowMaterials.current[index]!.opacity = envelope * (0.92 - index * 0.16)
+        }
+      })
+      return
+    }
+    if (kind === 'shadow-cast') {
+      group.position.set(direction * (0.55 + eased * 1.75), effectOriginY - 0.4 + Math.sin(progress * Math.PI) * 0.12, 0.26)
+      group.rotation.set(progress * 1.2, direction * progress * 2.8, progress * 0.7)
+      group.scale.setScalar(presentationScale * (0.82 + Math.sin(progress * Math.PI) * 0.34))
       return
     }
     if (impactKind) {
@@ -179,18 +208,50 @@ export function MenuAttackEffect({ accent, direction, durationMs, kind, originY,
 
   const shockwaveEffect = (
     <>
-      <mesh>
-        <ringGeometry args={[0.58, 0.68, 48]} />
-        <meshBasicMaterial color={accent} transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} />
-      </mesh>
-      <mesh rotation={[0, 0, Math.PI / 4]}>
-        <planeGeometry args={[1.25, 0.05]} />
-        <meshBasicMaterial color="#fff1c4" transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} />
-      </mesh>
-      <mesh rotation={[0, 0, -Math.PI / 4]}>
-        <planeGeometry args={[1.25, 0.05]} />
-        <meshBasicMaterial color={accent} transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} />
-      </mesh>
+      {[0, 1, 2].map((index) => (
+        <mesh key={index} rotation={[0, 0, index * 1.7]} scale={0.72 + index * 0.26}>
+          <torusGeometry args={[0.58, 0.038 + index * 0.008, 6, 40, Math.PI * (0.72 + index * 0.12)]} />
+          <meshBasicMaterial color={index === 1 ? '#fff1c4' : accent} transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
+        </mesh>
+      ))}
+      {[0, 1, 2, 3, 4].map((index) => {
+        const angle = index / 5 * Math.PI * 2
+        return (
+          <mesh key={`shard-${index}`} position={[Math.cos(angle) * 0.62, Math.sin(angle) * 0.42, 0]} rotation={[0, 0, angle]}>
+            <tetrahedronGeometry args={[0.075, 0]} />
+            <meshBasicMaterial color={index % 2 ? '#fff1c4' : accent} transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
+          </mesh>
+        )
+      })}
+    </>
+  )
+
+  const shadowBladeEffect = (
+    <>
+      {[0, 1, 2].map((index) => (
+        <mesh
+          key={index}
+          ref={(node) => {
+            if (node) shadowArcs.current[index] = node
+          }}
+          position={[0.08 * index, 0.1 - index * 0.08, index * -0.025]}
+          rotation={[0, 0, index * 0.16 - 0.2]}
+        >
+          <torusGeometry args={[0.7 + index * 0.14, 0.034 + index * 0.009, 6, 48, Math.PI * (0.76 + index * 0.09)]} />
+          <meshBasicMaterial
+            ref={(node) => {
+              if (node) shadowMaterials.current[index] = node
+            }}
+            color={index === 0 ? '#fff0df' : index === 1 ? '#ff315f' : '#7e0926'}
+            transparent
+            opacity={0}
+            side={DoubleSide}
+            blending={AdditiveBlending}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+      ))}
     </>
   )
 
@@ -215,6 +276,8 @@ export function MenuAttackEffect({ accent, direction, durationMs, kind, originY,
       {kind === 'ali-fireball' ? <FireballVisual directionX={direction} /> : null}
       {kind === 'jack-slash' ? <JackSlashVisual meshes={jackMeshes} materials={jackMaterials} /> : null}
       {kind === 'jack-shield' ? <JackShieldVisual /> : null}
+      {kind === 'shadow-slash' || kind === 'shadow-combo' ? shadowBladeEffect : null}
+      {kind === 'shadow-cast' ? <EnemyProjectileVisual kind="dark-orb" /> : null}
       {impactKind ? <CombatImpactVisual kind={impactKind} /> : null}
       {projectileKind ? <EnemyProjectileVisual kind={projectileKind} /> : null}
       {kind === 'slash' ? slashEffect : kind === 'projectile' ? projectileEffect : kind === 'shockwave' ? shockwaveEffect : kind === 'flame' ? flameEffect : null}

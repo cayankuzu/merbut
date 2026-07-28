@@ -10,6 +10,7 @@ import { AudioDirector } from '../audio/AudioDirector'
 import { useAudioStore } from '../audio/audioStore'
 import { usePerformanceStore } from '../store/performanceStore'
 import { APP_VERSION } from '../config/version'
+import { AudioSettingsPanel } from '../components/AudioSettingsPanel'
 import './app.css'
 
 const DebugCalibrationPanel = lazy(() =>
@@ -49,12 +50,13 @@ export default function App() {
   return (
     <>
       <main className={`game-shell${paused ? ' is-paused' : ''}`}>
+        <AudioDirector />
+        <AudioSettingsPanel />
         {assetsReady ? <>
           <Background />
           <GameScene />
           <div className="scene-grade" aria-hidden="true" />
           <SessionController />
-          <AudioDirector />
           <GameInterface />
           {debugEnabled ? (
             <Suspense fallback={null}>

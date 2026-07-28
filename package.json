@@ -1,12 +1,13 @@
 {
   "name": "merbut",
   "private": true,
-  "version": "1.1.2",
+  "version": "1.1.3",
   "type": "module",
   "scripts": {
     "dev": "node ./node_modules/vite/bin/vite.js",
     "typecheck": "node ./node_modules/typescript/bin/tsc -b --pretty false",
-    "prebuild": "node ./node_modules/typescript/bin/tsc -b --pretty false",
+    "check:version": "node scripts/check-version-sync.mjs",
+    "prebuild": "node scripts/check-version-sync.mjs && node ./node_modules/typescript/bin/tsc -b --pretty false",
     "build": "node ./node_modules/vite/bin/vite.js build",
     "lint": "node ./node_modules/oxlint/bin/oxlint .",
     "test": "node ./node_modules/vitest/vitest.mjs run",

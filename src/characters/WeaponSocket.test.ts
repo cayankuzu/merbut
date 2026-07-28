@@ -1,7 +1,7 @@
 import { Bone, Euler, Group, Object3D, Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 import { BOSS_MODEL_SCALES, CHARACTER_TRANSFORMS, SHADOW_WEAPON_TRANSFORM } from '../config/characterTransforms'
-import { applyWeaponTransform, attachWeapon, keepWeaponOutsideTorso, updateWeaponSocket } from './WeaponSocket'
+import { applyWeaponTransform, attachWeapon, keepWeaponOutsideTorso, placeWeaponGripInPalm, updateWeaponSocket } from './WeaponSocket'
 
 function transformedGrip(id: 'ali' | 'jack') {
   const weapon = new Object3D()
@@ -71,6 +71,28 @@ describe('weapon transforms', () => {
     updateWeaponSocket(attachment, true, 1)
 
     expect(attachment.socket.quaternion.angleTo(before)).toBeGreaterThan(0.25)
+  })
+
+  it('moves Ali\'s fixed grip from the wrist into the palm without rotating the blade', () => {
+    const character = new Group()
+    const rig = new Bone()
+    const forearm = new Bone()
+    const hand = new Bone()
+    hand.name = 'RightHand'
+    hand.position.set(0, 10, 0)
+    forearm.add(hand)
+    rig.add(forearm)
+    character.add(rig)
+    const weapon = new Object3D()
+    const attachment = attachWeapon(character, weapon, CHARACTER_TRANSFORMS.ali.weapon)
+    const bladeRotation = weapon.quaternion.clone()
+
+    expect(placeWeaponGripInPalm(attachment, 0.42)).toBe(true)
+    character.updateWorldMatrix(true, true)
+    const grip = weapon.localToWorld(new Vector3(...CHARACTER_TRANSFORMS.ali.weapon.gripPoint))
+
+    expect(grip.distanceTo(new Vector3(0, 14.2, 0))).toBeLessThan(0.00001)
+    expect(weapon.quaternion.angleTo(bladeRotation)).toBeLessThan(0.00001)
   })
 
   it('turns a torso-crossing blade around its fixed grip', () => {

@@ -4,6 +4,7 @@ import { ContactShadows, useAnimations, useGLTF } from '@react-three/drei'
 import { AnimationClip, Box3, Group, LoopOnce, MathUtils, type Object3D, Vector3 } from 'three'
 import { SkeletonUtils } from 'three-stdlib'
 import { AnimatedCharacter } from '../characters/AnimatedCharacter'
+import { EvilJackCharacter, type EvilJackAction } from '../characters/EvilJackCharacter'
 import { prepareAnimationClip } from '../animation/animationLoader'
 import { validateClipTargets } from '../animation/animationRetargeting'
 import { ASSET_PATHS } from '../config/assetPaths'
@@ -70,7 +71,7 @@ const ENEMY_SHOWCASE: readonly EnemyShowcaseDefinition[] = [
     id: 'aku-shadow', name: 'Aku’nun Gölgesi', row: 1, column: 0, rowCount: 3,
     base: ASSET_PATHS.bosses.evilJack.walk,
     motions: [ASSET_PATHS.bosses.evilJack.slash, ASSET_PATHS.bosses.evilJack.doubleCombo, ASSET_PATHS.bosses.evilJack.tripleCombo, ASSET_PATHS.bosses.evilJack.cast, ASSET_PATHS.bosses.evilJack.slash],
-    modelScale: BOSS_MODEL_SCALES.shadow, displayScale: 1, accent: '#ff315f', effects: ['slash', 'impact-boss', 'shockwave', 'projectile-dark-orb', 'slash'],
+    modelScale: BOSS_MODEL_SCALES.shadow, displayScale: 1, accent: '#ff315f', effects: ['shadow-slash', 'shadow-combo', 'shadow-combo', 'shadow-cast', 'shadow-slash'],
   },
   {
     id: 'aku', name: 'Aku', row: 1, column: 1, rowCount: 3,
@@ -304,6 +305,18 @@ function Hero({ durationMs, id, trigger, variant }: { durationMs: number; id: 'a
   return <AnimatedCharacter definition={CHARACTERS[id]} animationDurationSeconds={durationMs / 1_000} animationState={animation} animationSignal={trigger} />
 }
 
+const SHADOW_SHOWCASE_ACTIONS: readonly EvilJackAction[] = ['slash', 'double', 'triple', 'cast', 'slash']
+
+/** Uses the exact boss rig/weapon path so menu combos keep the katana socket. */
+function ShadowShowcase({ trigger, variant }: { trigger: number; variant: number }) {
+  const action = SHADOW_SHOWCASE_ACTIONS[variant] ?? 'slash'
+  return (
+    <group scale={BOSS_MODEL_SCALES.shadow}>
+      <EvilJackCharacter key={`${action}-${trigger}`} action={action} shadows={false} />
+    </group>
+  )
+}
+
 function FootAlignedModel({ children, effectOriginY, effectScale }: { children: ReactNode; effectOriginY: MutableRefObject<number>; effectScale: number }) {
   const anchor = useRef<Group>(null)
   const visual = useRef<Group>(null)
@@ -426,7 +439,9 @@ function StageCast({ action, activeEnemyIndex, activeHeroIndex, onEnemyCycleComp
           onCycleComplete={onEnemyCycleComplete}
           onMove={onEnemyMove}
         >
-          {({ durationMs, trigger, variant }) => <ActionModel base={enemy.base} durationMs={durationMs} motions={enemy.motions} scale={enemy.modelScale} trigger={trigger} variant={variant} />}
+          {({ durationMs, trigger, variant }) => enemy.id === 'aku-shadow'
+            ? <ShadowShowcase trigger={trigger} variant={variant} />
+            : <ActionModel base={enemy.base} durationMs={durationMs} motions={enemy.motions} scale={enemy.modelScale} trigger={trigger} variant={variant} />}
         </Fighter>
       </Suspense>
     </>

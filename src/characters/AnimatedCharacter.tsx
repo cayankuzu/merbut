@@ -9,14 +9,18 @@ import { useCharacterAnimations } from '../hooks/useCharacterAnimations'
 import { useDebugStore } from '../store/debugStore'
 import type { AnimationState } from '../types/animation'
 import type { CharacterDefinition } from '../types/character'
+import { AliFaceLight } from './AliFaceLight'
 import {
   alignWeaponAttachment,
   attachWeapon,
   findTorsoBone,
   keepWeaponOutsideTorso,
+  placeWeaponGripInPalm,
   updateWeaponSocket,
   type WeaponAttachment,
 } from './WeaponSocket'
+
+const ALI_PALM_REACH = 0.42
 
 interface AnimatedCharacterProps {
   definition: CharacterDefinition
@@ -68,12 +72,13 @@ export function AnimatedCharacter({ definition, animationDurationSeconds, animat
     enableShadows(characterScene)
     enableShadows(swordScene)
     const attachment = attachWeapon(characterScene, swordScene, initialWeaponTransform.current)
+    if (definition.id === 'ali') placeWeaponGripInPalm(attachment, ALI_PALM_REACH)
     attachmentRef.current = attachment
     return () => {
       attachment.detach()
       attachmentRef.current = null
     }
-  }, [characterScene, swordScene])
+  }, [characterScene, definition.id, swordScene])
 
   useLayoutEffect(() => {
     if (attachmentRef.current) alignWeaponAttachment(attachmentRef.current, transform.weapon)
@@ -85,6 +90,7 @@ export function AnimatedCharacter({ definition, animationDurationSeconds, animat
       // world-stable blade during idle/walk made it slide through the palm and
       // body as soon as the wrist moved (most visible in the roster preview).
       updateWeaponSocket(attachmentRef.current, true, delta)
+      if (definition.id === 'ali') placeWeaponGripInPalm(attachmentRef.current, ALI_PALM_REACH)
       keepWeaponOutsideTorso(
         attachmentRef.current,
         torso,
@@ -104,6 +110,7 @@ export function AnimatedCharacter({ definition, animationDurationSeconds, animat
       visible={animationState !== 'dead'}
     >
       <primitive object={characterScene} />
+      {definition.id === 'ali' ? <AliFaceLight scene={characterScene} /> : null}
     </group>
   )
 }
