@@ -27,12 +27,22 @@ describe('GraphicsSettingsPanel', () => {
   })
 
   it('turns an ultra selection into a persistent manual preference', () => {
+    usePerformanceStore.setState({
+      tier: 'minimal',
+      hardwareTier: 'minimal',
+      renderDpr: 0.75,
+    })
     render(createElement(GraphicsSettingsPanel))
     const ultra = screen.getByRole('radio', { name: /ULTRA/ })
 
     fireEvent.click(ultra)
 
     expect(ultra).toBeChecked()
-    expect(usePerformanceStore.getState()).toMatchObject({ preference: 'high', tier: 'high' })
+    expect(usePerformanceStore.getState()).toMatchObject({
+      preference: 'high',
+      tier: 'high',
+      qualityFactor: 1,
+      renderDpr: 1.6,
+    })
   })
 })

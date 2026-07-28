@@ -22,14 +22,34 @@ describe('graphics performance preferences', () => {
   })
 
   it('keeps a manual quality choice locked against adaptive changes', () => {
+    usePerformanceStore.setState({ hardwareTier: 'minimal' })
     usePerformanceStore.getState().setTier('high')
     usePerformanceStore.getState().setAdaptiveTier('performance')
 
     expect(usePerformanceStore.getState()).toMatchObject({
       preference: 'high',
       tier: 'high',
-      qualityFactor: 0.72,
-      renderDpr: 1.15,
+      qualityFactor: 1,
+      renderDpr: PERFORMANCE_PROFILES.high.dpr,
+    })
+  })
+
+  it('applies the full manual profile even when automatic detection found weak hardware', () => {
+    usePerformanceStore.setState({
+      preference: 'auto',
+      tier: 'minimal',
+      hardwareTier: 'minimal',
+      qualityFactor: 1,
+      renderDpr: PERFORMANCE_PROFILES.minimal.dpr,
+    })
+
+    usePerformanceStore.getState().setPreference('high')
+
+    expect(usePerformanceStore.getState()).toMatchObject({
+      preference: 'high',
+      tier: 'high',
+      qualityFactor: 1,
+      renderDpr: PERFORMANCE_PROFILES.high.dpr,
     })
   })
 

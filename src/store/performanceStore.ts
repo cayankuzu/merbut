@@ -254,6 +254,22 @@ function initialRenderDpr(tier: PerformanceTier, hardwareTier: PerformanceTier) 
   return Math.max(profile.minimumDpr, Math.min(profile.dpr, PERFORMANCE_PROFILES[hardwareTier].dpr))
 }
 
+function initialPreferenceQuality(
+  preference: GraphicsPreference,
+  tier: PerformanceTier,
+  hardwareTier: PerformanceTier,
+) {
+  return preference === 'auto' ? initialRuntimeQuality(tier, hardwareTier) : 1
+}
+
+function initialPreferenceDpr(
+  preference: GraphicsPreference,
+  tier: PerformanceTier,
+  hardwareTier: PerformanceTier,
+) {
+  return preference === 'auto' ? initialRenderDpr(tier, hardwareTier) : PERFORMANCE_PROFILES[tier].dpr
+}
+
 const initialPreference = storedPreference() ?? 'auto'
 const detectedHardwareTier = detectInitialPerformanceTier()
 const detectedInitialTier = initialPreference === 'auto' ? detectedHardwareTier : initialPreference
@@ -265,8 +281,8 @@ export const usePerformanceStore = create<PerformanceState>((set) => ({
   fps: 60,
   p95FrameMs: 16.7,
   longFrames: 0,
-  qualityFactor: initialRuntimeQuality(detectedInitialTier, detectedHardwareTier),
-  renderDpr: initialRenderDpr(detectedInitialTier, detectedHardwareTier),
+  qualityFactor: initialPreferenceQuality(initialPreference, detectedInitialTier, detectedHardwareTier),
+  renderDpr: initialPreferenceDpr(initialPreference, detectedInitialTier, detectedHardwareTier),
   setPreference: (preference) => {
     persistPreference(preference)
     set((state) => {
@@ -274,18 +290,18 @@ export const usePerformanceStore = create<PerformanceState>((set) => ({
       return {
         preference,
         tier,
-        qualityFactor: initialRuntimeQuality(tier, state.hardwareTier),
-        renderDpr: initialRenderDpr(tier, state.hardwareTier),
+        qualityFactor: initialPreferenceQuality(preference, tier, state.hardwareTier),
+        renderDpr: initialPreferenceDpr(preference, tier, state.hardwareTier),
       }
     })
   },
   setTier: (tier) => {
     persistPreference(tier)
-    set((state) => ({
+    set(() => ({
       preference: tier,
       tier,
-      qualityFactor: initialRuntimeQuality(tier, state.hardwareTier),
-      renderDpr: initialRenderDpr(tier, state.hardwareTier),
+      qualityFactor: 1,
+      renderDpr: PERFORMANCE_PROFILES[tier].dpr,
     }))
   },
   setAdaptiveTier: (tier) => set((state) => (

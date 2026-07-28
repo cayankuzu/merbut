@@ -102,7 +102,7 @@ export function GraphicsSettingsPanel() {
           ))}
         </div>
       </fieldset>
-      <p>Profil seçimi saklanır. Kare hızını korumak için iç çözünürlük, gölge sıklığı ve kalabalık bütçesi cihazınıza göre anlık ayarlanabilir.</p>
+      <p>İlk açılışta Otomatik profil kullanılır. Manuel seçiminiz tüm oyuna uygulanır, saklanır ve siz değiştirene kadar sabit kalır.</p>
     </section>
   )
 }

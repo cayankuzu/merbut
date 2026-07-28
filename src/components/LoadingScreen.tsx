@@ -45,7 +45,7 @@ interface LoadingScreenProps {
 }
 
 export function LoadingScreen({ onReady }: LoadingScreenProps) {
-  const { active, loaded, total } = useProgress()
+  const { loaded, total } = useProgress()
   const [backgroundsLoaded, setBackgroundsLoaded] = useState(0)
   const [preloadStarted, setPreloadStarted] = useState(false)
   const [complete, setComplete] = useState(false)
@@ -74,7 +74,6 @@ export function LoadingScreen({ onReady }: LoadingScreenProps) {
   const resourcesReady = preloadStarted
     && total >= MODEL_ASSETS.length
     && loaded >= total
-    && !active
     && backgroundsLoaded >= BACKGROUND_ASSETS.length
 
   const finish = useCallback((becauseOfTimeout = false) => {

@@ -134,6 +134,14 @@ function RuntimePerformanceGovernor({ active }: { active: boolean }) {
     const store = usePerformanceStore.getState()
     store.reportWindow(fps, p95)
 
+    if (store.preference !== 'auto') {
+      slowWindows.current = 0
+      fastWindows.current = 0
+      samples.current.length = 0
+      elapsed.current = 0
+      return
+    }
+
     const profile = PERFORMANCE_PROFILES[store.tier]
     const critical = fps < 32 || p95 > 75
     const underBudget = fps < 52 || p95 > 32
@@ -152,7 +160,7 @@ function RuntimePerformanceGovernor({ active }: { active: boolean }) {
       slowWindows.current = 0
       fastWindows.current = 0
       const phase = useSessionStore.getState().phase
-      if (store.preference === 'auto' && phase === 'countdown' && critical && atDprFloor && store.qualityFactor <= 0.2) {
+      if (phase === 'countdown' && critical && atDprFloor && store.qualityFactor <= 0.2) {
         store.setAdaptiveTier(LOWER_TIER[store.tier])
       }
     } else if (fastWindows.current >= 3) {
