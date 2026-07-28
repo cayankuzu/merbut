@@ -20,7 +20,6 @@ interface CharacterControllerProps {
 }
 
 const ATTACK_DURATION = 0.72
-const ATTACK_CHAIN_WINDOW = 0.3
 const FULL_TURN = Math.PI * 2
 
 function PlayerWorldHealth({ definition, visible }: { definition: CharacterDefinition; visible: boolean }) {
@@ -63,8 +62,6 @@ interface MotionState {
   jumpBufferRemaining: number
   airJumpsRemaining: number
   attackRemaining: number
-  attackElapsed: number
-  attackQueued: boolean
   accumulator: number
   facing: number
   manualRotation: number
@@ -102,8 +99,6 @@ export function CharacterController({ definition }: CharacterControllerProps) {
     jumpBufferRemaining: 0,
     airJumpsRemaining: GAME_CONFIG.movement.airJumps,
     attackRemaining: 0,
-    attackElapsed: 0,
-    attackQueued: false,
     accumulator: 0,
     facing: 0,
     manualRotation: 0,
@@ -120,8 +115,6 @@ export function CharacterController({ definition }: CharacterControllerProps) {
     value.jumpBufferRemaining = 0
     value.airJumpsRemaining = GAME_CONFIG.movement.airJumps
     value.attackRemaining = 0
-    value.attackElapsed = 0
-    value.attackQueued = false
     value.accumulator = 0
     value.facing = 0
     value.manualRotation = 0
@@ -163,8 +156,6 @@ export function CharacterController({ definition }: CharacterControllerProps) {
       value.velocityX = 0
       value.accumulator = 0
       value.attackRemaining = 0
-      value.attackElapsed = 0
-      value.attackQueued = false
       const drinking = session.phase === 'boss-intro' && session.bossPhase === 'drinking'
       const praying = session.phase === 'final-intro' && session.bossPhase === 'prayer'
       const inactiveState: AnimationState = status.dead
@@ -217,17 +208,10 @@ export function CharacterController({ definition }: CharacterControllerProps) {
     if (keyboard.consumePress(bindings.jump)) {
       value.jumpBufferRemaining = GAME_CONFIG.movement.jumpBuffer
     }
-    if (!abilityActive && keyboard.consumePress(bindings.attack)) {
-      if (value.attackRemaining <= 0 || value.attackElapsed >= ATTACK_CHAIN_WINDOW) {
-        value.attackRemaining = ATTACK_DURATION
-        value.attackElapsed = 0
-        value.attackQueued = false
-        attackTriggered = true
-      } else {
-        value.attackQueued = true
-      }
-    } else if (abilityActive) {
-      value.attackQueued = false
+    const attackPressed = keyboard.consumePress(bindings.attack)
+    if (attackPressed && !abilityActive && value.attackRemaining <= 0) {
+      value.attackRemaining = ATTACK_DURATION
+      attackTriggered = true
     }
 
     // Never repay a long render stall with a second CPU-heavy catch-up frame.
@@ -265,14 +249,7 @@ export function CharacterController({ definition }: CharacterControllerProps) {
         ? GAME_CONFIG.movement.coyoteTime
         : Math.max(0, value.coyoteRemaining - step)
       value.jumpBufferRemaining = Math.max(0, value.jumpBufferRemaining - step)
-      if (value.attackRemaining > 0) value.attackElapsed += step
       value.attackRemaining = Math.max(0, value.attackRemaining - step)
-      if (value.attackQueued && (value.attackRemaining <= 0 || value.attackElapsed >= ATTACK_CHAIN_WINDOW)) {
-        value.attackRemaining = ATTACK_DURATION
-        value.attackElapsed = 0
-        value.attackQueued = false
-        attackTriggered = true
-      }
 
       const canGroundJump = value.grounded || value.coyoteRemaining > 0
       const canAirJump = !canGroundJump && value.airJumpsRemaining > 0

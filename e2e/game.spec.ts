@@ -18,7 +18,7 @@ test('ana menü, kontrol brifingi ve duraklatma akışı çalışır', async ({ 
   await page.goto('/')
   await waitForAssets(page)
   await expect(page.getByRole('heading', { name: 'MERBUT' })).toBeVisible()
-  await expect(page.locator('.merbut-copyright')).toContainText('SÜRÜM v1.1.4')
+  await expect(page.locator('.merbut-copyright')).toContainText('SÜRÜM v1.2.3')
   await expect(page.locator('iframe[title="Merbut fon müziği · YouTube"]')).toHaveAttribute('src', /autoplay=1.*loop=1/)
   const audioDefaults = await page.evaluate(() => window.__MERBUT__!.getAudioState())
   expect(audioDefaults).toMatchObject({ musicPlaying: true, musicLooping: true })
@@ -108,6 +108,32 @@ test('iki oyuncu bağımsız hareket eder, zıplar, saldırır ve doğru yöne b
     const animations = window.__MERBUT__!.getState().animationStates
     return `${animations.ali}/${animations.jack}`
   }), { timeout: 1_000 }).toBe('attack/attack')
+})
+
+test('saldırı animasyonu bitmeden art arda saldırı kabul edilmez', async ({ page }) => {
+  await startGame(page)
+  const initial = await page.evaluate(() => window.__MERBUT__!.getState().attackSequences)
+
+  for (let index = 0; index < 6; index += 1) {
+    await page.keyboard.press('KeyS')
+    await page.keyboard.press('ArrowDown')
+    await page.waitForTimeout(60)
+  }
+
+  const duringAttack = await page.evaluate(() => window.__MERBUT__!.getState().attackSequences)
+  expect(duringAttack).toEqual({ ali: initial.ali + 1, jack: initial.jack + 1 })
+
+  // Kilit sırasında basılan tuşlar kuyruklanmamalı ve sonradan saldırı başlatmamalı.
+  await page.waitForTimeout(500)
+  const afterAnimation = await page.evaluate(() => window.__MERBUT__!.getState().attackSequences)
+  expect(afterAnimation).toEqual(duringAttack)
+
+  await page.keyboard.press('KeyS')
+  await page.keyboard.press('ArrowDown')
+  await expect.poll(() => page.evaluate(() => {
+    const sequences = window.__MERBUT__!.getState().attackSequences
+    return `${sequences.ali}/${sequences.jack}`
+  })).toBe(`${initial.ali + 2}/${initial.jack + 2}`)
 })
 
 test('özel yetenekler etkinleşir ve sahne sınırları korunur', async ({ page }) => {
