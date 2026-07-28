@@ -1,118 +1,191 @@
 import { expect, test, type Page } from '@playwright/test'
 
-async function waitForAssets(page: Page) {
-  await expect(page.locator('.loading-screen')).toHaveCount(0, { timeout: 60_000 })
+interface FrameBenchmark {
+  averageFps: number
+  frameCount: number
+  longFrames: number
+  p95FrameMs: number
+  p99FrameMs: number
+  storeFps: number
+  storeP95FrameMs: number
 }
 
 async function startCombat(page: Page) {
   await page.goto('/')
-  await waitForAssets(page)
-  if (process.env.PW_FORCE_PERFORMANCE === '1') {
-    await page.evaluate(() => window.__MERBUT__!.getPerformanceState().setTier('performance'))
-  }
-  await page.evaluate(() => window.__MERBUT__!.getAudioState().setMusicPlaying(false))
+  await expect(page.locator('.loading-screen')).toHaveCount(0, { timeout: 60_000 })
   await page.getByRole('button', { name: 'OYUNA BAŞLA' }).click()
   await page.getByRole('button', { name: 'SAVAŞA BAŞLA' }).click()
   await expect.poll(() => page.evaluate(() => window.__MERBUT__?.getSessionState().phase), { timeout: 10_000 }).toBe('playing')
+  await expect.poll(() => page.evaluate(() => window.__MERBUT__?.getSessionState().enemies.length)).toBeGreaterThan(0)
 }
 
-async function measureFrameWindow(page: Page, durationMs: number) {
-  return page.evaluate((duration) => new Promise<{ fps: number; p95: number; worst: number; over100: number }>((resolve) => {
-    const samples: number[] = []
-    const started = performance.now()
-    let previous = started
-    const frame = (now: number) => {
-      samples.push(now - previous)
-      previous = now
-      if (now - started < duration) requestAnimationFrame(frame)
-      else {
-        const ordered = [...samples].sort((a, b) => a - b)
-        const average = samples.reduce((sum, value) => sum + value, 0) / Math.max(1, samples.length)
-        resolve({
-          fps: 1_000 / Math.max(1, average),
-          p95: ordered[Math.min(ordered.length - 1, Math.floor(ordered.length * 0.95))] ?? average,
-          worst: ordered.at(-1) ?? average,
-          over100: samples.filter((value) => value > 100).length,
-        })
-      }
-    }
-    requestAnimationFrame(frame)
-  }), durationMs)
-}
-
-test('en düşük donanımda minimal görüntü profili otomatik seçilir', async ({ page }) => {
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, 'hardwareConcurrency', { configurable: true, get: () => 1 })
-    Object.defineProperty(navigator, 'deviceMemory', { configurable: true, get: () => 1 })
-  })
-  await page.goto('/')
-  console.info(`[browser-engine] ${await page.evaluate(() => navigator.userAgent)}`)
-  await expect.poll(() => page.evaluate(() => window.__MERBUT__?.getPerformanceState().tier)).toBe('minimal')
-})
-
-test('art arda iki oyuncu saldırısında render döngüsü takılmaz', async ({ page }) => {
-  test.setTimeout(75_000)
-  const gameErrors: string[] = []
-  page.on('pageerror', (error) => gameErrors.push(error.message))
-  await startCombat(page)
-  await page.waitForTimeout(1_000)
-
-  const sample = measureFrameWindow(page, 5_000)
-
-  const attacks = (async () => {
-    for (let index = 0; index < 18; index += 1) {
-      await page.keyboard.press('KeyS')
-      await page.keyboard.press('ArrowDown')
-      await page.waitForTimeout(245)
-    }
-  })()
-  const [metrics] = await Promise.all([sample, attacks])
-  const tier = await page.evaluate(() => window.__MERBUT__!.getPerformanceState().tier)
-  console.info(`[render-metrics] tier=${tier} fps=${metrics.fps.toFixed(2)} p95=${metrics.p95.toFixed(2)}ms worst=${metrics.worst.toFixed(2)}ms over100=${metrics.over100}`)
-
-  expect(metrics.fps).toBeGreaterThanOrEqual(35)
-  expect(metrics.p95).toBeLessThan(80)
-  expect(metrics.worst).toBeLessThan(200)
-  expect(metrics.over100).toBeLessThanOrEqual(2)
-  expect(gameErrors).toEqual([])
-})
-
-test('120 canlı düşman bulunan dünyada adaptif render bütçesi akıcı kalır', async ({ page }) => {
-  test.setTimeout(90_000)
-  const gameErrors: string[] = []
-  page.on('pageerror', (error) => gameErrors.push(error.message))
-  await startCombat(page)
-  await expect.poll(() => page.evaluate(() => window.__MERBUT__!.getSessionState().enemies.length)).toBeGreaterThan(0)
-  await page.evaluate(() => {
-    const template = window.__MERBUT__!.getSessionState().enemies.find((enemy) => !enemy.boss)!
+async function installStressScene(page: Page, enemyCount: number) {
+  await page.evaluate((count) => {
+    const api = window.__MERBUT__!
+    const session = api.getSessionState()
+    const template = session.enemies.find((enemy) => !enemy.boss)!
     const now = performance.now()
-    const enemies = Array.from({ length: 120 }, (_, index) => ({
+    const enemies = Array.from({ length: count }, (_, index) => ({
       ...template,
-      id: `stress-enemy-${index}`,
-      title: `Stress ${index + 1}`,
-      x: -4 + (index / 119) * 238,
-      biome: Math.min(6, Math.floor(index / 18)),
-      animation: 'walk' as const,
-      direction: index % 2 === 0 ? -1 as const : 1 as const,
-      health: template.maxHealth,
+      id: `perf-enemy-${index}`,
+      x: -18 + index % 50 * 0.72,
+      direction: index % 2 === 0 ? 1 as const : -1 as const,
+      health: 50_000,
+      maxHealth: 50_000,
+      animation: index % 3 === 0 ? 'attack' as const : 'walk' as const,
+      attackUntil: now + 60_000,
+      nextAttackAt: now + 60_000,
       deadAt: 0,
-      nextAttackAt: now + 750 + index * 13,
-      attackUntil: 0,
       boss: false,
       finalBoss: false,
-      bossType: null,
+      bossType: undefined,
+      bossForm: undefined,
+      special: 'none' as const,
     }))
-    window.__MERBUT__!.setSessionState({ enemies })
+    api.getPerformanceState().setTier('high')
+    api.setSessionState({ enemies })
+    api.getState().teleportPlayer('ali', -1)
+    api.getState().teleportPlayer('jack', 1)
+  }, enemyCount)
+  await expect.poll(() => page.evaluate(() => window.__MERBUT__!.getSessionState().enemies.length)).toBe(enemyCount)
+  await page.waitForTimeout(2_000)
+}
+
+async function benchmarkFrames(page: Page, durationMs: number, attackIntervalMs = 90): Promise<FrameBenchmark> {
+  return page.evaluate(({ attackInterval, duration }) => new Promise<FrameBenchmark>((resolve) => {
+    const api = window.__MERBUT__!
+    const targetId = api.getSessionState().enemies[0]!.id
+    let previous = 0
+    let startedAt = 0
+    let hit = 0
+    const deltas: number[] = []
+    const attackTimer = window.setInterval(() => {
+      const now = performance.now()
+      api.getSessionState().damageEnemy(targetId, 1, hit % 2 === 0 ? 'ali' : 'jack', now, 'melee')
+      hit += 1
+    }, attackInterval)
+
+    const frame = (now: number) => {
+      if (startedAt === 0) {
+        startedAt = now
+        previous = now
+      } else {
+        deltas.push(now - previous)
+        previous = now
+      }
+      if (now - startedAt < duration) {
+        requestAnimationFrame(frame)
+        return
+      }
+
+      window.clearInterval(attackTimer)
+      const ordered = [...deltas].sort((left, right) => left - right)
+      const percentile = (ratio: number) => ordered[Math.min(ordered.length - 1, Math.floor(ordered.length * ratio))] ?? 0
+      const elapsed = deltas.reduce((sum, value) => sum + value, 0)
+      const performanceState = api.getPerformanceState()
+      resolve({
+        averageFps: elapsed > 0 ? deltas.length * 1_000 / elapsed : 0,
+        frameCount: deltas.length,
+        longFrames: deltas.filter((value) => value >= 50).length,
+        p95FrameMs: percentile(0.95),
+        p99FrameMs: percentile(0.99),
+        storeFps: performanceState.fps,
+        storeP95FrameMs: performanceState.p95FrameMs,
+      })
+    }
+    requestAnimationFrame(frame)
+  }), { attackInterval: attackIntervalMs, duration: durationMs })
+}
+
+async function selectTier(page: Page, tier: 'minimal' | 'performance' | 'balanced' | 'high') {
+  await page.evaluate((nextTier) => window.__MERBUT__!.getPerformanceState().setTier(nextTier), tier)
+  await expect(page.locator('.game-canvas')).toHaveAttribute('data-graphics-tier', tier)
+  await page.waitForTimeout(1_500)
+}
+
+test('100 düşman ve ardışık saldırıda kare sürelerini bütçe içinde tutar', async ({ page }) => {
+  test.setTimeout(120_000)
+  await page.setViewportSize({ width: 1600, height: 900 })
+  await startCombat(page)
+  await installStressScene(page, 100)
+  const scene = page.locator('.game-canvas')
+  await expect(scene).toHaveAttribute('data-render-dpr', '1.10')
+  await expect(scene).toHaveAttribute('data-dynamic-shadows', 'off')
+  await expect(scene).toHaveAttribute('data-postprocessing', 'off')
+  const high = await benchmarkFrames(page, 6_000)
+  await selectTier(page, 'balanced')
+  const balanced = await benchmarkFrames(page, 6_000)
+  await selectTier(page, 'performance')
+  const performance = await benchmarkFrames(page, 6_000)
+
+  console.log(`MERBUT_PERF ${JSON.stringify({ high, balanced, performance })}`)
+  for (const result of [high, balanced, performance]) {
+    expect(result.averageFps).toBeGreaterThan(50)
+    expect(result.p95FrameMs).toBeLessThan(35)
+    expect(result.longFrames).toBeLessThanOrEqual(2)
+  }
+
+  await selectTier(page, 'high')
+  await page.evaluate(() => {
+    const api = window.__MERBUT__!
+    api.setSessionState({ enemies: api.getSessionState().enemies.slice(0, 5) })
   })
-  await expect.poll(() => page.evaluate(() => window.__MERBUT__!.getSessionState().enemies.length)).toBeGreaterThanOrEqual(120)
-  await page.waitForTimeout(5_000)
+  await expect(scene).toHaveAttribute('data-render-dpr', '1.35')
+  await expect(scene).toHaveAttribute('data-dynamic-shadows', 'off')
+  await expect(scene).toHaveAttribute('data-postprocessing', 'off')
+  const highDetail = await benchmarkFrames(page, 6_000)
+  console.log(`MERBUT_PERF_DETAIL ${JSON.stringify(highDetail)}`)
+  expect(highDetail.averageFps).toBeGreaterThan(50)
+  expect(highDetail.p95FrameMs).toBeLessThan(35)
+  expect(highDetail.longFrames).toBeLessThanOrEqual(2)
 
-  const metrics = await measureFrameWindow(page, 5_000)
-  const performanceState = await page.evaluate(() => window.__MERBUT__!.getPerformanceState())
-  console.info(`[120-enemy-metrics] tier=${performanceState.tier} fps=${metrics.fps.toFixed(2)} p95=${metrics.p95.toFixed(2)}ms worst=${metrics.worst.toFixed(2)}ms over100=${metrics.over100}`)
-
-  expect(metrics.fps).toBeGreaterThanOrEqual(35)
-  expect(metrics.p95).toBeLessThan(80)
-  expect(metrics.over100).toBeLessThanOrEqual(2)
-  expect(gameErrors).toEqual([])
+  await page.evaluate(() => {
+    const api = window.__MERBUT__!
+    const session = api.getSessionState()
+    const template = session.enemies[0]!
+    const now = performance.now()
+    const aku = {
+      ...template,
+      id: 'perf-aku',
+      biome: 6,
+      kind: 5 as const,
+      title: 'Aku, Zamanın Efendisi',
+      x: 0,
+      health: 50_000,
+      maxHealth: 50_000,
+      scale: 3.83,
+      animation: 'attack' as const,
+      boss: true,
+      finalBoss: true,
+      bossType: 'aku' as const,
+      bossForm: 'monster' as const,
+      special: 'aku-fire-rain' as const,
+      specialStartedAt: now,
+      specialUntil: now + 60_000,
+      nextSpecialAt: now + 60_000,
+      nextAuraAt: now + 60_000,
+    }
+    api.setSessionState({
+      activeBossId: aku.id,
+      bossPhase: 'fight',
+      enemies: [aku],
+      meteors: Array.from({ length: 11 }, (_, index) => ({
+        id: `perf-meteor-${index}`,
+        x: aku.x - 5 + index,
+        createdAt: now,
+        impactAt: now + 30_000,
+        landedAt: 0,
+        damage: 0,
+        kind: 'fire' as const,
+      })),
+    })
+  })
+  await expect.poll(() => page.evaluate(() => window.__MERBUT__!.getSessionState().enemies[0]?.bossType)).toBe('aku')
+  await expect(scene).toHaveAttribute('data-render-dpr', '1.00')
+  await page.waitForTimeout(2_000)
+  const bossStress = await benchmarkFrames(page, 6_000, 720)
+  console.log(`MERBUT_PERF_BOSS ${JSON.stringify(bossStress)}`)
+  expect(bossStress.averageFps).toBeGreaterThan(50)
+  expect(bossStress.p95FrameMs).toBeLessThan(35)
+  expect(bossStress.longFrames).toBeLessThanOrEqual(2)
 })

@@ -10,6 +10,11 @@ interface CharacterPreview3DProps {
   compact?: boolean
 }
 
+const HUD_PORTRAITS: Record<CharacterId, string> = {
+  ali: '/assets/ui/ali-hud.webp',
+  jack: '/assets/ui/jack-hud.webp',
+}
+
 function PreviewFrameScheduler({ active, fps }: { active: boolean; fps: number }) {
   const invalidate = useThree((state) => state.invalidate)
 
@@ -22,7 +27,7 @@ function PreviewFrameScheduler({ active, fps }: { active: boolean; fps: number }
   return null
 }
 
-export function CharacterPreview3D({ id, compact = false }: CharacterPreview3DProps) {
+function CharacterPreviewCanvas({ id }: { id: CharacterId }) {
   const paused = useSessionStore((state) => state.phase === 'paused')
   const tier = usePerformanceStore((state) => state.tier)
   const qualityFactor = usePerformanceStore((state) => state.qualityFactor)
@@ -32,22 +37,32 @@ export function CharacterPreview3D({ id, compact = false }: CharacterPreview3DPr
   const briefingDistance = id === 'ali' ? 6.5 : 5.55
   const briefingPanX = id === 'ali' ? -0.14 : 0
   return (
-    <div className={`character-preview${compact ? ' character-preview--compact' : ''}`} aria-label={`${id === 'ali' ? 'Hz. Ali' : 'Samuray Jack'} dönen 3B figürü`}>
+    <div className="character-preview" aria-label={`${id === 'ali' ? 'Hz. Ali' : 'Samuray Jack'} dönen 3B figürü`}>
       <Canvas
         key={`preview-renderer-${profile.antialias ? 'aa' : 'raw'}`}
         frameloop={paused ? 'never' : 'demand'}
-        dpr={compact ? Math.max(1, Math.min(1.25, renderDpr)) : renderDpr}
-        camera={{ position: [compact ? 0 : briefingPanX, compact ? 1.18 : 1.25, compact ? 5 : briefingDistance], fov: compact ? 32 : 34 }}
+        dpr={renderDpr}
+        camera={{ position: [briefingPanX, 1.25, briefingDistance], fov: 34 }}
         gl={{ alpha: true, antialias: profile.antialias, powerPreference: 'high-performance' }}
       >
-        <PreviewFrameScheduler active={!paused && !compact} fps={previewFps} />
+        <PreviewFrameScheduler active={!paused} fps={previewFps} />
         <ambientLight intensity={1.4} />
         <directionalLight position={[3, 5, 4]} intensity={3.2} color={id === 'ali' ? '#ffd78a' : '#ffe8f0'} />
         <pointLight position={[-2, 1, 2]} intensity={2.1} color={id === 'ali' ? '#ff8b32' : '#ff3d86'} />
         <Suspense fallback={null}>
-          <RotatingCharacterPreview id={id} initialRotation={compact ? 0 : Math.PI} rotate={!compact} />
+          <RotatingCharacterPreview id={id} initialRotation={Math.PI} />
         </Suspense>
       </Canvas>
+    </div>
+  )
+}
+
+export function CharacterPreview3D({ id, compact = false }: CharacterPreview3DProps) {
+  if (!compact) return <CharacterPreviewCanvas id={id} />
+  const label = id === 'ali' ? 'Hz. Ali' : 'Samuray Jack'
+  return (
+    <div className="character-preview character-preview--compact" aria-label={`${label} portresi`}>
+      <img src={HUD_PORTRAITS[id]} alt="" decoding="async" draggable={false} />
     </div>
   )
 }

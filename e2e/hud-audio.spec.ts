@@ -16,7 +16,8 @@ test('oyun HUD ön izlemeleri, dünya can barları ve müzik kontrolleri okunabi
   await expect.poll(() => page.evaluate(() => window.__MERBUT__?.getSessionState().phase), { timeout: 10_000 }).toBe('playing')
 
   await expect(page.locator('.player-hud')).toHaveCount(2)
-  await expect(page.locator('.player-hud .character-preview canvas')).toHaveCount(2)
+  await expect(page.locator('.player-hud .character-preview img')).toHaveCount(2)
+  await expect(page.locator('.player-hud .character-preview canvas')).toHaveCount(0)
   await expect(page.locator('.world-health--player')).toHaveCount(2)
   await expect(page.locator('.score-stack')).toBeVisible()
   await expect(page.locator('.score-stack > div')).toHaveCount(2)

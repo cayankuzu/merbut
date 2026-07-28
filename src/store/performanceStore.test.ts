@@ -3,6 +3,7 @@ import {
   classifyPerformanceSignals,
   graphicsPreferenceStorage,
   PERFORMANCE_PROFILES,
+  runtimeRenderDpr,
   usePerformanceStore,
 } from './performanceStore'
 
@@ -64,8 +65,8 @@ describe('graphics performance preferences', () => {
     expect(PERFORMANCE_PROFILES.high.dpr).toBeGreaterThan(PERFORMANCE_PROFILES.balanced.dpr)
     expect(PERFORMANCE_PROFILES.balanced.dpr).toBeGreaterThan(PERFORMANCE_PROFILES.performance.dpr)
     expect(PERFORMANCE_PROFILES.performance.dpr).toBeGreaterThan(PERFORMANCE_PROFILES.minimal.dpr)
-    expect(PERFORMANCE_PROFILES.high.shadowMapSize).toBe(2048)
-    expect(PERFORMANCE_PROFILES.high.postprocessMultisampling).toBe(4)
+    expect(PERFORMANCE_PROFILES.high.shadowMapSize).toBe(1024)
+    expect(PERFORMANCE_PROFILES.high.postprocessMultisampling).toBe(0)
     expect(PERFORMANCE_PROFILES.high.textureAnisotropy).toBe(8)
   })
 
@@ -84,6 +85,13 @@ describe('graphics performance preferences', () => {
     usePerformanceStore.getState().reportWindow(42, 31)
 
     expect(graphicsPreferenceStorage.readRaw()).toBe(before)
+  })
+
+  it('caps only the active render resolution while a very large crowd is visible', () => {
+    expect(runtimeRenderDpr(1.35, 12)).toBe(1.35)
+    expect(runtimeRenderDpr(1.35, 100)).toBe(1.1)
+    expect(runtimeRenderDpr(1, 100)).toBe(1)
+    expect(runtimeRenderDpr(1.35, 1, true)).toBe(1)
   })
 
   it('starts conservative on an integrated Intel GPU despite a fast CPU', () => {

@@ -42,7 +42,7 @@ describe('GraphicsSettingsPanel', () => {
       preference: 'high',
       tier: 'high',
       qualityFactor: 1,
-      renderDpr: 1.6,
+      renderDpr: 1.35,
     })
   })
 })

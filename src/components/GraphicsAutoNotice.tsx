@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAudioStore } from '../audio/audioStore'
-import { usePerformanceStore, type PerformanceTier } from '../store/performanceStore'
+import { runtimeRenderDpr, usePerformanceStore, type PerformanceTier } from '../store/performanceStore'
+import { useSessionStore } from '../store/sessionStore'
 
 const TIER_NAMES: Record<PerformanceTier, string> = {
   minimal: 'AKICI',
@@ -15,6 +16,9 @@ export function GraphicsAutoNotice() {
   const qualityFactor = usePerformanceStore((state) => state.qualityFactor)
   const renderDpr = usePerformanceStore((state) => state.renderDpr)
   const tier = usePerformanceStore((state) => state.tier)
+  const enemyCount = useSessionStore((state) => state.enemies.length)
+  const heavyBoss = useSessionStore((state) => state.enemies.some((enemy) => enemy.boss && enemy.animation !== 'dead'))
+  const effectiveDpr = runtimeRenderDpr(renderDpr, enemyCount, heavyBoss)
   const openSettings = useAudioStore((state) => state.openPanel)
 
   useEffect(() => {
@@ -29,7 +33,7 @@ export function GraphicsAutoNotice() {
       <div>
         <small>GRAFİK KALİBRASYONU TAMAMLANDI</small>
         <strong>{preference === 'auto' ? 'Cihazınız için en akıcı profil otomatik uygulandı.' : 'Kayıtlı grafik tercihiniz uygulandı.'}</strong>
-        <span>{TIER_NAMES[tier]} · İç çözünürlük {renderDpr.toFixed(2)}× · Adaptif bütçe %{Math.round(qualityFactor * 100)} · Değiştirmek için Ayarlar’ı açın.</span>
+        <span>{TIER_NAMES[tier]} · İç çözünürlük {effectiveDpr.toFixed(2)}× · Adaptif bütçe %{Math.round(qualityFactor * 100)} · Değiştirmek için Ayarlar’ı açın.</span>
       </div>
       <button type="button" onClick={() => { openSettings(); setVisible(false) }}>GRAFİĞİ DÜZENLE</button>
       <button className="graphics-auto-notice__close" type="button" aria-label="Grafik bildirimini kapat" onClick={() => setVisible(false)}>×</button>

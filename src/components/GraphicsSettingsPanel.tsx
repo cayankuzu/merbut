@@ -2,8 +2,10 @@ import { startTransition } from 'react'
 import {
   type GraphicsPreference,
   type PerformanceTier,
+  runtimeRenderDpr,
   usePerformanceStore,
 } from '../store/performanceStore'
+import { useSessionStore } from '../store/sessionStore'
 
 interface GraphicsOption {
   detail: string
@@ -28,13 +30,13 @@ const GRAPHICS_OPTIONS: readonly GraphicsOption[] = [
   {
     id: 'balanced',
     label: 'YÜKSEK',
-    detail: '0,60–1,15× dinamik çözünürlük · 1K’ya kadar yumuşak gölge · görsel efektler',
+    detail: '0,60–1,15× dinamik çözünürlük · yumuşak temas gölgesi · yoğun efekt bütçesi',
     recommendation: '6 çekirdek · 8-16 GB RAM · GTX 1650 veya RX 570',
   },
   {
     id: 'high',
     label: 'ULTRA',
-    detail: '0,60–1,60× dinamik çözünürlük · 2K’ya kadar gölge · 4× MSAA · yakın tam modeller',
+    detail: '0,60–1,35× dinamik çözünürlük · yumuşak temas gölgesi · yüksek parçacık · yakın tam modeller',
     recommendation: '8+ çekirdek · 16 GB RAM · RTX 2060, RX 6600 veya Apple M1+',
   },
 ]
@@ -52,6 +54,9 @@ export function GraphicsSettingsPanel() {
   const fps = usePerformanceStore((state) => state.fps)
   const p95FrameMs = usePerformanceStore((state) => state.p95FrameMs)
   const renderDpr = usePerformanceStore((state) => state.renderDpr)
+  const enemyCount = useSessionStore((state) => state.enemies.length)
+  const heavyBoss = useSessionStore((state) => state.enemies.some((enemy) => enemy.boss && enemy.animation !== 'dead'))
+  const effectiveDpr = runtimeRenderDpr(renderDpr, enemyCount, heavyBoss)
   const setPreference = usePerformanceStore((state) => state.setPreference)
 
   const selectPreference = (nextPreference: GraphicsPreference) => {
@@ -66,7 +71,7 @@ export function GraphicsSettingsPanel() {
           <h3 id="graphics-settings-title">Grafik profili</h3>
         </div>
         <output title={`95. yüzdelik kare süresi: ${p95FrameMs.toFixed(1)} ms`}>
-          {Math.round(fps)} FPS · {TIER_LABELS[tier]} · {renderDpr.toFixed(2)}×
+          {Math.round(fps)} FPS · {TIER_LABELS[tier]} · {effectiveDpr.toFixed(2)}×
         </output>
       </div>
 

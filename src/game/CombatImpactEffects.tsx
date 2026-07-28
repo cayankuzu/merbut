@@ -5,7 +5,7 @@ import { useSessionStore } from '../store/sessionStore'
 import type { CombatImpactState } from '../types/session'
 import { CombatImpactVisual } from './CombatImpactVisual'
 import { CombatFeedbackAura } from './CombatFeedbackAura'
-import { PERFORMANCE_PROFILES, usePerformanceStore } from '../store/performanceStore'
+import { runtimeDetailedImpacts, usePerformanceStore } from '../store/performanceStore'
 
 function CombatImpact({ impact, detail }: { impact: CombatImpactState; detail: boolean }) {
   const root = useRef<Group>(null)
@@ -28,6 +28,7 @@ export function CombatImpactEffects() {
   const impacts = useSessionStore((state) => state.impacts)
   const tier = usePerformanceStore((state) => state.tier)
   const qualityFactor = usePerformanceStore((state) => state.qualityFactor)
-  const detail = PERFORMANCE_PROFILES[tier].particleRatio * qualityFactor >= 0.36
+  const enemyCount = useSessionStore((state) => state.enemies.length)
+  const detail = runtimeDetailedImpacts(tier, qualityFactor, enemyCount)
   return <>{impacts.map((impact) => <CombatImpact impact={impact} detail={detail} key={impact.id} />)}</>
 }

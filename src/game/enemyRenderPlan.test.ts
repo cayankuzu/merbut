@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildEnemyRenderPlan, FULL_ENEMY_ACTOR_LIMITS } from './enemyRenderPlan'
+import { buildEnemyRenderPlan, FULL_ENEMY_ACTOR_LIMITS, runtimeFullEnemyActorLimit } from './enemyRenderPlan'
 import type { EnemyState } from '../types/session'
 
 function enemy(id: string, x: number, overrides: Partial<EnemyState> = {}): EnemyState {
@@ -40,6 +40,13 @@ function enemy(id: string, x: number, overrides: Partial<EnemyState> = {}): Enem
 }
 
 describe('buildEnemyRenderPlan', () => {
+  it('reduces only the full skinned actor budget as crowd pressure rises', () => {
+    expect(runtimeFullEnemyActorLimit('high', 1, 12)).toBe(12)
+    expect(runtimeFullEnemyActorLimit('high', 1, 100)).toBe(6)
+    expect(runtimeFullEnemyActorLimit('balanced', 1, 100)).toBe(4)
+    expect(runtimeFullEnemyActorLimit('minimal', 0.2, 100)).toBe(2)
+  })
+
   it('keeps nearby enemies nearest-first at full fidelity and batches the rest', () => {
     const enemies = Array.from({ length: 18 }, (_, index) => enemy(`enemy-${index}`, index - 9))
     const plan = buildEnemyRenderPlan(enemies, 0, 30, 'balanced')

@@ -46,7 +46,7 @@ export function EvilJackBossActor({ id }: EvilJackBossActorProps) {
   if (!enemy) return null
   return (
     <group ref={root} position={[initialX, 0, 0]} name={enemy.title}>
-      <group ref={modelRoot} scale={0}><EvilJackCharacter action={actionName} /></group>
+      <group ref={modelRoot} scale={0}><EvilJackCharacter action={actionName} shadows={false} /></group>
     </group>
   )
 }

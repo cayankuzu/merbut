@@ -1,4 +1,4 @@
-import { Bloom, EffectComposer, Vignette } from '@react-three/postprocessing'
+import { Bloom, EffectComposer } from '@react-three/postprocessing'
 import { PERFORMANCE_PROFILES, type PerformanceTier } from '../store/performanceStore'
 
 interface AdaptiveVisualGradeProps {
@@ -15,7 +15,7 @@ export function AdaptiveVisualGrade({ qualityFactor, tier }: AdaptiveVisualGrade
   const profile = PERFORMANCE_PROFILES[tier]
   const multisampling = qualityFactor >= 0.85
     ? profile.postprocessMultisampling
-    : qualityFactor >= 0.7 ? 2 : 0
+    : qualityFactor >= 0.7 ? Math.min(2, profile.postprocessMultisampling) as 0 | 2 : 0
   return (
     <EffectComposer
       enabled={qualityFactor >= 0.6}
@@ -26,9 +26,8 @@ export function AdaptiveVisualGrade({ qualityFactor, tier }: AdaptiveVisualGrade
         intensity={(high ? 0.46 : 0.28) * (0.72 + qualityFactor * 0.28)}
         luminanceThreshold={0.82}
         luminanceSmoothing={0.3}
-        mipmapBlur={high}
+        mipmapBlur={false}
       />
-      <Vignette offset={0.18} darkness={high ? 0.48 : 0.34} eskil={false} />
     </EffectComposer>
   )
 }

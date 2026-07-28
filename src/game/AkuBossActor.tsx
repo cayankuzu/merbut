@@ -15,12 +15,12 @@ import { currentEnemyById, enemyById } from './enemyLookup'
 
 interface AkuBossActorProps { id: string }
 
-function enableShadows(root: Object3D) {
+function optimizeBossModel(root: Object3D) {
   root.traverse((node) => {
     if ('isMesh' in node && node.isMesh) {
       const mesh = node as Object3D & { castShadow: boolean; receiveShadow: boolean }
-      mesh.castShadow = true
-      mesh.receiveShadow = true
+      mesh.castShadow = false
+      mesh.receiveShadow = false
     }
   })
 }
@@ -146,7 +146,7 @@ export function AkuBossActor({ id }: AkuBossActorProps) {
   const normalAssets = ASSET_PATHS.bosses.aku.normal
   const monsterAssets = ASSET_PATHS.bosses.aku.monster
 
-  const normalWalk = useGLTF(normalAssets.walk)
+  const normalWalk = useGLTF(normalAssets.walkLod)
   const normalRun = useGLTF(normalAssets.run)
   const normalAttack = useGLTF(normalAssets.attack)
   const normalHeavy = useGLTF(normalAssets.heavy)
@@ -215,8 +215,8 @@ export function AkuBossActor({ id }: AkuBossActorProps) {
               : enemy?.animation === 'attack' ? 'double' : enemy?.animation === 'idle' ? 'idle' : 'run'
 
   useLayoutEffect(() => {
-    enableShadows(normalScene)
-    enableShadows(monsterScene)
+    optimizeBossModel(normalScene)
+    optimizeBossModel(monsterScene)
   }, [monsterScene, normalScene])
 
   useEffect(() => {
@@ -232,10 +232,20 @@ export function AkuBossActor({ id }: AkuBossActorProps) {
 
   useEffect(() => {
     const entries = [
-      { action: normalAnimations.actions[normalAction], actions: normalAnimations.actions, name: normalAction },
-      { action: monsterAnimations.actions[monsterAction], actions: monsterAnimations.actions, name: monsterAction },
+      {
+        active: enemy?.bossForm === 'normal' && enemy.special !== 'aku-split' && enemy.special !== 'aku-shapeshift',
+        action: normalAnimations.actions[normalAction], actions: normalAnimations.actions, name: normalAction,
+      },
+      {
+        active: enemy?.bossForm === 'monster' && enemy.special !== 'aku-split' && enemy.special !== 'aku-shapeshift',
+        action: monsterAnimations.actions[monsterAction], actions: monsterAnimations.actions, name: monsterAction,
+      },
     ]
-    entries.forEach(({ action, actions, name }) => {
+    entries.forEach(({ active, action, actions, name }) => {
+      if (!active) {
+        Object.values(actions).forEach((candidate) => candidate?.stop())
+        return
+      }
       if (!action) return
       const looping = name === 'walk' || name === 'run' || name === 'idle'
       action.enabled = true
@@ -249,7 +259,7 @@ export function AkuBossActor({ id }: AkuBossActorProps) {
       }
       Object.entries(actions).forEach(([candidateName, candidate]) => { if (candidateName !== name) candidate?.fadeOut(0.14) })
     })
-  }, [enemy?.animation, monsterAction, monsterAnimations.actions, normalAction, normalAnimations.actions])
+  }, [enemy?.animation, enemy?.bossForm, enemy?.special, monsterAction, monsterAnimations.actions, normalAction, normalAnimations.actions])
 
   useFrame((_, delta) => {
     const current = currentEnemyById(id)
@@ -265,6 +275,8 @@ export function AkuBossActor({ id }: AkuBossActorProps) {
     const monsterTarget = current.bossForm === 'monster' && !split && !mimicking ? current.scale * arriving * deadScale : 0
     normalRoot.current.scale.setScalar(MathUtils.damp(normalRoot.current.scale.x, normalTarget, 8, delta))
     monsterRoot.current.scale.setScalar(MathUtils.damp(monsterRoot.current.scale.x, monsterTarget, 8, delta))
+    normalRoot.current.visible = normalTarget > 0.001 || normalRoot.current.scale.x > 0.01
+    monsterRoot.current.visible = monsterTarget > 0.001 || monsterRoot.current.scale.x > 0.01
     minisRoot.current.visible = split
     if (split) {
       minisRoot.current.rotation.set(0, -root.current.rotation.y, 0)
@@ -292,8 +304,8 @@ export function AkuBossActor({ id }: AkuBossActorProps) {
   if (!enemy) return null
   return (
     <group ref={root} position={[initialX, 0, 0]} name={enemy.title}>
-      <group ref={normalRoot} scale={0}><primitive object={normalScene} /></group>
-      <group ref={monsterRoot} scale={0}><primitive object={monsterScene} /></group>
+      <group ref={normalRoot} scale={0} visible={enemy.bossForm === 'normal'}><primitive object={normalScene} /></group>
+      <group ref={monsterRoot} scale={0} visible={enemy.bossForm === 'monster'}><primitive object={monsterScene} /></group>
       <group ref={minisRoot} visible={false}>
         {MINI_AKU_OFFSETS.map((offset, index) => <group key={offset} name={`mini-aku-${index + 1}`} ref={(group) => { if (group) miniGroups.current[index] = group }}><MiniAkuModel bossId={id} index={index} /></group>)}
       </group>

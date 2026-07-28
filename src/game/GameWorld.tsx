@@ -20,6 +20,7 @@ import { BossIntroSequence } from './BossIntroSequence'
 import { BossBattleEffects } from './BossBattleEffects'
 import { FinalPortal } from './FinalPortal'
 import { useSessionStore } from '../store/sessionStore'
+import { ActorContactShadows } from './ActorContactShadows'
 
 export function GameWorld() {
   const phase = useSessionStore((state) => state.phase)
@@ -34,6 +35,7 @@ export function GameWorld() {
       {showCombatActors ? <>
         <AliCharacter />
         <JackCharacter />
+        <ActorContactShadows />
         <EnemySystem />
         <ZemzemPickups />
         <CombatEffects />

@@ -8,8 +8,7 @@ import { prepareAnimationClip } from '../animation/animationLoader'
 import { validateClipTargets } from '../animation/animationRetargeting'
 import { ENEMIES } from '../config/enemies'
 import { useSessionStore } from '../store/sessionStore'
-import { PERFORMANCE_PROFILES, runtimeAnimationFps, usePerformanceStore } from '../store/performanceStore'
-import { WorldHealthBar } from './WorldHealthBar'
+import { runtimeAnimationFps, usePerformanceStore } from '../store/performanceStore'
 import { currentEnemyById, enemyById } from './enemyLookup'
 
 interface EnemyActorProps {
@@ -34,7 +33,6 @@ export function EnemyActor({ id }: EnemyActorProps) {
     const current = enemyById(state.enemies, id)
     return current ? {
       kind: current.kind, title: current.title, animation: current.animation, scale: current.scale,
-      health: current.health, maxHealth: current.maxHealth, accent: current.accent, boss: current.boss,
     } : null
   }))
   const initialX = useMemo(() => currentEnemyById(id)?.x ?? 0, [id])
@@ -43,7 +41,6 @@ export function EnemyActor({ id }: EnemyActorProps) {
   const animationAccumulator = useRef(0)
   const tier = usePerformanceStore((state) => state.tier)
   const qualityFactor = usePerformanceStore((state) => state.qualityFactor)
-  const profile = PERFORMANCE_PROFILES[tier]
   const animationFps = runtimeAnimationFps(tier, qualityFactor)
   const definition = ENEMIES[enemy?.kind ?? 1]
   const walkFile = useGLTF(definition.walk)
@@ -61,7 +58,7 @@ export function EnemyActor({ id }: EnemyActorProps) {
   const activeAction = useRef<EnemyActionName | null>(null)
   const actionsPrimed = useRef(false)
 
-  useLayoutEffect(() => configureEnemyShadows(scene, profile.shadows), [profile.shadows, scene])
+  useLayoutEffect(() => configureEnemyShadows(scene, false), [scene])
 
   // Keep both clips registered with the mixer for the life of this actor. Calling
   // play() after an action has been faded out can make Three's internal binding
@@ -145,11 +142,6 @@ export function EnemyActor({ id }: EnemyActorProps) {
       <group ref={modelRoot} scale={enemy.scale}>
         <primitive object={scene} />
       </group>
-      {enemy.animation !== 'dead' && !enemy.boss ? (
-        <group position={[0, enemy.scale * 1.9, 0]}>
-          <WorldHealthBar label={enemy.title} health={enemy.health} maxHealth={enemy.maxHealth} accent={enemy.accent} />
-        </group>
-      ) : null}
     </group>
   )
 }

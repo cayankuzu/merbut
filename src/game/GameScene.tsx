@@ -10,21 +10,28 @@ import {
 } from 'three'
 import { GameWorld } from './GameWorld'
 import { useSessionStore } from '../store/sessionStore'
-import { PERFORMANCE_PROFILES, type PerformanceTier, usePerformanceStore } from '../store/performanceStore'
+import {
+  PERFORMANCE_PROFILES,
+  runtimeDynamicShadows,
+  runtimePostprocessing,
+  runtimeRenderDpr,
+  type PerformanceTier,
+  usePerformanceStore,
+} from '../store/performanceStore'
 
 const LOWER_TIER: Record<PerformanceTier, PerformanceTier> = {
   high: 'balanced', balanced: 'performance', performance: 'minimal', minimal: 'minimal',
 }
 const AdaptiveVisualGrade = lazy(() => import('./AdaptiveVisualGrade').then((module) => ({ default: module.AdaptiveVisualGrade })))
 
-function ShadowRenderBudget() {
+function ShadowRenderBudget({ enabled }: { enabled: boolean }) {
   const gl = useThree((state) => state.gl)
   const scene = useThree((state) => state.scene)
   const elapsed = useRef(0)
   const tier = usePerformanceStore((state) => state.tier)
   const qualityFactor = usePerformanceStore((state) => state.qualityFactor)
   const profile = PERFORMANCE_PROFILES[tier]
-  const shadowFps = profile.shadows && qualityFactor >= 0.6
+  const shadowFps = enabled
     ? Math.max(4, Math.round(profile.shadowFps * qualityFactor))
     : 0
 
@@ -87,9 +94,42 @@ function TextureQuality() {
   return null
 }
 
-function RuntimePerformanceGovernor({ active }: { active: boolean }) {
+function ScenePrecompiler() {
+  const gl = useThree((state) => state.gl)
+  const scene = useThree((state) => state.scene)
+  const camera = useThree((state) => state.camera)
+  const phase = useSessionStore((state) => state.phase)
+
+  useEffect(() => {
+    if (phase !== 'countdown') return
+    let cancelled = false
+    const compile = () => {
+      if (cancelled) return
+      void gl.compileAsync(scene, camera).catch(() => undefined)
+    }
+    const idleWindow = window as unknown as {
+      cancelIdleCallback?: Window['cancelIdleCallback']
+      requestIdleCallback?: Window['requestIdleCallback']
+    }
+    if (idleWindow.requestIdleCallback) {
+      const handle = idleWindow.requestIdleCallback(compile, { timeout: 500 })
+      return () => {
+        cancelled = true
+        idleWindow.cancelIdleCallback?.(handle)
+      }
+    }
+    const handle = globalThis.setTimeout(compile, 32)
+    return () => {
+      cancelled = true
+      globalThis.clearTimeout(handle)
+    }
+  }, [camera, gl, phase, scene])
+
+  return null
+}
+
+function RuntimePerformanceGovernor({ active, effectiveDpr }: { active: boolean; effectiveDpr: number }) {
   const setDpr = useThree((state) => state.setDpr)
-  const renderDpr = usePerformanceStore((state) => state.renderDpr)
   const samples = useRef<number[]>([])
   const elapsed = useRef(0)
   const activeElapsed = useRef(0)
@@ -97,8 +137,8 @@ function RuntimePerformanceGovernor({ active }: { active: boolean }) {
   const fastWindows = useRef(0)
 
   useEffect(() => {
-    setDpr(renderDpr)
-  }, [renderDpr, setDpr])
+    setDpr(effectiveDpr)
+  }, [effectiveDpr, setDpr])
 
   useEffect(() => {
     if (!('PerformanceObserver' in window)) return
@@ -181,21 +221,33 @@ function RuntimePerformanceGovernor({ active }: { active: boolean }) {
 
 export function GameScene() {
   const phase = useSessionStore((state) => state.phase)
+  const enemyCount = useSessionStore((state) => state.enemies.length)
+  const heavyBoss = useSessionStore((state) => state.enemies.some((enemy) => enemy.boss && enemy.animation !== 'dead'))
   const active = phase === 'countdown' || phase === 'boss-intro' || phase === 'final-intro' || phase === 'playing' || phase === 'ending'
+  const showCombatActors = phase !== 'menu' && phase !== 'controls'
   const tier = usePerformanceStore((state) => state.tier)
   const qualityFactor = usePerformanceStore((state) => state.qualityFactor)
   const renderDpr = usePerformanceStore((state) => state.renderDpr)
   const profile = PERFORMANCE_PROFILES[tier]
+  const effectiveDpr = runtimeRenderDpr(renderDpr, enemyCount, heavyBoss)
+  // Animated shadow maps duplicate every skinned draw. Instanced contact
+  // shadows preserve grounding during combat without that second render pass.
+  const dynamicShadows = !showCombatActors && runtimeDynamicShadows(tier, qualityFactor, enemyCount)
+  // Full-screen post effects scale with pixel count rather than actor count and
+  // caused the normal high-detail scene to cost more than a 100-enemy crowd.
+  const postprocessing = !showCombatActors && runtimePostprocessing(tier, qualityFactor, enemyCount)
   return (
     <Canvas
       className="game-canvas"
       data-graphics-tier={tier}
       data-quality-factor={qualityFactor.toFixed(2)}
-      data-render-dpr={renderDpr.toFixed(2)}
-      shadows={profile.shadows}
-      dpr={renderDpr}
+      data-render-dpr={effectiveDpr.toFixed(2)}
+      data-dynamic-shadows={dynamicShadows ? 'on' : 'off'}
+      data-postprocessing={postprocessing ? 'on' : 'off'}
+      shadows={dynamicShadows}
+      dpr={effectiveDpr}
       frameloop={active ? 'always' : 'demand'}
-      gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
+      gl={{ antialias: profile.antialias, alpha: true, powerPreference: 'high-performance' }}
       onCreated={({ gl }) => {
         gl.shadowMap.type = PCFShadowMap
         gl.toneMapping = ACESFilmicToneMapping
@@ -205,11 +257,12 @@ export function GameScene() {
       }}
     >
       <Suspense fallback={null}>
-        <RuntimePerformanceGovernor active={active} />
-        <ShadowRenderBudget />
+        <RuntimePerformanceGovernor active={active} effectiveDpr={effectiveDpr} />
+        <ScenePrecompiler />
+        <ShadowRenderBudget enabled={dynamicShadows} />
         <TextureQuality />
         <GameWorld />
-        {(tier === 'balanced' || tier === 'high') && qualityFactor >= 0.6 ? (
+        {postprocessing && (tier === 'balanced' || tier === 'high') ? (
           <Suspense fallback={null}><AdaptiveVisualGrade qualityFactor={qualityFactor} tier={tier} /></Suspense>
         ) : null}
       </Suspense>

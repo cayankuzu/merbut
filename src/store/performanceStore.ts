@@ -138,10 +138,10 @@ export const PERFORMANCE_PROFILES: Record<PerformanceTier, PerformanceProfile> =
     menuFps: 60,
     minimumDpr: 0.6,
     particleRatio: 0.85,
-    postprocessMultisampling: 2,
-    postprocessResolutionScale: 0.9,
-    shadowFps: 15,
-    shadowMapSize: 1024,
+    postprocessMultisampling: 0,
+    postprocessResolutionScale: 0.6,
+    shadowFps: 6,
+    shadowMapSize: 512,
     shadows: true,
     softShadows: true,
     textureAnisotropy: 4,
@@ -150,16 +150,16 @@ export const PERFORMANCE_PROFILES: Record<PerformanceTier, PerformanceProfile> =
     actorMountDistance: 64,
     animationFps: 60,
     antialias: true,
-    dpr: 1.6,
+    dpr: 1.35,
     dynamicLights: true,
     impactBudget: 32,
     menuFps: 60,
     minimumDpr: 0.6,
     particleRatio: 1.25,
-    postprocessMultisampling: 4,
-    postprocessResolutionScale: 1,
-    shadowFps: 20,
-    shadowMapSize: 2048,
+    postprocessMultisampling: 0,
+    postprocessResolutionScale: 0.65,
+    shadowFps: 8,
+    shadowMapSize: 1024,
     shadows: true,
     softShadows: true,
     textureAnisotropy: 8,
@@ -342,4 +342,25 @@ export function runtimeParticleRatio(tier: PerformanceTier, qualityFactor: numbe
 
 export function runtimeAnimationFps(tier: PerformanceTier, qualityFactor: number) {
   return Math.max(PERFORMANCE_PROFILES.minimal.animationFps, Math.round(PERFORMANCE_PROFILES[tier].animationFps * qualityFactor))
+}
+
+export function runtimeDynamicShadows(tier: PerformanceTier, qualityFactor: number, enemyCount: number) {
+  if (!PERFORMANCE_PROFILES[tier].shadows || qualityFactor < 0.6) return false
+  const limit = tier === 'high' ? 18 : tier === 'balanced' ? 10 : 0
+  return enemyCount <= limit
+}
+
+export function runtimePostprocessing(tier: PerformanceTier, qualityFactor: number, enemyCount: number) {
+  if ((tier !== 'balanced' && tier !== 'high') || qualityFactor < 0.6) return false
+  return enemyCount <= (tier === 'high' ? 24 : 12)
+}
+
+export function runtimeDetailedImpacts(tier: PerformanceTier, qualityFactor: number, enemyCount: number) {
+  return PERFORMANCE_PROFILES[tier].particleRatio * qualityFactor >= 0.5 && enemyCount <= 24
+}
+
+export function runtimeRenderDpr(configuredDpr: number, enemyCount: number, heavyBoss = false) {
+  const crowdCap = enemyCount >= 80 ? 1.1 : enemyCount >= 40 ? 1.18 : enemyCount >= 20 ? 1.25 : configuredDpr
+  const bossCap = heavyBoss ? 1 : configuredDpr
+  return Math.min(configuredDpr, crowdCap, bossCap)
 }

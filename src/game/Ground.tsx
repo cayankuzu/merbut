@@ -20,7 +20,6 @@ import {
 } from '../config/biomes'
 import { GAME_CONFIG } from '../config/gameConfig'
 import { useDebugStore } from '../store/debugStore'
-import { FollowingContactShadows } from './FollowingContactShadows'
 
 const GROUND_MARGIN = 7
 const GROUND_WIDTH = WORLD_VISUAL_RIGHT - WORLD_VISUAL_LEFT + GROUND_MARGIN * 2
@@ -328,7 +327,6 @@ export function Ground() {
         <meshBasicMaterial />
       </mesh>
 
-      <FollowingContactShadows groundHeight={groundHeight} />
     </group>
   )
 }

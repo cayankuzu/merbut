@@ -7,14 +7,16 @@ import { useShallow } from 'zustand/react/shallow'
 import { useGameStore } from '../store/gameStore'
 import { PERFORMANCE_PROFILES, usePerformanceStore } from '../store/performanceStore'
 import { CrowdEnemyProxies } from './CrowdEnemyProxies'
-import { buildEnemyRenderPlan, FULL_ENEMY_ACTOR_LIMITS } from './enemyRenderPlan'
+import { buildEnemyRenderPlan, runtimeFullEnemyActorLimit } from './enemyRenderPlan'
+import { EnemyHealthBars } from './EnemyHealthBars'
 
 export function EnemySystem() {
   const roster = useSessionStore(useShallow((state) => state.enemies.map((enemy) => `${enemy.id}|${enemy.bossType ?? 'enemy'}`)))
   const tier = usePerformanceStore((state) => state.tier)
   const qualityFactor = usePerformanceStore((state) => state.qualityFactor)
   const mountDistance = PERFORMANCE_PROFILES[tier].actorMountDistance
-  const fullActorLimit = Math.max(tier === 'minimal' ? 3 : 2, Math.round(FULL_ENEMY_ACTOR_LIMITS[tier] * qualityFactor))
+  const enemyCount = roster.length
+  const fullActorLimit = runtimeFullEnemyActorLimit(tier, qualityFactor, enemyCount)
   const [visibilityTick, setVisibilityTick] = useState(0)
   const stickyFullActors = useRef<string[]>([])
 
@@ -33,6 +35,7 @@ export function EnemySystem() {
     const bossTypes = new Map(enemies.map((enemy) => [enemy.id, enemy.bossType]))
     return {
       actorKeys: plan.fullActorIds.map((id) => `${id}|${bossTypes.get(id) ?? 'enemy'}`),
+      healthBarIds: plan.fullActorIds.filter((id) => !bossTypes.get(id)),
       proxyIds: plan.proxyIds,
     }
   }, [fullActorLimit, mountDistance, roster, tier, visibilityTick])
@@ -44,5 +47,5 @@ export function EnemySystem() {
       : bossType === 'aku'
         ? <AkuBossActor id={id} key={id} />
         : <EnemyActor id={id} key={id} />
-  })}<CrowdEnemyProxies ids={renderPlan.proxyIds} /></>
+  })}<EnemyHealthBars ids={renderPlan.healthBarIds} /><CrowdEnemyProxies ids={renderPlan.proxyIds} /></>
 }

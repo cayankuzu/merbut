@@ -12,7 +12,7 @@ import {
 import { biomeAtmosphere } from '../config/biomeAtmosphere'
 import { getBiomeBlend } from '../config/biomes'
 import { useGameStore } from '../store/gameStore'
-import { PERFORMANCE_PROFILES, usePerformanceStore } from '../store/performanceStore'
+import { PERFORMANCE_PROFILES, runtimeDynamicShadows, usePerformanceStore } from '../store/performanceStore'
 import { useSessionStore } from '../store/sessionStore'
 
 const targetFog = new Color()
@@ -35,7 +35,11 @@ export function BiomeLighting() {
   const fog = useMemo(() => new Fog('#56342f', 18, 35), [])
   const tier = usePerformanceStore((state) => state.tier)
   const qualityFactor = usePerformanceStore((state) => state.qualityFactor)
+  const phase = useSessionStore((state) => state.phase)
+  const enemyCount = useSessionStore((state) => state.enemies.length)
   const profile = PERFORMANCE_PROFILES[tier]
+  const dynamicShadows = (phase === 'menu' || phase === 'controls')
+    && runtimeDynamicShadows(tier, qualityFactor, enemyCount)
 
   useEffect(() => {
     scene.fog = fog
@@ -95,7 +99,7 @@ export function BiomeLighting() {
       <hemisphereLight ref={hemisphere} args={['#ffe0bb', '#3d242e', 1.02]} />
       <directionalLight
         ref={directional}
-        castShadow={profile.shadows && qualityFactor >= 0.6}
+        castShadow={dynamicShadows}
         position={[-4, 9, 7]}
         intensity={2.15}
         color="#ffe0bb"

@@ -1,5 +1,5 @@
 import { useSessionStore } from '../store/sessionStore'
-import type { EnemyProjectileState, ProjectileState } from '../types/session'
+import type { EnemyProjectileState, MeteorState, ProjectileState } from '../types/session'
 
 /**
  * Projectile arrays are replaced atomically by the combat simulation.  Cache a
@@ -20,6 +20,7 @@ function indexById<T extends { id: string }>(
 
 const fireballIndexes = new WeakMap<readonly ProjectileState[], ReadonlyMap<string, ProjectileState>>()
 const enemyProjectileIndexes = new WeakMap<readonly EnemyProjectileState[], ReadonlyMap<string, EnemyProjectileState>>()
+const meteorIndexes = new WeakMap<readonly MeteorState[], ReadonlyMap<string, MeteorState>>()
 
 export function fireballById(projectiles: readonly ProjectileState[], id: string) {
   return indexById(fireballIndexes, projectiles).get(id)
@@ -35,4 +36,8 @@ export function currentFireballById(id: string) {
 
 export function currentEnemyProjectileById(id: string) {
   return enemyProjectileById(useSessionStore.getState().enemyProjectiles, id)
+}
+
+export function currentMeteorById(id: string) {
+  return indexById(meteorIndexes, useSessionStore.getState().meteors).get(id)
 }

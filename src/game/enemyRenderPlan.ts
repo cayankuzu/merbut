@@ -13,6 +13,21 @@ export const FULL_ENEMY_ACTOR_LIMITS: Record<PerformanceTier, number> = {
   high: 12,
 }
 
+export function runtimeFullEnemyActorLimit(
+  tier: PerformanceTier,
+  qualityFactor: number,
+  enemyCount: number,
+) {
+  const crowdScale = enemyCount >= 80
+    ? 0.5
+    : enemyCount >= 40
+      ? 0.65
+      : enemyCount >= 20
+        ? 0.8
+        : 1
+  return Math.max(2, Math.round(FULL_ENEMY_ACTOR_LIMITS[tier] * qualityFactor * crowdScale))
+}
+
 export interface EnemyRenderPlan {
   fullActorIds: string[]
   proxyIds: string[]

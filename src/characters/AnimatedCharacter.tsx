@@ -7,6 +7,8 @@ import { prepareAnimationClip } from '../animation/animationLoader'
 import { validateClipTargets } from '../animation/animationRetargeting'
 import { useCharacterAnimations } from '../hooks/useCharacterAnimations'
 import { useDebugStore } from '../store/debugStore'
+import { runtimeDynamicShadows, usePerformanceStore } from '../store/performanceStore'
+import { useSessionStore } from '../store/sessionStore'
 import type { AnimationState } from '../types/animation'
 import type { CharacterDefinition } from '../types/character'
 import { AliFaceLight } from './AliFaceLight'
@@ -34,12 +36,12 @@ interface AnimatedCharacterProps {
   animationDurationSeconds?: number
 }
 
-function enableShadows(root: Object3D) {
+function configureShadows(root: Object3D, enabled: boolean) {
   root.traverse((node) => {
     if ('isMesh' in node && node.isMesh) {
       const mesh = node as Object3D & { castShadow: boolean; receiveShadow: boolean }
-      mesh.castShadow = true
-      mesh.receiveShadow = true
+      mesh.castShadow = enabled
+      mesh.receiveShadow = false
     }
   })
 }
@@ -51,6 +53,12 @@ export function AnimatedCharacter({ continuousFaceLight = true, definition, anim
   const attackFile = useGLTF(definition.assets.attack)
   const swordFile = useGLTF(definition.assets.sword)
   const transform = useDebugStore((state) => state.transforms[definition.id])
+  const tier = usePerformanceStore((state) => state.tier)
+  const qualityFactor = usePerformanceStore((state) => state.qualityFactor)
+  const phase = useSessionStore((state) => state.phase)
+  const enemyCount = useSessionStore((state) => state.enemies.length)
+  const dynamicShadows = (phase === 'menu' || phase === 'controls')
+    && runtimeDynamicShadows(tier, qualityFactor, enemyCount)
   const attachmentRef = useRef<WeaponAttachment | null>(null)
   const initialWeaponTransform = useRef(transform.weapon)
 
@@ -73,8 +81,10 @@ export function AnimatedCharacter({ continuousFaceLight = true, definition, anim
   useCharacterAnimations(characterScene, clips, animationState, animationSignal, animationDurationSeconds)
 
   useLayoutEffect(() => {
-    enableShadows(characterScene)
-    enableShadows(swordScene)
+    configureShadows(characterScene, dynamicShadows)
+    // The weapons contain more than half a million render vertices. Their
+    // silhouettes remain attached to the body shadow without a second pass.
+    configureShadows(swordScene, false)
     const attachment = attachWeapon(characterScene, swordScene, initialWeaponTransform.current)
     if (definition.id === 'ali') placeWeaponGripInPalm(attachment, ALI_PALM_REACH)
     attachmentRef.current = attachment
@@ -82,7 +92,7 @@ export function AnimatedCharacter({ continuousFaceLight = true, definition, anim
       attachment.detach()
       attachmentRef.current = null
     }
-  }, [characterScene, definition.id, swordScene])
+  }, [characterScene, definition.id, dynamicShadows, swordScene])
 
   useLayoutEffect(() => {
     if (attachmentRef.current) alignWeaponAttachment(attachmentRef.current, transform.weapon)

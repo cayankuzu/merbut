@@ -109,6 +109,16 @@ function nearestLivingPlayer(enemyX: number) {
   )
 }
 
+function nearestPlayerFrom(
+  enemyX: number,
+  ids: readonly CharacterId[],
+  positions: ReturnType<typeof useGameStore.getState>['positions'],
+) {
+  if (ids.length === 0) return null
+  if (ids.length === 1) return ids[0]!
+  return Math.abs(positions.ali[0] - enemyX) <= Math.abs(positions.jack[0] - enemyX) ? 'ali' : 'jack'
+}
+
 function dropZemzem(x: number, now: number) {
   const state = useSessionStore.getState()
   if (Math.random() >= DIFFICULTIES[state.difficulty].healDropChance) return
@@ -411,6 +421,11 @@ export function GameDirector() {
     if (!['countdown', 'boss-intro', 'final-intro', 'playing', 'ending'].includes(session.phase)) return
     if (session.phase !== 'playing') return
 
+    accumulator.current += delta
+    if (accumulator.current < COMBAT_STEP) return
+    const step = accumulator.current
+    accumulator.current = 0
+
     const game = useGameStore.getState()
     const livingIds = livingPlayers()
     const midpoint = livingIds.length > 0
@@ -461,10 +476,6 @@ export function GameDirector() {
       previousAttackSequences.current[id] = sequence
     }
 
-    accumulator.current += delta
-    if (accumulator.current < COMBAT_STEP) return
-    const step = accumulator.current
-    accumulator.current = 0
     const current = useSessionStore.getState()
     const currentGame = useGameStore.getState()
     const shieldActive = current.players.jack.abilityActiveUntil > now && !current.players.jack.dead
@@ -482,7 +493,7 @@ export function GameDirector() {
           const bossState = runAkuBoss(enemy, now, currentGame.positions)
           if (bossState) return bossState
         }
-        const targetId = nearestLivingPlayer(enemy.x)
+        const targetId = nearestPlayerFrom(enemy.x, livingIds, currentGame.positions)
         if (!targetId) return enemy
         const targetX = currentGame.positions[targetId][0]
         const distance = Math.abs(targetX - enemy.x)
@@ -528,13 +539,16 @@ export function GameDirector() {
     current.updateEnemies(updatedEnemies)
 
     const fireballs: ProjectileState[] = []
-    for (const projectile of useSessionStore.getState().projectiles) {
+    const activeFireballs = useSessionStore.getState().projectiles
+    let collisionEnemies = useSessionStore.getState().enemies
+    for (const projectile of activeFireballs) {
       const travel = FIREBALL_SPEED * step
       const moved = { ...projectile, x: projectile.x + projectile.directionX * travel, z: projectile.z + projectile.directionZ * travel, travelled: projectile.travelled + travel }
       let consumed = false
-      for (const enemy of useSessionStore.getState().enemies) {
+      for (const enemy of collisionEnemies) {
         if (enemy.animation !== 'dead' && Math.abs(enemy.x - moved.x) < (enemy.boss ? 1.5 : 0.9) && Math.abs(moved.z) < 1.4) {
           hitEnemy(enemy.id, 58 * rules.abilityDamage, 'ali', now, 'fireball')
+          collisionEnemies = useSessionStore.getState().enemies
           consumed = true
           break
         }
@@ -544,7 +558,8 @@ export function GameDirector() {
     current.updateProjectiles(fireballs)
 
     const enemyShots: EnemyProjectileState[] = []
-    for (const shot of useSessionStore.getState().enemyProjectiles) {
+    const activeEnemyShots = useSessionStore.getState().enemyProjectiles
+    for (const shot of activeEnemyShots) {
       if (shot.kind === 'time-portal') {
         const liveSession = useSessionStore.getState()
         const source = liveSession.enemies.find((enemy) => enemy.id === shot.sourceId)
@@ -559,7 +574,7 @@ export function GameDirector() {
       if (shieldBlocked) {
         current.addImpact({ kind: 'frost', x: moved.x, y: 1.1, createdAt: now, duration: 620, lethal: false })
       } else if (reachedTarget || moved.travelled > 13) {
-        const targetId = nearestLivingPlayer(moved.x)
+        const targetId = nearestPlayerFrom(moved.x, livingIds, currentGame.positions)
         const targetFeetY = targetId ? currentGame.positions[targetId][1] : 0
         const intersectsPlayerHeight = shot.y >= targetFeetY + 0.15 && shot.y <= targetFeetY + 2.25
         if (targetId && intersectsPlayerHeight && Math.abs(currentGame.positions[targetId][0] - moved.x) < 1.25) {
@@ -575,9 +590,10 @@ export function GameDirector() {
     current.updateEnemyProjectiles(enemyShots)
 
     const meteors: MeteorState[] = []
-    for (const meteor of useSessionStore.getState().meteors) {
+    const activeMeteors = useSessionStore.getState().meteors
+    for (const meteor of activeMeteors) {
       if (meteor.landedAt === 0 && now >= meteor.impactAt) {
-        for (const id of livingPlayers()) {
+        for (const id of livingIds) {
           if (Math.abs(currentGame.positions[id][0] - meteor.x) < 1.35 && currentGame.positions[id][1] <= 0.9 && !isShielded(id, currentGame.positions, shieldActive)) current.damagePlayer(id, meteor.damage, now)
         }
         current.addImpact({ kind: meteor.kind === 'fire' ? 'ember' : 'boss', x: meteor.x, y: 0.08, createdAt: now, duration: 1_050, lethal: false })
@@ -586,7 +602,8 @@ export function GameDirector() {
     }
     current.updateMeteors(meteors)
 
-    for (const pickup of useSessionStore.getState().pickups) {
+    const activePickups = useSessionStore.getState().pickups
+    for (const pickup of activePickups) {
       for (const id of livingIds) {
         if (Math.abs(currentGame.positions[id][0] - pickup.x) < 0.95) {
           current.collectPickup(pickup.id, id, now)
