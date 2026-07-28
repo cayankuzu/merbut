@@ -1,7 +1,6 @@
 import { Bone, type Object3D } from 'three'
 
 const FACE_ANCHOR_NAMES = ['headfront', 'HeadFront', 'mixamorigHeadFront', 'Head'] as const
-
 export function findAliFaceAnchor(root: Object3D) {
   for (const name of FACE_ANCHOR_NAMES) {
     const candidate = root.getObjectByName(name)

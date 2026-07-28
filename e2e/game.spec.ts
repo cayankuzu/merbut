@@ -18,7 +18,7 @@ test('ana menü, kontrol brifingi ve duraklatma akışı çalışır', async ({ 
   await page.goto('/')
   await waitForAssets(page)
   await expect(page.getByRole('heading', { name: 'MERBUT' })).toBeVisible()
-  await expect(page.locator('.merbut-copyright')).toContainText('SÜRÜM v1.1.3')
+  await expect(page.locator('.merbut-copyright')).toContainText('SÜRÜM v1.1.4')
   await expect(page.locator('iframe[title="Merbut fon müziği · YouTube"]')).toHaveAttribute('src', /autoplay=1.*loop=1/)
   const audioDefaults = await page.evaluate(() => window.__MERBUT__!.getAudioState())
   expect(audioDefaults).toMatchObject({ musicPlaying: true, musicLooping: true })

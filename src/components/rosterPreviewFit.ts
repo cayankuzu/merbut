@@ -7,6 +7,8 @@ export interface RosterPreviewFit {
   modelOffset: readonly [number, number, number]
 }
 
+export const ROSTER_CAMERA_PADDING = 1.28
+
 const FALLBACK_HALF_HEIGHT = 1.5
 const FALLBACK_HORIZONTAL_RADIUS = 1.1
 const MIN_EXTENT = 0.25
@@ -22,11 +24,11 @@ function centeredOffset(value: number) {
 
 /**
  * Centers a roster model on its rotation pivot and returns a conservative
- * cylinder that contains its complete AABB through a 360 degree Y rotation.
+ * sphere that contains its complete AABB through unrestricted yaw and pitch.
  */
 export function computeRosterPreviewFit(bounds: Box3): RosterPreviewFit {
   if (bounds.isEmpty()) return {
-    center: [0, 1.25, 0],
+    center: [0, 0, 0],
     halfHeight: FALLBACK_HALF_HEIGHT,
     horizontalRadius: FALLBACK_HORIZONTAL_RADIUS,
     modelOffset: [0, 0, 0],
@@ -35,29 +37,35 @@ export function computeRosterPreviewFit(bounds: Box3): RosterPreviewFit {
   const boundsCenter = bounds.getCenter(new Vector3())
   const size = bounds.getSize(new Vector3())
   const halfWidth = Math.max(MIN_EXTENT, finiteOr(size.x / 2, FALLBACK_HORIZONTAL_RADIUS))
+  const halfHeight = Math.max(MIN_EXTENT, finiteOr(size.y / 2, FALLBACK_HALF_HEIGHT))
   const halfDepth = Math.max(MIN_EXTENT, finiteOr(size.z / 2, FALLBACK_HORIZONTAL_RADIUS))
+  const radius = Math.hypot(halfWidth, halfHeight, halfDepth)
 
   return {
-    center: [0, finiteOr(boundsCenter.y, 1.25), 0],
-    halfHeight: Math.max(MIN_EXTENT, finiteOr(size.y / 2, FALLBACK_HALF_HEIGHT)),
-    horizontalRadius: Math.hypot(halfWidth, halfDepth),
-    modelOffset: [centeredOffset(boundsCenter.x), 0, centeredOffset(boundsCenter.z)],
+    center: [0, 0, 0],
+    halfHeight: radius,
+    horizontalRadius: radius,
+    modelOffset: [
+      centeredOffset(boundsCenter.x),
+      centeredOffset(boundsCenter.y),
+      centeredOffset(boundsCenter.z),
+    ],
   }
 }
 
-/** Returns the camera distance required to contain the complete framing cylinder. */
+/** Returns the camera distance required to contain the complete framing sphere. */
 export function getRosterPreviewDistance(
   fit: Pick<RosterPreviewFit, 'halfHeight' | 'horizontalRadius'>,
   verticalFovDegrees: number,
   aspect: number,
-  padding = 1.12,
+  padding = ROSTER_CAMERA_PADDING,
 ) {
   const halfHeight = Math.max(MIN_EXTENT, finiteOr(fit.halfHeight, FALLBACK_HALF_HEIGHT))
   const horizontalRadius = Math.max(MIN_EXTENT, finiteOr(fit.horizontalRadius, FALLBACK_HORIZONTAL_RADIUS))
   const verticalHalfFov = MathUtils.degToRad(MathUtils.clamp(finiteOr(verticalFovDegrees, 34), 10, 120) / 2)
   const safeAspect = Math.max(0.1, finiteOr(aspect, 1))
   const horizontalHalfFov = Math.atan(Math.tan(verticalHalfFov) * safeAspect)
-  const verticalDistance = horizontalRadius + halfHeight / Math.tan(verticalHalfFov)
-  const horizontalDistance = horizontalRadius + horizontalRadius / Math.tan(horizontalHalfFov)
-  return Math.max(verticalDistance, horizontalDistance) * Math.max(1, finiteOr(padding, 1.12))
+  const verticalDistance = halfHeight / Math.sin(verticalHalfFov)
+  const horizontalDistance = horizontalRadius / Math.sin(horizontalHalfFov)
+  return Math.max(verticalDistance, horizontalDistance) * Math.max(1, finiteOr(padding, ROSTER_CAMERA_PADDING))
 }

@@ -1,7 +1,16 @@
 import { Bone, Euler, Group, Object3D, Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 import { BOSS_MODEL_SCALES, CHARACTER_TRANSFORMS, SHADOW_WEAPON_TRANSFORM } from '../config/characterTransforms'
-import { applyWeaponTransform, attachWeapon, keepWeaponOutsideTorso, placeWeaponGripInPalm, updateWeaponSocket } from './WeaponSocket'
+import {
+  applyWeaponTransform,
+  attachWeapon,
+  constrainWeaponBladeAgainstCapsule,
+  findWeaponBodyGuard,
+  keepWeaponOutsideBody,
+  keepWeaponOutsideTorso,
+  placeWeaponGripInPalm,
+  updateWeaponSocket,
+} from './WeaponSocket'
 
 function transformedGrip(id: 'ali' | 'jack') {
   const weapon = new Object3D()
@@ -87,12 +96,151 @@ describe('weapon transforms', () => {
     const attachment = attachWeapon(character, weapon, CHARACTER_TRANSFORMS.ali.weapon)
     const bladeRotation = weapon.quaternion.clone()
 
-    expect(placeWeaponGripInPalm(attachment, 0.42)).toBe(true)
+    expect(placeWeaponGripInPalm(attachment, 0.48)).toBe(true)
     character.updateWorldMatrix(true, true)
     const grip = weapon.localToWorld(new Vector3(...CHARACTER_TRANSFORMS.ali.weapon.gripPoint))
 
-    expect(grip.distanceTo(new Vector3(0, 14.2, 0))).toBeLessThan(0.00001)
+    expect(grip.distanceTo(new Vector3(0, 14.8, 0))).toBeLessThan(0.00001)
     expect(weapon.quaternion.angleTo(bladeRotation)).toBeLessThan(0.00001)
+  })
+
+  it('keeps Ali\'s grip locked to the same palm point at gallery yaw, pitch and scale angles', () => {
+    const galleryStage = new Group()
+    const character = new Group()
+    const rig = new Bone()
+    const forearm = new Bone()
+    const hand = new Bone()
+    hand.name = 'RightHand'
+    hand.position.set(1.2, 24.3015, -0.7)
+    forearm.position.set(-3.5, 7.25, 2.1)
+    forearm.add(hand)
+    rig.add(forearm)
+    character.add(rig)
+    galleryStage.add(character)
+
+    const weapon = new Object3D()
+    const attachment = attachWeapon(character, weapon, CHARACTER_TRANSFORMS.ali.weapon)
+    const authoredBladeRotation = weapon.quaternion.clone()
+    const galleryAngles = [
+      { rotation: [0, 0, 0], scale: 1 },
+      { rotation: [-0.28, 0.85, 0], scale: 1.35 },
+      { rotation: [0.34, -1.1, 0.08], scale: 0.72 },
+      { rotation: [-0.52, Math.PI, -0.06], scale: 1.8 },
+    ] as const
+
+    galleryAngles.forEach(({ rotation, scale }) => {
+      galleryStage.rotation.set(rotation[0], rotation[1], rotation[2])
+      galleryStage.scale.setScalar(scale)
+      galleryStage.updateWorldMatrix(true, true)
+      updateWeaponSocket(attachment, true, 1)
+      expect(placeWeaponGripInPalm(attachment, 0.48)).toBe(true)
+      galleryStage.updateWorldMatrix(true, true)
+
+      const forearmPosition = forearm.getWorldPosition(new Vector3())
+      const wristPosition = hand.getWorldPosition(new Vector3())
+      const expectedPalm = wristPosition.clone().addScaledVector(
+        wristPosition.clone().sub(forearmPosition),
+        0.48,
+      )
+      const weaponGrip = weapon.localToWorld(
+        new Vector3(...CHARACTER_TRANSFORMS.ali.weapon.gripPoint),
+      )
+
+      expect(weaponGrip.distanceTo(expectedPalm)).toBeLessThan(0.00001)
+      expect(weapon.quaternion.angleTo(authoredBladeRotation)).toBeLessThan(0.00001)
+    })
+  })
+
+  it('recognizes Ali/Jack and Mixamo body chains as the same five guard capsules', () => {
+    const createRig = (prefix = '') => {
+      const root = new Group()
+      const bones = new Map<string, Bone>()
+      ;[
+        'Hips', 'Spine', 'LeftUpLeg', 'LeftLeg', 'LeftFoot',
+        'RightUpLeg', 'RightLeg', 'RightFoot',
+      ].forEach((name) => {
+        const bone = new Bone()
+        bone.name = `${prefix}${name}`
+        root.add(bone)
+        bones.set(name, bone)
+      })
+      return root
+    }
+
+    expect(findWeaponBodyGuard(createRig()).capsules.map(({ id }) => id)).toEqual([
+      'torso', 'skirt-left', 'skirt-right', 'leg-left', 'leg-right',
+    ])
+    expect(findWeaponBodyGuard(createRig('mixamorig')).capsules.map(({ id }) => id)).toEqual([
+      'torso', 'skirt-left', 'skirt-right', 'leg-left', 'leg-right',
+    ])
+  })
+
+  it('turns a walking blade around a projected body capsule', () => {
+    const direction = constrainWeaponBladeAgainstCapsule(
+      new Vector3(1, 0, 0),
+      new Vector3(1, -1, 0),
+      new Vector3(1, 1, 0),
+      2,
+      0.25,
+    )
+
+    expect(direction.x).toBeGreaterThan(0)
+    expect(Math.abs(direction.y)).toBeGreaterThan(0.1)
+    const capsuleEndpoint = new Vector3(1, direction.y > 0 ? 1 : -1, 0)
+    const closestBladeT = Math.max(0, Math.min(2, capsuleEndpoint.dot(direction)))
+    expect(capsuleEndpoint.distanceTo(direction.clone().multiplyScalar(closestBladeT))).toBeGreaterThanOrEqual(0.25)
+  })
+
+  it('keeps the walking sword on its hand grip while clearing the full body guard', () => {
+    const character = new Group()
+    const rig = new Bone()
+    rig.scale.setScalar(0.01)
+    const forearm = new Bone()
+    const hand = new Bone()
+    hand.name = 'RightHand'
+    hand.position.set(-100, 0, 0)
+    forearm.add(hand)
+    rig.add(forearm)
+    character.add(rig)
+
+    const makeBone = (name: string, x: number, y: number) => {
+      const bone = new Bone()
+      bone.name = name
+      bone.position.set(x, y, 0)
+      rig.add(bone)
+      return bone
+    }
+    makeBone('Hips', 0, -20)
+    makeBone('Spine', 0, 80)
+    makeBone('LeftUpLeg', -18, -40)
+    makeBone('LeftLeg', -18, -90)
+    makeBone('LeftFoot', -18, -150)
+    makeBone('RightUpLeg', 18, -40)
+    makeBone('RightLeg', 18, -90)
+    makeBone('RightFoot', 18, -150)
+
+    const transform = {
+      alignBlade: false,
+      bladeDirection: [1, 0, 0] as [number, number, number],
+      gripPoint: [0, 0, 0] as [number, number, number],
+      position: [0, 0, 0] as [number, number, number],
+      rotation: [0, 0, 0] as [number, number, number],
+      scale: [1, 1, 1] as [number, number, number],
+    }
+    const weapon = new Object3D()
+    const attachment = attachWeapon(character, weapon, transform)
+    character.updateWorldMatrix(true, true)
+    const gripBefore = attachment.socket.getWorldPosition(new Vector3())
+    const socketRotationBefore = attachment.socket.quaternion.clone()
+    const weaponRotationBefore = weapon.quaternion.clone()
+
+    expect(keepWeaponOutsideBody(attachment, findWeaponBodyGuard(character), transform, 200)).toBe(true)
+    character.updateWorldMatrix(true, true)
+    const gripAfter = attachment.socket.getWorldPosition(new Vector3())
+
+    expect(gripAfter.distanceTo(gripBefore)).toBeLessThan(0.00001)
+    expect(weapon.quaternion.angleTo(weaponRotationBefore)).toBeLessThan(0.00001)
+    expect(attachment.socket.quaternion.angleTo(socketRotationBefore)).toBeGreaterThan(0.05)
   })
 
   it('turns a torso-crossing blade around its fixed grip', () => {

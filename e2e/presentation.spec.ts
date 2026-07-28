@@ -21,6 +21,10 @@ test('karakter brifingi ve arşiv metinleri okunabilir, modeller doğru yönden 
   await expect(page.locator('.character-gallery__model > span')).toContainText('%100')
   await page.locator('.character-gallery__model').dispatchEvent('wheel', { deltaY: -200 })
   await expect(page.locator('.character-gallery__model > span')).toContainText('%124')
+  for (let step = 0; step < 12; step += 1) {
+    await page.locator('.character-gallery__model').dispatchEvent('wheel', { deltaY: -200 })
+  }
+  await expect(page.locator('.character-gallery__model > span')).toContainText('%280')
   const modelBounds = await page.locator('.character-gallery__model').boundingBox()
   expect(modelBounds).not.toBeNull()
   await page.mouse.move(modelBounds!.x + modelBounds!.width * 0.55, modelBounds!.y + modelBounds!.height * 0.55)

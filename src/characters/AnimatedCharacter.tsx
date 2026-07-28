@@ -14,13 +14,15 @@ import {
   alignWeaponAttachment,
   attachWeapon,
   findTorsoBone,
+  findWeaponBodyGuard,
+  keepWeaponOutsideBody,
   keepWeaponOutsideTorso,
   placeWeaponGripInPalm,
   updateWeaponSocket,
   type WeaponAttachment,
 } from './WeaponSocket'
 
-const ALI_PALM_REACH = 0.42
+const ALI_PALM_REACH = 0.48
 
 interface AnimatedCharacterProps {
   definition: CharacterDefinition
@@ -54,6 +56,7 @@ export function AnimatedCharacter({ definition, animationDurationSeconds, animat
   const characterScene = useMemo(() => SkeletonUtils.clone(idleFile.scene), [idleFile.scene])
   const swordScene = useMemo(() => swordFile.scene.clone(true), [swordFile.scene])
   const torso = useMemo(() => findTorsoBone(characterScene), [characterScene])
+  const bodyGuard = useMemo(() => findWeaponBodyGuard(characterScene), [characterScene])
 
   const clips = useMemo(() => {
     const prepared: AnimationClip[] = [
@@ -91,13 +94,24 @@ export function AnimatedCharacter({ definition, animationDurationSeconds, animat
       // body as soon as the wrist moved (most visible in the roster preview).
       updateWeaponSocket(attachmentRef.current, true, delta)
       if (definition.id === 'ali') placeWeaponGripInPalm(attachmentRef.current, ALI_PALM_REACH)
-      keepWeaponOutsideTorso(
-        attachmentRef.current,
-        torso,
-        transform.weapon,
-        definition.id === 'ali' ? 136 : 122,
-        definition.id === 'ali' ? 15 : 13,
-      )
+      if (animationState === 'walk') {
+        keepWeaponOutsideBody(
+          attachmentRef.current,
+          bodyGuard,
+          transform.weapon,
+          definition.id === 'ali' ? 136 : 122,
+        )
+      } else {
+        // Preserve the authored idle/attack arcs; their existing torso guard is
+        // intentionally narrower than the full walking-body protection.
+        keepWeaponOutsideTorso(
+          attachmentRef.current,
+          torso,
+          transform.weapon,
+          definition.id === 'ali' ? 136 : 122,
+          definition.id === 'ali' ? 15 : 13,
+        )
+      }
     }
   })
 

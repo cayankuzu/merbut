@@ -1,126 +1,312 @@
-import { Suspense, useEffect, useMemo, useRef, type MutableRefObject } from 'react'
+import {
+  Suspense,
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { useAnimations, useGLTF } from '@react-three/drei'
-import { Box3, Group, LoopRepeat, MathUtils, PerspectiveCamera, SkinnedMesh, Vector3 } from 'three'
+import { useGLTF } from '@react-three/drei'
+import {
+  AnimationMixer,
+  Bone,
+  Box3,
+  Group,
+  LoopOnce,
+  PerspectiveCamera,
+  SkinnedMesh,
+  Vector3,
+  type AnimationClip,
+  type Object3D,
+} from 'three'
 import { SkeletonUtils } from 'three-stdlib'
-import { AnimatedCharacter } from '../characters/AnimatedCharacter'
-import { EvilJackCharacter } from '../characters/EvilJackCharacter'
 import { prepareAnimationClip } from '../animation/animationLoader'
 import { validateClipTargets } from '../animation/animationRetargeting'
+import { AliFaceLight } from '../characters/AliFaceLight'
+import {
+  alignWeaponAttachment,
+  attachWeapon,
+  placeWeaponGripInPalm,
+  updateWeaponSocket,
+  type WeaponAttachment,
+} from '../characters/WeaponSocket'
+import { findShadowTorsoBone, updateShadowWeaponSocket } from '../characters/shadowWeapon'
 import { ASSET_PATHS } from '../config/assetPaths'
-import { BOSS_MODEL_SCALES } from '../config/characterTransforms'
+import { SHADOW_WEAPON_TRANSFORM } from '../config/characterTransforms'
 import type { RosterPreview } from '../config/characterRoster'
-import { ENEMIES } from '../config/enemies'
 import { CHARACTERS } from '../config/gameConfig'
-import { computeRosterPreviewFit, getRosterPreviewDistance, type RosterPreviewFit } from './rosterPreviewFit'
+import { useDebugStore } from '../store/debugStore'
+import type { CharacterId } from '../types/character'
+import type { GalleryRotation } from './characterGalleryRotation'
+import {
+  computeRosterPreviewFit,
+  getRosterPreviewDistance,
+  ROSTER_CAMERA_PADDING,
+  type RosterPreviewFit,
+} from './rosterPreviewFit'
+import { getRosterPoseSpec } from './rosterPreviewPose'
 
-const FIT_SAMPLE_DELAYS = [0, 0.32, 0.74] as const
-const CAMERA_PADDING = 1.12
+const ALI_PALM_REACH = 0.48
 
-interface RosterFitState extends RosterPreviewFit {
-  ready: boolean
+/** Samples a natural non-T-pose once, then leaves every bone completely still. */
+function useFrozenPose(
+  root: Object3D,
+  source: AnimationClip | undefined,
+  fraction: number,
+) {
+  const clip = useMemo(
+    () => validateClipTargets(root, prepareAnimationClip(source, 'gallery-static-pose')),
+    [root, source],
+  )
+
+  useLayoutEffect(() => {
+    const mixer = new AnimationMixer(root)
+    const action = mixer.clipAction(clip)
+    action.enabled = true
+    action.clampWhenFinished = true
+    action.setLoop(LoopOnce, 1).reset().play()
+    mixer.setTime(Math.max(0, clip.duration * fraction))
+    action.paused = true
+    root.updateWorldMatrix(true, true)
+
+    return () => {
+      action.stop()
+      mixer.uncacheRoot(root)
+    }
+  }, [clip, fraction, root])
 }
 
-function LocomotionAsset({ animationSource, modelSource, scale = 1.5 }: { animationSource?: string; modelSource: string; scale?: number }) {
-  const modelFile = useGLTF(modelSource)
-  const animationFile = useGLTF(animationSource ?? modelSource)
-  const scene = useMemo(() => SkeletonUtils.clone(modelFile.scene), [modelFile.scene])
-  const clip = useMemo(
-    () => validateClipTargets(scene, prepareAnimationClip(animationFile.animations[0], 'walk')),
-    [animationFile.animations, scene],
+function StaticHeroPose({
+  id,
+  onReady,
+  poseFraction,
+}: {
+  id: CharacterId
+  onReady: () => void
+  poseFraction: number
+}) {
+  const definition = CHARACTERS[id]
+  const idleFile = useGLTF(definition.assets.idle)
+  const swordFile = useGLTF(definition.assets.sword)
+  const transform = useDebugStore((state) => state.transforms[id])
+  const initialWeaponTransform = useRef(transform.weapon)
+  const attachment = useRef<WeaponAttachment | null>(null)
+  const characterScene = useMemo(() => SkeletonUtils.clone(idleFile.scene), [idleFile.scene])
+  const swordScene = useMemo(() => swordFile.scene.clone(true), [swordFile.scene])
+
+  useFrozenPose(characterScene, idleFile.animations[0], poseFraction)
+
+  useLayoutEffect(() => {
+    const nextAttachment = attachWeapon(characterScene, swordScene, initialWeaponTransform.current)
+    updateWeaponSocket(nextAttachment, true, 1)
+    if (id === 'ali') placeWeaponGripInPalm(nextAttachment, ALI_PALM_REACH)
+    attachment.current = nextAttachment
+    characterScene.updateWorldMatrix(true, true)
+    onReady()
+    return () => {
+      nextAttachment.detach()
+      attachment.current = null
+    }
+  }, [characterScene, id, onReady, swordScene])
+
+  useLayoutEffect(() => {
+    if (!attachment.current) return
+    alignWeaponAttachment(attachment.current, transform.weapon)
+    updateWeaponSocket(attachment.current, true, 1)
+    if (id === 'ali') placeWeaponGripInPalm(attachment.current, ALI_PALM_REACH)
+    characterScene.updateWorldMatrix(true, true)
+  }, [characterScene, id, transform.weapon])
+
+  return (
+    <group
+      name={`${id}-gallery-static-pose`}
+      position={transform.modelPosition}
+      rotation={transform.modelRotation}
+      scale={transform.modelScale}
+    >
+      <primitive object={characterScene} />
+      {id === 'ali' ? <AliFaceLight scene={characterScene} /> : null}
+    </group>
   )
-  const { actions } = useAnimations([clip], scene)
-  useEffect(() => {
-    const action = actions.walk
-    action?.reset().setLoop(LoopRepeat, Infinity).play()
-    return () => { action?.stop() }
-  }, [actions])
+}
+
+function StaticShadowPose({
+  onReady,
+  poseFraction,
+  scale,
+}: {
+  onReady: () => void
+  poseFraction: number
+  scale: number
+}) {
+  const modelFile = useGLTF(ASSET_PATHS.bosses.evilJack.walk)
+  const swordFile = useGLTF(ASSET_PATHS.jack.sword)
+  const attachment = useRef<WeaponAttachment | null>(null)
+  const scene = useMemo(() => SkeletonUtils.clone(modelFile.scene), [modelFile.scene])
+  const sword = useMemo(() => swordFile.scene.clone(true), [swordFile.scene])
+  const torso = useMemo(() => findShadowTorsoBone(scene), [scene])
+
+  useFrozenPose(scene, modelFile.animations[0], poseFraction)
+
+  useLayoutEffect(() => {
+    const nextAttachment = attachWeapon(scene, sword, SHADOW_WEAPON_TRANSFORM)
+    updateShadowWeaponSocket(nextAttachment, torso, true, 1)
+    attachment.current = nextAttachment
+    scene.updateWorldMatrix(true, true)
+    onReady()
+    return () => {
+      nextAttachment.detach()
+      attachment.current = null
+    }
+  }, [onReady, scene, sword, torso])
+
   return <primitive object={scene} scale={scale} />
 }
 
-function PreviewModel({ preview }: { preview: RosterPreview }) {
-  if (preview.type === 'hero') return <AnimatedCharacter definition={CHARACTERS[preview.id]} animationState="walk" />
-  if (preview.type === 'enemy') return <LocomotionAsset modelSource={ENEMIES[preview.kind].walk} scale={ENEMIES[preview.kind].scale} />
-  if (preview.type === 'shadow') return <group scale={BOSS_MODEL_SCALES.shadow}><EvilJackCharacter action="walk" loopCombat shadows={false} /></group>
-  if (preview.form === 'normal') return <LocomotionAsset modelSource={ASSET_PATHS.bosses.aku.normal.walk} scale={BOSS_MODEL_SCALES.aku} />
-  return <LocomotionAsset animationSource={ASSET_PATHS.bosses.aku.monster.walk} modelSource={ASSET_PATHS.bosses.aku.monster.idle} scale={BOSS_MODEL_SCALES.aku} />
+function StaticPoseAsset({
+  modelSource,
+  onReady,
+  poseFraction,
+  poseSource,
+  scale,
+}: {
+  modelSource: string
+  onReady: () => void
+  poseFraction: number
+  poseSource: string
+  scale: number
+}) {
+  const modelFile = useGLTF(modelSource)
+  const poseFile = useGLTF(poseSource)
+  const scene = useMemo(() => SkeletonUtils.clone(modelFile.scene), [modelFile.scene])
+  useFrozenPose(scene, poseFile.animations[0], poseFraction)
+  useLayoutEffect(() => {
+    scene.updateWorldMatrix(true, true)
+    onReady()
+  }, [onReady, scene])
+  return <primitive object={scene} scale={scale} />
 }
 
-function refreshAnimatedBounds(root: Group) {
+function PreviewModel({ onReady, preview }: { onReady: () => void; preview: RosterPreview }) {
+  const pose = getRosterPoseSpec(preview)
+  if (pose.kind === 'hero' && preview.type === 'hero') {
+    return <StaticHeroPose id={preview.id} onReady={onReady} poseFraction={pose.poseFraction} />
+  }
+  if (pose.kind === 'shadow') {
+    return <StaticShadowPose onReady={onReady} poseFraction={pose.poseFraction} scale={pose.scale} />
+  }
+  return (
+    <StaticPoseAsset
+      modelSource={pose.modelSource}
+      onReady={onReady}
+      poseSource={pose.poseSource}
+      poseFraction={pose.poseFraction}
+      scale={pose.scale}
+    />
+  )
+}
+
+function refreshAnimatedBounds(root: Object3D) {
   root.traverse((node) => {
-    if (node instanceof SkinnedMesh) node.computeBoundingBox()
+    if (node instanceof SkinnedMesh) {
+      node.skeleton.update()
+      node.computeBoundingBox()
+      const posedBounds = node.boundingBox?.clone()
+      node.geometry.computeBoundingBox()
+      if (node.geometry.boundingBox) {
+        node.boundingBox ??= new Box3()
+        node.boundingBox.copy(node.geometry.boundingBox)
+        if (posedBounds && !posedBounds.isEmpty()) node.boundingBox.union(posedBounds)
+      }
+    }
   })
 }
 
-function RotatableRosterModel({ fit, preview, rotation }: { fit: MutableRefObject<RosterFitState>; preview: RosterPreview; rotation: number }) {
+function expandBoundsBySkeleton(root: Object3D, bounds: Box3) {
+  const skeletonBounds = new Box3()
+  const bonePosition = new Vector3()
+  root.traverse((node) => {
+    if (node instanceof Bone) skeletonBounds.expandByPoint(node.getWorldPosition(bonePosition))
+  })
+  if (skeletonBounds.isEmpty()) return
+  const skeletonSize = skeletonBounds.getSize(new Vector3())
+  skeletonBounds.expandByScalar(Math.max(0.08, skeletonSize.length() * 0.08))
+  bounds.union(skeletonBounds)
+}
+
+function RotatableRosterModel({
+  fit,
+  onFit,
+  preview,
+  rotation,
+}: {
+  fit: RosterPreviewFit
+  onFit: Dispatch<SetStateAction<RosterPreviewFit>>
+  preview: RosterPreview
+  rotation: GalleryRotation
+}) {
   const root = useRef<Group>(null)
   const content = useRef<Group>(null)
-  const envelope = useRef(new Box3())
-  const sample = useRef(new Box3())
-  const sampleIndex = useRef(0)
-  const mountedAt = useRef<number | null>(null)
+  const [modelReady, setModelReady] = useState(false)
+  const handleModelReady = useCallback(() => setModelReady(true), [])
+  const renderedOnce = useRef(false)
+  const measured = useRef(false)
 
-  useFrame(({ clock }, delta) => {
+  useFrame((state) => {
+    if (!modelReady || measured.current) return
+    if (!renderedOnce.current) {
+      renderedOnce.current = true
+      state.invalidate()
+      return
+    }
     const modelRoot = root.current
     const modelContent = content.current
     if (!modelRoot || !modelContent) return
 
-    modelRoot.rotation.y = MathUtils.damp(modelRoot.rotation.y, rotation, 12, delta)
-    modelRoot.position.y = Math.sin(clock.elapsedTime * 1.5) * 0.025
-
-    mountedAt.current ??= clock.elapsedTime
-    const nextDelay = FIT_SAMPLE_DELAYS[sampleIndex.current]
-    if (nextDelay === undefined || clock.elapsedTime - mountedAt.current < nextDelay) return
-
-    const renderedRotation = modelRoot.rotation.y
-    const renderedHeight = modelRoot.position.y
+    const renderedRotation = modelRoot.rotation.clone()
     const renderedContentPosition = modelContent.position.clone()
-    modelRoot.rotation.y = 0
-    modelRoot.position.y = 0
+    modelRoot.rotation.set(0, 0, 0)
     modelContent.position.set(0, 0, 0)
     modelRoot.updateWorldMatrix(true, true)
     refreshAnimatedBounds(modelContent)
-    sample.current.setFromObject(modelContent)
+    const bounds = new Box3().setFromObject(modelContent)
+    expandBoundsBySkeleton(modelContent, bounds)
+    const nextFit = computeRosterPreviewFit(bounds)
 
-    if (!sample.current.isEmpty()) {
-      envelope.current.union(sample.current)
-      const nextFit = computeRosterPreviewFit(envelope.current)
-      fit.current.center = nextFit.center
-      fit.current.halfHeight = nextFit.halfHeight
-      fit.current.horizontalRadius = nextFit.horizontalRadius
-      fit.current.modelOffset = nextFit.modelOffset
-      fit.current.ready = true
-    }
-
-    modelContent.position.set(...(fit.current.ready ? fit.current.modelOffset : renderedContentPosition.toArray()))
-    modelRoot.rotation.y = renderedRotation
-    modelRoot.position.y = renderedHeight
+    modelContent.position.copy(renderedContentPosition)
+    modelRoot.rotation.copy(renderedRotation)
     modelRoot.updateWorldMatrix(true, true)
-    sampleIndex.current += 1
+    measured.current = true
+    onFit(nextFit)
   })
-  return <group ref={root} rotation={[0, rotation, 0]}><group ref={content}><PreviewModel preview={preview} /></group></group>
+
+  return (
+    <group ref={root} rotation={[rotation[1], rotation[0], 0]}>
+      <group ref={content} position={fit.modelOffset}>
+        <PreviewModel onReady={handleModelReady} preview={preview} />
+      </group>
+    </group>
+  )
 }
 
-function PreviewCamera({ fit, pan, zoom }: { fit: MutableRefObject<RosterFitState>; pan: readonly [number, number]; zoom: number }) {
+function PreviewCamera({ fit, pan, zoom }: { fit: RosterPreviewFit; pan: readonly [number, number]; zoom: number }) {
   const camera = useThree((state) => state.camera)
-  const target = useRef(new Vector3(0, 1.25, 0))
-  useFrame((_, delta) => {
-    if (!(camera instanceof PerspectiveCamera)) return
-    const center = fit.current.center
-    const targetX = center[0] + pan[0]
-    const targetY = center[1] + pan[1]
-    const targetZ = center[2]
-    const distance = getRosterPreviewDistance(fit.current, camera.fov, camera.aspect, CAMERA_PADDING) / zoom
+  const invalidate = useThree((state) => state.invalidate)
 
-    target.current.x = MathUtils.damp(target.current.x, targetX, 10, delta)
-    target.current.y = MathUtils.damp(target.current.y, targetY, 10, delta)
-    target.current.z = MathUtils.damp(target.current.z, targetZ, 10, delta)
-    camera.position.x = MathUtils.damp(camera.position.x, targetX, 10, delta)
-    camera.position.y = MathUtils.damp(camera.position.y, targetY, 10, delta)
-    camera.position.z = MathUtils.damp(camera.position.z, targetZ + distance, fit.current.ready ? 9 : 14, delta)
-    camera.lookAt(target.current)
+  useLayoutEffect(() => {
+    if (!(camera instanceof PerspectiveCamera)) return
+    const targetX = fit.center[0] + pan[0]
+    const targetY = fit.center[1] + pan[1]
+    const targetZ = fit.center[2]
+    const distance = getRosterPreviewDistance(fit, camera.fov, camera.aspect, ROSTER_CAMERA_PADDING) / zoom
+    camera.position.set(targetX, targetY, targetZ + distance)
+    camera.lookAt(new Vector3(targetX, targetY, targetZ))
     camera.updateProjectionMatrix()
-  })
+    invalidate()
+  }, [camera, fit, invalidate, pan, zoom])
   return null
 }
 
@@ -128,26 +314,39 @@ interface RosterCharacterPreview3DProps {
   label: string
   pan: readonly [number, number]
   preview: RosterPreview
-  rotation: number
+  rotation: GalleryRotation
   zoom: number
 }
 
 export function RosterCharacterPreview3D({ preview, rotation, pan, zoom, label }: RosterCharacterPreview3DProps) {
-  const fit = useRef<RosterFitState>({
-    center: [0, 1.25, 0],
+  const [fit, setFit] = useState<RosterPreviewFit>({
+    center: [0, 0, 0],
     halfHeight: 1.5,
-    horizontalRadius: 1.1,
+    horizontalRadius: 1.5,
     modelOffset: [0, 0, 0],
-    ready: false,
   })
+
   return (
-    <div className="roster-model" aria-label={`${label} döndürülebilir 3B modeli`}>
-      <Canvas dpr={[0.8, 1.1]} camera={{ position: [0, 1.25, 8], fov: 34 }} gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}>
+    <div
+      className="roster-model"
+      data-static-pose="true"
+      data-fit-radius={fit.halfHeight.toFixed(3)}
+      data-fit-offset={`${fit.modelOffset[0].toFixed(3)},${fit.modelOffset[1].toFixed(3)},${fit.modelOffset[2].toFixed(3)}`}
+      aria-label={`${label} döndürülebilir 3B modeli`}
+    >
+      <Canvas
+        frameloop="demand"
+        dpr={[0.8, 1.1]}
+        camera={{ position: [0, 0, 8], fov: 34 }}
+        gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}
+      >
         <ambientLight intensity={1.5} />
         <directionalLight position={[4, 6, 4]} intensity={3.5} color="#fff0d6" />
         <pointLight position={[-3, 1.5, 2]} intensity={3} color="#ff3d73" />
         <PreviewCamera fit={fit} pan={pan} zoom={zoom} />
-        <Suspense fallback={null}><RotatableRosterModel fit={fit} preview={preview} rotation={rotation} /></Suspense>
+        <Suspense fallback={null}>
+          <RotatableRosterModel fit={fit} onFit={setFit} preview={preview} rotation={rotation} />
+        </Suspense>
       </Canvas>
     </div>
   )

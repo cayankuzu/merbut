@@ -8,7 +8,7 @@ import { validateClipTargets } from '../animation/animationRetargeting'
 import { ASSET_PATHS } from '../config/assetPaths'
 import { SHADOW_WEAPON_TRANSFORM } from '../config/characterTransforms'
 import { attachWeapon, type WeaponAttachment } from './WeaponSocket'
-import { findShadowTorsoBone, updateShadowWeaponSocket } from './shadowWeapon'
+import { findShadowTorsoBone, findShadowWeaponBodyGuard, updateShadowWeaponSocket } from './shadowWeapon'
 
 export type EvilJackAction = 'walk' | 'run' | 'slash' | 'double' | 'triple' | 'cast' | 'dead'
 
@@ -64,6 +64,7 @@ export function EvilJackCharacter({ action, loopCombat = false, shadows = true }
     return clone
   }, [swordFile.scene])
   const torso = useMemo(() => findShadowTorsoBone(scene), [scene])
+  const bodyGuard = useMemo(() => findShadowWeaponBodyGuard(scene), [scene])
   const clips = useMemo(() => [
     validateClipTargets(scene, prepareAnimationClip(walkFile.animations[0], 'walk')),
     validateClipTargets(scene, prepareAnimationClip(runFile.animations[0], 'run')),
@@ -114,7 +115,15 @@ export function EvilJackCharacter({ action, loopCombat = false, shadows = true }
   useFrame((_, delta) => {
     if (!attachment.current) return
     const followsHand = action !== 'dead'
-    updateShadowWeaponSocket(attachment.current, followsHand ? torso : null, followsHand, delta)
+    const locomotion = action === 'walk' || action === 'run'
+    updateShadowWeaponSocket(
+      attachment.current,
+      followsHand ? torso : null,
+      followsHand,
+      delta,
+      bodyGuard,
+      locomotion,
+    )
   })
 
   return <primitive object={scene} />
