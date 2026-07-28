@@ -4,7 +4,9 @@ import { useAnimations, useGLTF } from '@react-three/drei'
 import { Group, LoopRepeat, MathUtils } from 'three'
 import { SkeletonUtils } from 'three-stdlib'
 import { AnimatedCharacter } from '../characters/AnimatedCharacter'
+import { EvilJackCharacter } from '../characters/EvilJackCharacter'
 import { ASSET_PATHS } from '../config/assetPaths'
+import { BOSS_MODEL_SCALES } from '../config/characterTransforms'
 import type { RosterPreview } from '../config/characterRoster'
 import { ENEMIES } from '../config/enemies'
 import { CHARACTERS } from '../config/gameConfig'
@@ -24,9 +26,9 @@ function AnimatedAsset({ source, scale = 1.5 }: { source: string; scale?: number
 function PreviewModel({ preview }: { preview: RosterPreview }) {
   if (preview.type === 'hero') return <group position={[0, -1.32, 0]}><AnimatedCharacter definition={CHARACTERS[preview.id]} animationState="walk" /></group>
   if (preview.type === 'enemy') return <group position={[0, -1.28, 0]}><AnimatedAsset source={ENEMIES[preview.kind].walk} scale={ENEMIES[preview.kind].scale} /></group>
-  if (preview.type === 'shadow') return <group position={[0, -1.3, 0]}><AnimatedAsset source={ASSET_PATHS.bosses.evilJack.walk} scale={2.35} /></group>
+  if (preview.type === 'shadow') return <group position={[0, -1.3, 0]} scale={BOSS_MODEL_SCALES.shadow}><EvilJackCharacter action="slash" loopCombat shadows={false} /></group>
   const source = preview.form === 'normal' ? ASSET_PATHS.bosses.aku.normal.walk : ASSET_PATHS.bosses.aku.monster.idle
-  return <group position={[0, -1.25, 0]}><AnimatedAsset source={source} scale={3.05} /></group>
+  return <group position={[0, -1.25, 0]}><AnimatedAsset source={source} scale={BOSS_MODEL_SCALES.aku} /></group>
 }
 
 function RotatableRosterModel({ preview, rotation }: { preview: RosterPreview; rotation: number }) {
@@ -42,10 +44,10 @@ function RotatableRosterModel({ preview, rotation }: { preview: RosterPreview; r
 function getPreviewCamera(preview: RosterPreview) {
   if (preview.type === 'hero') return { distance: 5.5, height: 1.25 }
   if (preview.type === 'enemy') return { distance: 5.25, height: 1.2 }
-  if (preview.type === 'shadow') return { distance: 7.2, height: 1.4 }
+  if (preview.type === 'shadow') return { distance: 11.5, height: 2.3 }
   return preview.form === 'monster'
-    ? { distance: 11.4, height: 1.75 }
-    : { distance: 9, height: 1.55 }
+    ? { distance: 18.5, height: 3.2 }
+    : { distance: 13.8, height: 2.5 }
 }
 
 function PreviewCamera({ distance, height, pan, zoom }: { distance: number; height: number; pan: readonly [number, number]; zoom: number }) {

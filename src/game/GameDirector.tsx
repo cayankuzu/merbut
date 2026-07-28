@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { BIOMES, BIOME_WORLD_WIDTH, WORLD_VISUAL_LEFT, WORLD_VISUAL_RIGHT } from '../config/biomes'
 import { DIFFICULTIES } from '../config/difficulty'
+import { BOSS_MODEL_SCALES } from '../config/characterTransforms'
 import { BOSS_DEFINITIONS, ENEMIES, ENEMY_NAMES, type EnemyKind } from '../config/enemies'
 import { expandWaveSpawns, shouldTriggerWave, WAVES, type WaveDefinition } from '../config/waves'
 import { areBiomeEnemiesCleared, arePriorBiomeWavesCleared, BIOME_GATE_PADDING, getBiomeGateX, getClosedBiomeRightLimit } from './biomeProgress'
@@ -12,6 +13,7 @@ import type { CharacterId } from '../types/character'
 import type { EnemyProjectileState, EnemySpecial, EnemyState, ImpactKind, MeteorState, ProjectileState } from '../types/session'
 import { isActiveAkuFight } from './akuCombat'
 import { getMiniAkuMotion, MINI_AKU_ATTACK_TIMES } from './akuMiniSwarm'
+import { chooseShadowAttack, getShadowStrikeThresholds } from './shadowCombat'
 
 const COMBAT_STEP = 1 / 30
 const MELEE_RANGE = { ali: 2.35, jack: 2.25 } as const
@@ -26,7 +28,7 @@ let projectileSequence = 0
 let meteorSequence = 0
 
 const IMPACTS: Record<number, ImpactKind> = { 1: 'ember', 2: 'void', 3: 'quake', 4: 'stone', 5: 'frost' }
-const AKU_SPECIAL_DURATION: Record<Exclude<EnemySpecial, 'none' | 'combo-double' | 'combo-triple' | 'meteor'>, number> = {
+const AKU_SPECIAL_DURATION: Record<Exclude<EnemySpecial, 'none' | 'shadow-slash' | 'combo-double' | 'combo-triple' | 'meteor'>, number> = {
   'aku-melee': 1_900,
   'aku-heavy': 2_700,
   'aku-ranged': 2_500,
@@ -64,7 +66,7 @@ function buildWave(wave: WaveDefinition, midpoint: number): EnemyState[] {
       attackRange: boss?.bossType === 'shadow' ? 3.7 : boss?.bossType === 'aku' ? 4.25 : base.attackRange,
       attackCooldown: boss ? base.attackCooldown * difficulty.bossCooldown * 0.86 : base.attackCooldown,
       score: boss?.score ?? base.score,
-      scale: boss?.bossType === 'shadow' ? 2.94 : boss?.bossType === 'aku' ? 3.83 : boss ? base.scale * 1.55 : base.scale,
+      scale: boss?.bossType === 'shadow' ? BOSS_MODEL_SCALES.shadow : boss?.bossType === 'aku' ? BOSS_MODEL_SCALES.aku : boss ? base.scale * 1.55 : base.scale,
       accent: boss?.bossType === 'shadow' ? '#ff244f' : boss?.bossType === 'aku' ? '#74f05b' : base.accent,
       direction: spawn.side === 1 ? -1 : 1,
       animation: 'walk',
@@ -181,7 +183,7 @@ function runShadowBoss(enemy: EnemyState, now: number, positions: ReturnType<typ
       return { ...enemy, animation: 'attack' as const, nextAuraAt }
     }
     const elapsed = now - enemy.specialStartedAt
-    const thresholds = enemy.special === 'combo-triple' ? [620, 1_420, 2_280] : [720, 1_650]
+    const thresholds = getShadowStrikeThresholds(enemy.special)
     let mask = enemy.specialHitMask
     const shieldActive = session.players.jack.abilityActiveUntil > now && !session.players.jack.dead
     thresholds.forEach((threshold, index) => {
@@ -189,7 +191,10 @@ function runShadowBoss(enemy: EnemyState, now: number, positions: ReturnType<typ
       if (elapsed >= threshold && (mask & bit) === 0) {
         mask |= bit
         for (const id of livingPlayers()) {
-          if (Math.abs(positions[id][0] - enemy.x) <= 2.65 && !isShielded(id, positions, shieldActive)) session.damagePlayer(id, Math.round(enemy.damage * 0.58), now)
+          if (Math.abs(positions[id][0] - enemy.x) <= 2.65 && !isShielded(id, positions, shieldActive)) {
+            const multiplier = enemy.special === 'shadow-slash' ? 0.72 : 0.58
+            session.damagePlayer(id, Math.round(enemy.damage * multiplier), now)
+          }
         }
         session.addImpact({ kind: 'boss', x: enemy.x + enemy.direction * 1.4, y: 1.1, createdAt: now, duration: 700, lethal: false })
       }
@@ -199,14 +204,25 @@ function runShadowBoss(enemy: EnemyState, now: number, positions: ReturnType<typ
   if (now < enemy.nextSpecialAt) return null
   const roll = Math.random()
   const closestDistance = Math.min(...livingPlayers().map((id) => Math.abs(positions[id][0] - enemy.x)))
-  if (closestDistance > enemy.attackRange && roll >= 0.18) {
+  const choice = chooseShadowAttack(roll, closestDistance, enemy.attackRange)
+  if (choice === 'approach') {
     return { ...enemy, animation: 'walk' as const, nextSpecialAt: now + 900 }
   }
-  if (roll < 0.36) {
+  if (choice === 'meteor') {
     startMeteorRain(enemy, now, 'shadow')
     return { ...enemy, special: 'meteor' as const, specialStartedAt: now, specialUntil: now + 6_400, nextAuraAt: now, animation: 'attack' as const }
   }
-  const triple = roll > 0.72
+  if (choice === 'slash') {
+    return {
+      ...enemy,
+      special: 'shadow-slash' as const,
+      specialStartedAt: now,
+      specialUntil: now + 1_250,
+      specialHitMask: 0,
+      animation: 'attack' as const,
+    }
+  }
+  const triple = choice === 'triple'
   return {
     ...enemy,
     special: triple ? 'combo-triple' as const : 'combo-double' as const,

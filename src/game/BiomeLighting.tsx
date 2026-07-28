@@ -8,7 +8,6 @@ import {
   Group,
   HemisphereLight,
   Object3D,
-  PointLight,
 } from 'three'
 import { biomeAtmosphere } from '../config/biomeAtmosphere'
 import { getBiomeBlend } from '../config/biomes'
@@ -32,7 +31,7 @@ export function BiomeLighting() {
   const hemisphere = useRef<HemisphereLight>(null)
   const directional = useRef<DirectionalLight>(null)
   const directionalTarget = useRef<Object3D>(null)
-  const accent = useRef<PointLight>(null)
+  const accent = useRef<DirectionalLight>(null)
   const fog = useMemo(() => new Fog('#56342f', 18, 35), [])
   const tier = usePerformanceStore((state) => state.tier)
   const profile = PERFORMANCE_PROFILES[tier]
@@ -41,6 +40,7 @@ export function BiomeLighting() {
     scene.fog = fog
     if (directional.current && directionalTarget.current) {
       directional.current.target = directionalTarget.current
+      if (accent.current) accent.current.target = directionalTarget.current
     }
     return () => {
       if (scene.fog === fog) scene.fog = null
@@ -84,7 +84,7 @@ export function BiomeLighting() {
     }
     if (accent.current) {
       accent.current.color.lerp(targetAccent, smoothing)
-      accent.current.intensity += ((cinematic ? (terminal ? 10.6 : 8.6) : 7) * pulse - accent.current.intensity) * smoothing
+      accent.current.intensity += ((cinematic ? (terminal ? 1.05 : 0.84) : 0.62) * pulse - accent.current.intensity) * smoothing
     }
   })
 
@@ -106,7 +106,7 @@ export function BiomeLighting() {
         shadow-bias={-0.00025}
       />
       <object3D ref={directionalTarget} position={[0, 1.2, 0]} />
-      {profile.dynamicLights ? <pointLight ref={accent} position={[5, 4, 3]} intensity={7} distance={13} color="#ff286f" /> : null}
+      {profile.dynamicLights ? <directionalLight ref={accent} position={[7, 5, 4]} intensity={0.62} color="#ff286f" /> : null}
     </group>
   )
 }

@@ -27,8 +27,8 @@ Kalibrasyon paneli: [http://localhost:5173/?debug=1](http://localhost:5173/?debu
 
 | Karakter | Hareket | Zıplama | Saldırı | Özel yetenek | 360° dönüş |
 | --- | --- | --- | --- | --- | --- |
-| Hz. Ali | `A` / `D` | `W` | `S` | `R`: 6 sn içinde en çok 9 alev topu | `Z` / `X` |
-| Samuray Jack | `←` / `→` | `↑` | `↓` | `L`: hareket edilebilir 6 sn kalkan | `Ö` / `Ç` |
+| Hz. Ali | `A` / `D` | `W` | `S` | `R`: 4 sn boyunca sınırsız alev topu | `Z` / `X` |
+| Samuray Jack | `←` / `→` | `↑` | `↓` | `L`: hareket edilebilir 4 sn kalkan | `Ö` / `Ç` |
 
 `Esc`, oynanış, geri sayım, boss sinematiği ve final sırasında bütün dünya zamanını durdurur.
 

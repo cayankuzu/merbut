@@ -216,7 +216,7 @@ button {
   overflow: hidden;
   background:
     linear-gradient(180deg, rgba(8, 10, 14, 0.04), transparent 35%, rgba(28, 23, 29, 0.1) 58%, rgba(22, 19, 24, 0.62) 100%),
-    radial-gradient(ellipse at 50% 64%, rgba(255, 180, 125, 0.08), transparent 52%);
+    linear-gradient(110deg, color-mix(in srgb, var(--biome-accent) 7%, transparent), color-mix(in srgb, var(--biome-haze) 10%, transparent));
 }
 
 .scene-backdrop__haze::before {

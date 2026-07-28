@@ -7,7 +7,6 @@ import {
   DynamicDrawUsage,
   Group,
   InstancedMesh,
-  Mesh,
   MeshBasicMaterial,
   Object3D,
   OctahedronGeometry,
@@ -51,70 +50,6 @@ const MOTIFS: readonly Motif[] = BIOMES.flatMap((biome, biomeIndex) =>
 function isCinematicPhase() {
   const session = useSessionStore.getState()
   return session.phase === 'boss-intro' || session.phase === 'final-intro' || session.phase === 'ending'
-}
-
-function CameraHaze() {
-  const root = useRef<Group>(null)
-  const core = useRef<Mesh>(null)
-  const flare = useRef<Mesh>(null)
-  const farMaterial = useRef<MeshBasicMaterial>(null)
-  const coreMaterial = useRef<MeshBasicMaterial>(null)
-  const flareMaterial = useRef<MeshBasicMaterial>(null)
-  const tier = usePerformanceStore((state) => state.tier)
-  const profile = PERFORMANCE_PROFILES[tier]
-  const fromColor = useMemo(() => new Color(), [])
-  const toColor = useMemo(() => new Color(), [])
-  const accent = useMemo(() => new Color(), [])
-  const paleAccent = useMemo(() => new Color(), [])
-  const paleColor = useMemo(() => new Color('#fff1d0'), [])
-
-  useFrame(({ clock }, delta) => {
-    const rootNode = root.current
-    if (!rootNode || !farMaterial.current || !coreMaterial.current || !flareMaterial.current) return
-    const cameraX = useGameStore.getState().cameraX
-    const blend = getBiomeBlend(cameraX)
-    const from = biomeAtmosphere(blend.from)
-    const to = biomeAtmosphere(blend.to)
-    const hazeOpacity = from.hazeOpacity + (to.hazeOpacity - from.hazeOpacity) * blend.mix
-    const hazeScale = from.hazeScale + (to.hazeScale - from.hazeScale) * blend.mix
-    const speed = from.driftSpeed + (to.driftSpeed - from.driftSpeed) * blend.mix
-    const cinematic = isCinematicPhase()
-    const pulse = 1 + Math.sin(clock.elapsedTime * (0.45 + speed * 0.3)) * 0.045
-    const targetOpacity = hazeOpacity * Math.max(0.1, profile.particleRatio) * (cinematic ? 1.25 : 1)
-    const smoothing = 1 - Math.exp(-Math.min(delta, 0.1) * 2.7)
-
-    accent.copy(fromColor.set(blend.from.accentColor)).lerp(toColor.set(blend.to.accentColor), blend.mix)
-    paleAccent.copy(accent).lerp(paleColor, 0.48)
-    farMaterial.current.color.lerp(accent, smoothing)
-    coreMaterial.current.color.lerp(paleAccent, smoothing)
-    flareMaterial.current.color.lerp(accent, smoothing)
-    farMaterial.current.opacity += (targetOpacity * 0.45 - farMaterial.current.opacity) * smoothing
-    coreMaterial.current.opacity += (targetOpacity * 0.24 - coreMaterial.current.opacity) * smoothing
-    flareMaterial.current.opacity += (targetOpacity * (cinematic ? 0.27 : 0.11) - flareMaterial.current.opacity) * smoothing
-    if (core.current) core.current.visible = profile.particleRatio >= 0.3
-    if (flare.current) flare.current.visible = profile.dynamicLights
-    rootNode.position.set(cameraX, 3.45, -8.9)
-    rootNode.scale.set(hazeScale * pulse, hazeScale * pulse, 1)
-    rootNode.rotation.z = Math.sin(clock.elapsedTime * 0.11) * 0.028
-    rootNode.visible = profile.particleRatio > 0.08
-  })
-
-  return (
-    <group ref={root} name="biome-camera-haze" visible={false}>
-      <mesh scale={[8.7, 3.2, 1]}>
-        <circleGeometry args={[1, 48]} />
-        <meshBasicMaterial ref={farMaterial} color="#ff5b72" transparent opacity={0} depthWrite={false} blending={AdditiveBlending} toneMapped={false} />
-      </mesh>
-      <mesh ref={core} position={[0.9, -0.12, 0.05]} scale={[5.2, 1.85, 1]}>
-        <circleGeometry args={[1, 40]} />
-        <meshBasicMaterial ref={coreMaterial} color="#fff0c8" transparent opacity={0} depthWrite={false} blending={AdditiveBlending} toneMapped={false} />
-      </mesh>
-      <mesh ref={flare} position={[-3.9, 0.58, 0.08]} rotation={[0, 0, -0.28]} scale={[4.7, 0.075, 1]}>
-        <planeGeometry args={[1, 1]} />
-        <meshBasicMaterial ref={flareMaterial} color="#ff5b72" transparent opacity={0} depthWrite={false} blending={AdditiveBlending} toneMapped={false} />
-      </mesh>
-    </group>
-  )
 }
 
 function MotifField() {
@@ -214,11 +149,10 @@ function CinematicGroundPulse() {
 }
 
 /** Shared, low-poly art-direction layer. It adds no assets and remains under
- * four draw calls regardless of enemy count or number of biomes. */
+ * three draw calls regardless of enemy count or number of biomes. */
 export function BiomeAtmosphere() {
   return (
     <group name="adaptive-biome-atmosphere">
-      <CameraHaze />
       <MotifField />
       <CinematicGroundPulse />
     </group>

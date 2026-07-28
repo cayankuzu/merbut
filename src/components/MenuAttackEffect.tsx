@@ -9,6 +9,7 @@ import { JackSlashVisual } from '../game/JackSlashVisual'
 import { CombatImpactVisual } from '../game/CombatImpactVisual'
 import { EnemyProjectileVisual } from '../game/EnemyProjectileVisual'
 import type { EnemyProjectileState, ImpactKind } from '../types/session'
+import { getMenuAttackDurationMs } from './menuShowcaseCycle'
 
 export type MenuAttackEffectKind =
   | 'none'
@@ -36,11 +37,13 @@ interface MenuAttackEffectProps {
   /** Live model-derived origin used by the menu showcase without re-rendering. */
   originYRef?: MutableRefObject<number>
   presentationScale?: number
+  /** Keeps the visual envelope aligned with its model's showcase move. */
+  durationMs?: number
   trigger: number
   variant: number
 }
 
-export function MenuAttackEffect({ accent, direction, kind, originY, originYRef, presentationScale = 1, trigger, variant }: MenuAttackEffectProps) {
+export function MenuAttackEffect({ accent, direction, durationMs, kind, originY, originYRef, presentationScale = 1, trigger, variant }: MenuAttackEffectProps) {
   const root = useRef<Group>(null)
   const aliArcs = useRef<Mesh[]>([])
   const aliMaterials = useRef<MeshBasicMaterial[]>([])
@@ -64,13 +67,7 @@ export function MenuAttackEffect({ accent, direction, kind, originY, originYRef,
     const effectOriginY = originYRef?.current ?? originY
 
     elapsed.current += delta
-    const duration = kind === 'ali-slash' || kind === 'jack-slash'
-      ? 1
-      : kind === 'projectile' || kind === 'ali-fireball'
-        ? 0.92
-        : kind === 'jack-shield'
-          ? 1.05
-          : 0.72
+    const duration = Math.max(0.1, (durationMs ?? getMenuAttackDurationMs(kind)) / 1_000)
     const progress = elapsed.current / duration
     if (progress >= 1) {
       group.visible = false

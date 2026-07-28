@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-test('ana menü her altı saniyede tek kahraman ve tek düşman gösterir', async ({ page }) => {
+test('ana menü her karakteri iki hamleden sonra değiştirir', async ({ page }) => {
   test.setTimeout(60_000)
   const consoleErrors: string[] = []
   page.on('console', (message) => {
@@ -22,12 +22,13 @@ test('ana menü her altı saniyede tek kahraman ve tek düşman gösterir', asyn
 
   const firstFrame = await page.locator('.menu-battle-stage').screenshot({ path: 'e2e-artifacts/menu-vertical-columns-compact.png' })
   const firstNames = await page.locator('.menu-fighter-name').allTextContents()
-  await page.waitForTimeout(1_900)
+  await expect.poll(async () => page.locator('.menu-battle-stage').getAttribute('data-hero-move')).toBe('2')
+  await expect.poll(async () => page.locator('.menu-battle-stage').getAttribute('data-enemy-move')).toBe('2')
   const actionFrame = await page.locator('.menu-battle-stage').screenshot({ path: 'e2e-artifacts/menu-random-attacks-v5.png' })
 
   expect(actionFrame.equals(firstFrame)).toBe(false)
-  await page.waitForTimeout(4_300)
-  await expect.poll(async () => page.locator('.menu-fighter-name').allTextContents()).not.toEqual(firstNames)
+  await expect.poll(async () => page.locator('.menu-fighter-name--heroes').textContent(), { timeout: 8_000 }).not.toBe(firstNames[0])
+  await expect.poll(async () => page.locator('.menu-fighter-name--enemies').textContent(), { timeout: 8_000 }).not.toBe(firstNames[1])
   await page.setViewportSize({ width: 1600, height: 960 })
   await page.waitForTimeout(500)
   await page.screenshot({ path: 'e2e-artifacts/menu-vertical-columns-wide.png' })

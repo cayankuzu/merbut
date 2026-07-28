@@ -1,28 +1,12 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
-import { useAnimations, useGLTF } from '@react-three/drei'
+import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Group, LoopOnce, LoopRepeat, MathUtils, Object3D } from 'three'
-import { SkeletonUtils } from 'three-stdlib'
+import { Group, MathUtils } from 'three'
 import { useShallow } from 'zustand/react/shallow'
-import { prepareAnimationClip } from '../animation/animationLoader'
-import { validateClipTargets } from '../animation/animationRetargeting'
-import { ASSET_PATHS } from '../config/assetPaths'
-import { CHARACTER_TRANSFORMS } from '../config/characterTransforms'
+import { EvilJackCharacter, type EvilJackAction } from '../characters/EvilJackCharacter'
 import { useSessionStore } from '../store/sessionStore'
-import { attachWeapon, updateWeaponSocket, type WeaponAttachment } from '../characters/WeaponSocket'
 import { currentEnemyById, enemyById } from './enemyLookup'
 
 interface EvilJackBossActorProps { id: string }
-
-function enableShadows(root: Object3D) {
-  root.traverse((node) => {
-    if ('isMesh' in node && node.isMesh) {
-      const mesh = node as Object3D & { castShadow: boolean; receiveShadow: boolean }
-      mesh.castShadow = true
-      mesh.receiveShadow = true
-    }
-  })
-}
 
 export function EvilJackBossActor({ id }: EvilJackBossActorProps) {
   const enemy = useSessionStore(useShallow((state) => {
@@ -31,31 +15,9 @@ export function EvilJackBossActor({ id }: EvilJackBossActorProps) {
   }))
   const initialX = useMemo(() => currentEnemyById(id)?.x ?? 0, [id])
   const bossPhase = useSessionStore((state) => state.bossPhase)
-  const assets = ASSET_PATHS.bosses.evilJack
-  const walkFile = useGLTF(assets.walk)
-  const runFile = useGLTF(assets.run)
-  const slashFile = useGLTF(assets.slash)
-  const doubleFile = useGLTF(assets.doubleCombo)
-  const tripleFile = useGLTF(assets.tripleCombo)
-  const castFile = useGLTF(assets.cast)
-  const hitFile = useGLTF(assets.hit)
-  const swordFile = useGLTF(ASSET_PATHS.jack.sword)
   const root = useRef<Group>(null)
   const modelRoot = useRef<Group>(null)
-  const attachment = useRef<WeaponAttachment | null>(null)
-  const scene = useMemo(() => SkeletonUtils.clone(walkFile.scene), [walkFile.scene])
-  const sword = useMemo(() => swordFile.scene.clone(true), [swordFile.scene])
-  const clips = useMemo(() => [
-    validateClipTargets(scene, prepareAnimationClip(walkFile.animations[0], 'walk')),
-    validateClipTargets(scene, prepareAnimationClip(runFile.animations[0], 'run')),
-    validateClipTargets(scene, prepareAnimationClip(slashFile.animations[0], 'slash')),
-    validateClipTargets(scene, prepareAnimationClip(doubleFile.animations[0], 'double')),
-    validateClipTargets(scene, prepareAnimationClip(tripleFile.animations[0], 'triple')),
-    validateClipTargets(scene, prepareAnimationClip(castFile.animations[0], 'cast')),
-    validateClipTargets(scene, prepareAnimationClip(hitFile.animations[0], 'dead')),
-  ], [castFile.animations, doubleFile.animations, hitFile.animations, runFile.animations, scene, slashFile.animations, tripleFile.animations, walkFile.animations])
-  const { actions } = useAnimations(clips, scene)
-  const actionName = enemy?.animation === 'dead'
+  const actionName: EvilJackAction = enemy?.animation === 'dead'
     ? 'dead'
     : enemy?.animation === 'idle'
       ? 'walk'
@@ -71,29 +33,6 @@ export function EvilJackBossActor({ id }: EvilJackBossActorProps) {
               ? 'slash'
               : 'run'
 
-  useLayoutEffect(() => {
-    enableShadows(scene)
-    enableShadows(sword)
-    attachment.current = attachWeapon(scene, sword, CHARACTER_TRANSFORMS.jack.weapon)
-    return () => { attachment.current?.detach(); attachment.current = null }
-  }, [scene, sword])
-
-  useEffect(() => {
-    const action = actions[actionName]
-    if (!action) return
-    const looping = actionName === 'run' || actionName === 'walk'
-    action.enabled = true
-    action.paused = false
-    action.clampWhenFinished = !looping
-    action.setLoop(looping ? LoopRepeat : LoopOnce, looping ? Infinity : 1)
-    action.reset().fadeIn(0.12).play()
-    if (actionName === 'walk') {
-      action.time = 0
-      action.paused = true
-    }
-    Object.entries(actions).forEach(([name, candidate]) => { if (name !== actionName) candidate?.fadeOut(0.12) })
-  }, [actionName, actions])
-
   useFrame((_, delta) => {
     const current = currentEnemyById(id)
     if (!root.current || !modelRoot.current || !current) return
@@ -102,13 +41,12 @@ export function EvilJackBossActor({ id }: EvilJackBossActorProps) {
     const arrivalScale = bossPhase === 'offering' || bossPhase === 'drinking' ? 0 : 1
     const targetScale = current.scale * arrivalScale * (current.animation === 'dead' ? 0.86 : 1)
     modelRoot.current.scale.setScalar(MathUtils.damp(modelRoot.current.scale.x, targetScale, 7, delta))
-    if (attachment.current) updateWeaponSocket(attachment.current, actionName !== 'run', delta)
   })
 
   if (!enemy) return null
   return (
     <group ref={root} position={[initialX, 0, 0]} name={enemy.title}>
-      <group ref={modelRoot} scale={0}><primitive object={scene} /></group>
+      <group ref={modelRoot} scale={0}><EvilJackCharacter action={actionName} /></group>
     </group>
   )
 }

@@ -10,6 +10,7 @@ export function useCharacterAnimations(
   clips: AnimationClip[],
   state: AnimationState,
   replayToken = 0,
+  presentationDurationSeconds?: number,
 ) {
   const { actions } = useAnimations(clips, root)
   const currentAction = useRef<AnimationAction | null>(null)
@@ -26,7 +27,9 @@ export function useCharacterAnimations(
     next.paused = false
     next.clampWhenFinished = !looping
     next.setLoop(looping ? LoopRepeat : LoopOnce, looping ? Number.POSITIVE_INFINITY : 1)
-    next.timeScale = state === 'walk'
+    next.timeScale = presentationDurationSeconds && (state === 'attack' || state === 'fireball')
+      ? next.getClip().duration / presentationDurationSeconds
+      : state === 'walk'
       ? 1.15
       : state === 'jump'
         ? clips.find((clip) => clip.name === 'jump')!.duration / 0.95
@@ -46,7 +49,7 @@ export function useCharacterAnimations(
     currentAction.current = next
     currentState.current = state
     currentReplayToken.current = replayToken
-  }, [actions, clips, replayToken, state])
+  }, [actions, clips, presentationDurationSeconds, replayToken, state])
 
   useEffect(
     () => () => {

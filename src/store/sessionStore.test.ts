@@ -183,17 +183,22 @@ describe('session store', () => {
     expect(useSessionStore.getState().bossPhase).toBe('fight')
   })
 
-  it('uses boss Zemzem as a full difficulty-specific life checkpoint', () => {
+  it('keeps lost lives and eliminated state through the boss Zemzem checkpoint', () => {
     useSessionStore.getState().setDifficulty('hard')
     useSessionStore.getState().startCountdown()
     useSessionStore.getState().tick(4, 10_000)
     useSessionStore.getState().damagePlayer('ali', 10_000, 10_100)
     useSessionStore.getState().startBossEncounter('shadow-hard', 11_000)
     useSessionStore.getState().tick(0.1, 12_500)
-    expect(useSessionStore.getState().players.ali).toMatchObject({ lives: DIFFICULTIES.hard.playerLives, dead: false })
+    expect(useSessionStore.getState().players.ali).toMatchObject({
+      lives: 0,
+      dead: true,
+      health: 0,
+      maxHealth: DIFFICULTIES.hard.bossPlayerHealth,
+    })
   })
 
-  it('restores the full survival checkpoint after the shadow boss', () => {
+  it('does not restore lives or revive eliminated players after the shadow boss', () => {
     const rules = DIFFICULTIES.normal
     const session = useSessionStore.getState()
     session.startCountdown()
@@ -202,30 +207,37 @@ describe('session store', () => {
     expect(useSessionStore.getState().players.ali.lives).toBe(0)
     useSessionStore.getState().finishBossEncounter(30_200)
     expect(useSessionStore.getState().players.ali).toMatchObject({
-      lives: rules.playerLives,
-      dead: false,
+      lives: 0,
+      dead: true,
       maxHealth: rules.playerHealth,
+      health: 0,
     })
-    expect(useSessionStore.getState().players.ali.health).toBeGreaterThan(0)
   })
 
-  it('grants a short recovery window when a cleared biome advances', () => {
+  it('heals HP without restoring a lost life when a cleared biome advances', () => {
+    const rules = DIFFICULTIES.normal
     const session = useSessionStore.getState()
     session.startCountdown()
     session.tick(4, 40_000)
-    session.damagePlayer('ali', 60, 40_100)
+    const downAt = 40_100
+    session.damagePlayer('ali', rules.playerHealth, downAt)
+    const respawnAt = downAt + rules.respawnSeconds * 1_000
+    session.tick(rules.respawnSeconds, respawnAt + 1)
+    session.damagePlayer('ali', 60, respawnAt + 1_600)
     const before = useSessionStore.getState().players.ali.health
     const livesBefore = useSessionStore.getState().players.ali.lives
-    useSessionStore.getState().setCurrentBiome(1, 72, 41_000)
+    const biomeAt = respawnAt + 1_700
+    useSessionStore.getState().setCurrentBiome(1, 72, biomeAt)
     expect(useSessionStore.getState().lockedLeft).toBe(28.25)
     const recovered = useSessionStore.getState().players.ali
     expect(recovered.health).toBeGreaterThan(before)
     expect(recovered.health).toBeLessThanOrEqual(recovered.maxHealth)
-    expect(recovered.lives).toBe(Math.min(DIFFICULTIES.normal.playerLives, livesBefore + 1))
-    expect(recovered.invulnerableUntil).toBe(42_000)
+    expect(recovered.lives).toBe(livesBefore)
+    expect(recovered.lives).toBe(rules.playerLives - 1)
+    expect(recovered.invulnerableUntil).toBe(biomeAt + 1_000)
   })
 
-  it('revives an eliminated partner with one life after the team clears a biome', () => {
+  it('does not revive or grant a life to an eliminated partner after a biome clear', () => {
     const rules = DIFFICULTIES.normal
     const session = useSessionStore.getState()
     session.startCountdown()
@@ -234,14 +246,14 @@ describe('session store', () => {
     expect(useSessionStore.getState().players.jack).toMatchObject({ lives: 0, dead: true })
     useSessionStore.getState().setCurrentBiome(1, 72, 46_000)
     expect(useSessionStore.getState().players.jack).toMatchObject({
-      lives: 1,
-      dead: false,
-      respawnAt: 0,
-      health: rules.playerHealth,
+      lives: 0,
+      dead: true,
+      respawnAt: Infinity,
+      health: 0,
     })
   })
 
-  it('awakens protected final-fight lives for a fallen hero when the final prayer begins', () => {
+  it('does not restore final-fight lives for an eliminated hero when prayer begins', () => {
     const rules = DIFFICULTIES.normal
     const session = useSessionStore.getState()
     session.startCountdown()
@@ -250,27 +262,27 @@ describe('session store', () => {
     expect(useSessionStore.getState().players.jack.lives).toBe(0)
     useSessionStore.getState().startFinalEncounter('aku', 50_200)
     expect(useSessionStore.getState().players.jack).toMatchObject({
-      lives: rules.playerLives,
-      dead: false,
-      health: rules.bossPlayerHealth,
+      lives: 0,
+      dead: true,
+      health: 0,
       maxHealth: rules.bossPlayerHealth,
     })
   })
 
-  it('restores the selected difficulty life pool for the final prayer', () => {
+  it('preserves the remaining life pool for every difficulty during final prayer', () => {
     useSessionStore.getState().setDifficulty('hard')
     useSessionStore.getState().startCountdown()
     useSessionStore.getState().tick(4, 59_000)
-    useSessionStore.getState().damagePlayer('ali', 10_000, 59_100)
+    useSessionStore.getState().damagePlayer('ali', DIFFICULTIES.hard.playerHealth, 59_100)
     useSessionStore.getState().startFinalEncounter('aku-hard', 60_000)
-    expect(useSessionStore.getState().players.ali.lives).toBe(DIFFICULTIES.hard.playerLives)
+    expect(useSessionStore.getState().players.ali.lives).toBe(DIFFICULTIES.hard.playerLives - 1)
 
     useSessionStore.getState().returnToMenu()
     useSessionStore.getState().setDifficulty('soulslike')
     useSessionStore.getState().startCountdown()
     useSessionStore.getState().tick(4, 60_100)
-    useSessionStore.getState().damagePlayer('ali', 10_000, 60_200)
+    useSessionStore.getState().damagePlayer('ali', DIFFICULTIES.soulslike.playerHealth, 60_200)
     useSessionStore.getState().startFinalEncounter('aku-souls', 61_000)
-    expect(useSessionStore.getState().players.ali.lives).toBe(DIFFICULTIES.soulslike.playerLives)
+    expect(useSessionStore.getState().players.ali.lives).toBe(DIFFICULTIES.soulslike.playerLives - 1)
   })
 })

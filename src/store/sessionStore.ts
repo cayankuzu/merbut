@@ -242,11 +242,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           players = Object.fromEntries(Object.entries(state.players).map(([id, player]) => {
             return [id, {
               ...player,
-              lives: rules.playerLives,
               maxHealth: rules.bossPlayerHealth,
-              health: rules.bossPlayerHealth,
-              dead: false,
-              respawnAt: 0,
+              health: player.dead ? 0 : rules.bossPlayerHealth,
               abilityCharge: ABILITY_MAX_CHARGE,
               invulnerableUntil: now + 2_000,
             }]
@@ -331,7 +328,6 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   }),
   setCurrentBiome: (currentBiome, lockedRight, now = performance.now()) => set((state) => {
     const advanced = currentBiome > state.currentBiome
-    const maxLives = DIFFICULTIES[state.difficulty].playerLives
     return {
       currentBiome: Math.max(state.currentBiome, currentBiome),
       lockedLeft: advanced ? getClosedBiomeLeftLimit(currentBiome) : state.lockedLeft,
@@ -340,13 +336,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       players: advanced
         ? Object.fromEntries(Object.entries(state.players).map(([id, player]) => [id, {
           ...player,
-          lives: Math.min(maxLives, player.lives + 1),
-          dead: false,
-          respawnAt: 0,
-          health: player.dead
-            ? player.maxHealth
-            : Math.min(player.maxHealth, Math.max(player.health, 0) + player.maxHealth * 0.3),
-          invulnerableUntil: Math.max(player.invulnerableUntil, now + 1_000),
+          health: player.dead ? 0 : Math.min(player.maxHealth, Math.max(player.health, 0) + player.maxHealth * 0.3),
+          invulnerableUntil: player.dead ? player.invulnerableUntil : Math.max(player.invulnerableUntil, now + 1_000),
         }])) as Record<CharacterId, PlayerStatus>
         : state.players,
     }
@@ -509,15 +500,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       projectiles: [], enemyProjectiles: [], meteors: [],
       players: Object.fromEntries(Object.entries(state.players).map(([id, player]) => [id, {
         ...player,
-        lives: rules.playerLives,
         maxHealth: rules.bossPlayerHealth,
-        health: rules.bossPlayerHealth,
-        dead: false,
-        respawnAt: 0,
+        health: player.dead ? 0 : rules.bossPlayerHealth,
         abilityCharge: ABILITY_MAX_CHARGE,
         invulnerableUntil: now + 2_000,
       }])) as Record<CharacterId, PlayerStatus>,
-      feed: [...state.feed, { id: nextId('feed'), text: 'Samuray Jack duaya durdu — ilahi halkalar canı ve tüm son savaş yaşamlarını uyandırdı', tone: 'system' as const, expiresAt: now + 7_000 }],
+      feed: [...state.feed, { id: nextId('feed'), text: 'Samuray Jack duaya durdu — ilahi halkalar kalan canı koruyup şifayı uyandırdı', tone: 'system' as const, expiresAt: now + 7_000 }],
     }
   }),
   finishBossEncounter: (now) => set((state) => {
@@ -525,18 +513,14 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     return {
       bossPhase: 'complete', activeBossId: null, meteors: [], enemyProjectiles: [],
       players: Object.fromEntries(Object.entries(state.players).map(([id, player]) => {
-        const lives = rules.playerLives
         return [id, {
           ...player,
-          lives,
-          dead: lives > 0 ? false : player.dead,
-          respawnAt: lives > 0 ? 0 : player.respawnAt,
           maxHealth: rules.playerHealth,
-          health: lives > 0 ? Math.min(rules.playerHealth, Math.max(rules.playerHealth * 0.55, player.health)) : 0,
+          health: player.dead ? 0 : Math.min(rules.playerHealth, Math.max(rules.playerHealth * 0.55, player.health)),
           abilityActiveUntil: 0,
         }]
       })) as Record<CharacterId, PlayerStatus>,
-      feed: [...state.feed, { id: nextId('feed'), text: 'Gölgenin kudreti dağıldı — Zemzem kontrol noktası tüm yaşamları yeniledi', tone: 'system' as const, expiresAt: now + 5_000 }],
+      feed: [...state.feed, { id: nextId('feed'), text: 'Gölgenin kudreti dağıldı — Zemzem kontrol noktası kalan canları tazeledi', tone: 'system' as const, expiresAt: now + 5_000 }],
     }
   }),
   startEnding: (bossId, now) => set((state) => {
