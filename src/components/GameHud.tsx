@@ -1,5 +1,5 @@
 import { memo, useEffect, useReducer } from 'react'
-import { ALI_FIREBALL_MAX_SHOTS } from '../config/abilities'
+import { ALI_FIREBALL_MAX_SHOTS, JACK_SHIELD_DURATION_MS } from '../config/abilities'
 import { BIOMES } from '../config/biomes'
 import { DIFFICULTIES } from '../config/difficulty'
 import type { CharacterId } from '../types/character'
@@ -21,12 +21,18 @@ function PlayerHud({ id, player, prayerActive, now }: { id: CharacterId; player:
   const isAli = id === 'ali'
   const health = Math.max(0, Math.min(100, player.health / player.maxHealth * 100))
   const abilityActive = player.abilityActiveUntil > now
-  const ability = abilityActive ? 100 : Math.max(0, Math.min(100, player.abilityCharge))
+  const remainingFireballs = Math.max(0, ALI_FIREBALL_MAX_SHOTS - player.abilityShots)
+  const remainingShieldMs = Math.max(0, player.abilityActiveUntil - now)
+  const ability = abilityActive
+    ? isAli
+      ? remainingFireballs / ALI_FIREBALL_MAX_SHOTS * 100
+      : remainingShieldMs / JACK_SHIELD_DURATION_MS * 100
+    : Math.max(0, Math.min(100, player.abilityCharge))
   const frozen = player.frozenUntil > now
   const skill = isAli ? 'ALEV PENCERESİ' : 'KORUYUCU KALKAN'
   const activeSkillStatus = isAli
-    ? ` · ${Math.max(0, ALI_FIREBALL_MAX_SHOTS - player.abilityShots)} ATIŞ`
-    : ' · AKTİF'
+    ? ` · ${remainingFireballs}/${ALI_FIREBALL_MAX_SHOTS} ATIŞ`
+    : ` · ${(remainingShieldMs / 1_000).toFixed(1)} SN`
   return (
     <article className={`player-hud player-hud--${id}${player.dead ? ' is-dead' : ''}${prayerActive ? ' is-prayer-active' : ''}${frozen ? ' is-time-frozen' : ''}`} aria-label={`${isAli ? 'Hz. Ali' : 'Samuray Jack'} savaş bilgisi`}>
       <HudCharacterPreview id={id} compact />
@@ -79,8 +85,8 @@ export function GameHud() {
       <div className={`together-warning${togetherWarning ? ' is-visible' : ''}`} role="alert"><span /> Birlikte kalın</div>
 
       <aside className="score-stack" aria-label="Skorlar">
-        <div><span>HZ. ALİ</span><b>{players.ali.score.toLocaleString('tr-TR')}</b><em>{players.ali.kills} KILL</em></div>
-        <div><span>SAMURAY JACK</span><b>{players.jack.score.toLocaleString('tr-TR')}</b><em>{players.jack.kills} KILL</em></div>
+        <div><span>HZ. ALİ</span><b>{players.ali.score.toLocaleString('tr-TR')}</b></div>
+        <div><span>SAMURAY JACK</span><b>{players.jack.score.toLocaleString('tr-TR')}</b></div>
         <section className="combat-flow" aria-live="polite"><header><span>OYUN AKIŞI</span><b>{biome + 1}/7</b></header><p className="is-objective">{gateStatus}</p>{flow.map((item, index) => <p className={`is-${item.tone}`} key={item.id}><i>{String(index + 1).padStart(2, '0')}</i>{item.text}</p>)}</section>
       </aside>
 

@@ -19,6 +19,8 @@ test('oyun HUD ön izlemeleri, dünya can barları ve müzik kontrolleri okunabi
   await expect(page.locator('.player-hud .character-preview canvas')).toHaveCount(2)
   await expect(page.locator('.world-health--player')).toHaveCount(2)
   await expect(page.locator('.score-stack')).toBeVisible()
+  await expect(page.locator('.score-stack > div')).toHaveCount(2)
+  await expect(page.locator('.score-stack')).not.toContainText('KILL')
   await expect(page.locator('.combat-flow')).toBeVisible()
   await expect(page.locator('.enemy-roster')).toBeVisible()
   await page.waitForTimeout(900)

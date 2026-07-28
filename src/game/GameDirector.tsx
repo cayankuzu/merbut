@@ -10,7 +10,7 @@ import { enemyCatchUpMultiplier, shouldEnemyApproach } from './enemyAI'
 import { useGameStore } from '../store/gameStore'
 import { useSessionStore } from '../store/sessionStore'
 import type { CharacterId } from '../types/character'
-import type { EnemyProjectileState, EnemySpecial, EnemyState, ImpactKind, MeteorState, ProjectileState } from '../types/session'
+import type { EnemyProjectileState, EnemySpecial, EnemyState, ImpactKind, MeteorState, PlayerAttackSource, ProjectileState } from '../types/session'
 import {
   AKU_FIRE_SPIKE_DAMAGE_COOLDOWN_MS,
   AKU_FIRE_SPIKE_DAMAGE_MULTIPLIER,
@@ -116,11 +116,11 @@ function dropZemzem(x: number, now: number) {
   state.addFeed('Yerde Zemzem şişesi belirdi', 'system', now)
 }
 
-function hitEnemy(id: string, amount: number, attacker: CharacterId, now: number) {
+function hitEnemy(id: string, amount: number, attacker: CharacterId, now: number, source: PlayerAttackSource = 'melee') {
   const state = useSessionStore.getState()
   const before = state.enemies.find((enemy) => enemy.id === id)
   if (!before) return
-  const killed = state.damageEnemy(id, amount, attacker, now)
+  const killed = state.damageEnemy(id, amount, attacker, now, source)
   if (!killed) return
   if (!before.boss) dropZemzem(before.x, now)
   if (before.bossType === 'shadow') useSessionStore.getState().finishBossEncounter(now)
@@ -534,7 +534,7 @@ export function GameDirector() {
       let consumed = false
       for (const enemy of useSessionStore.getState().enemies) {
         if (enemy.animation !== 'dead' && Math.abs(enemy.x - moved.x) < (enemy.boss ? 1.5 : 0.9) && Math.abs(moved.z) < 1.4) {
-          hitEnemy(enemy.id, 58 * rules.abilityDamage, 'ali', now)
+          hitEnemy(enemy.id, 58 * rules.abilityDamage, 'ali', now, 'fireball')
           consumed = true
           break
         }

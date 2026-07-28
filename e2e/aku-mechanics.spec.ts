@@ -12,15 +12,51 @@ async function startCombat(page: Page, difficultyIndex = 1) {
 
 test('Ali dört saniyelik pencerede en fazla dokuz alev topu atar', async ({ page }) => {
   await startCombat(page)
-  const attempts = await page.evaluate(() => {
+  const result = await page.evaluate(() => {
     const session = window.__MERBUT__!.getSessionState()
+    const target = session.enemies.find((enemy) => !enemy.boss)!
     session.grantAbilityCharge('ali', 100)
     const startedAt = performance.now()
-    return Array.from({ length: 12 }, (_, index) => session.launchFireball(startedAt + index * 280, 0, 0, 0))
+    const attempts = Array.from({ length: 12 }, (_, index) => session.launchFireball(startedAt + index * 280, 0, 0, 0))
+    for (let hit = 0; hit < 12; hit += 1) {
+      session.damageEnemy(target.id, 1, 'ali', startedAt + 100 + hit * 200, 'fireball')
+    }
+    return {
+      attempts,
+      chargeAfterHits: window.__MERBUT__!.getSessionState().players.ali.abilityCharge,
+      reopenedAfterWindow: window.__MERBUT__!.getSessionState().launchFireball(startedAt + 4_001, 0, 0, 0),
+    }
   })
 
-  expect(attempts.slice(0, 9).every(Boolean)).toBe(true)
-  expect(attempts.slice(9).every((accepted) => !accepted)).toBe(true)
+  expect(result.attempts.slice(0, 9).every(Boolean)).toBe(true)
+  expect(result.attempts.slice(9).every((accepted) => !accepted)).toBe(true)
+  expect(result.chargeAfterHits).toBe(0)
+  expect(result.reopenedAfterWindow).toBe(false)
+  await expect(page.locator('.player-hud--ali .player-hud__ability span')).toContainText('0/9 ATIŞ')
+})
+
+test('Jack kalkanı aktifken kendini yeniden şarj edip zincirlenemez', async ({ page }) => {
+  await startCombat(page)
+  const result = await page.evaluate(() => {
+    const session = window.__MERBUT__!.getSessionState()
+    const target = session.enemies.find((enemy) => !enemy.boss)!
+    const startedAt = performance.now()
+    session.grantAbilityCharge('jack', 100, startedAt)
+    const activated = session.activateShield(startedAt)
+    for (let hit = 0; hit < 6; hit += 1) {
+      session.damageEnemy(target.id, 1, 'jack', startedAt + 100 + hit * 300, 'melee')
+    }
+    session.grantAbilityCharge('jack', 100, startedAt + 2_000)
+    return {
+      activated,
+      chargeDuringShield: window.__MERBUT__!.getSessionState().players.jack.abilityCharge,
+      chainedDuringShield: window.__MERBUT__!.getSessionState().activateShield(startedAt + 2_100),
+      reopenedAfterShield: window.__MERBUT__!.getSessionState().activateShield(startedAt + 4_001),
+    }
+  })
+
+  expect(result).toEqual({ activated: true, chargeDuringShield: 0, chainedDuringShield: false, reopenedAfterShield: false })
+  await expect(page.locator('.player-hud--jack .player-hud__ability span')).toContainText(/\d\.\d SN/)
 })
 
 test('Aku ateş yağmurunda çevresindeki diken alanı oyuncuya hasar verir', async ({ page }) => {

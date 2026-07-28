@@ -9,6 +9,7 @@ export type BossForm = 'normal' | 'monster'
 export type BossType = 'shadow' | 'aku'
 export type EnemySpecial = 'none' | 'shadow-slash' | 'combo-double' | 'combo-triple' | 'meteor' | 'aku-melee' | 'aku-heavy' | 'aku-ranged' | 'aku-fire-rain' | 'aku-time-portal' | 'aku-split' | 'aku-shapeshift' | 'aku-spin'
 export type ImpactKind = 'ember' | 'void' | 'quake' | 'stone' | 'frost' | 'boss' | 'holy' | 'portal'
+export type PlayerAttackSource = 'melee' | 'fireball'
 
 export interface PlayerStatus {
   health: number

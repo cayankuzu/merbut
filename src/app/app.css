@@ -1141,10 +1141,9 @@ button {
 @keyframes loading-exit { to { opacity:0; visibility:hidden; } }
 
 .score-stack { top: 20px; right: 22px; width: 380px; }
-.score-stack > div { display:grid; grid-template-columns:1fr auto; grid-template-rows:auto auto; padding:12px 15px 11px; margin:0 0 6px; border-left-width:4px; background:linear-gradient(90deg,rgba(14,3,7,.9),rgba(8,2,5,.74)); box-shadow:0 10px 34px rgba(0,0,0,.24); }
+.score-stack > div { display:flex; align-items:center; justify-content:space-between; padding:12px 15px 11px; margin:0 0 6px; border-left-width:4px; background:linear-gradient(90deg,rgba(14,3,7,.9),rgba(8,2,5,.74)); box-shadow:0 10px 34px rgba(0,0,0,.24); }
 .score-stack > div span { font-size:10px; }
-.score-stack > div b { grid-row:1/3; grid-column:2; align-self:center; font-size:22px; }
-.score-stack > div em { color:rgba(255,239,216,.52); font-size:8px; font-style:normal; letter-spacing:.15em; }
+.score-stack > div b { font-size:22px; }
 .combat-flow { margin-top:10px; padding:14px 14px 12px; border:1px solid rgba(255,255,255,.12); background:linear-gradient(145deg,rgba(9,2,5,.9),rgba(18,5,8,.66)); backdrop-filter:blur(10px); }
 .combat-flow header { display:flex; justify-content:space-between; padding-bottom:10px; border-bottom:1px solid rgba(255,255,255,.11); }
 .combat-flow header span { color:#ffc166; font-size:9px; font-weight:900; letter-spacing:.22em; }

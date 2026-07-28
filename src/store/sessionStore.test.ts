@@ -43,6 +43,78 @@ describe('session store', () => {
     expect(useSessionStore.getState().launchFireball(14_001, 0, 0, 0)).toBe(false)
   })
 
+  it('never lets fireball impacts recharge or reopen Ali fireball ability', () => {
+    const session = useSessionStore.getState()
+    session.startCountdown()
+    session.tick(4, 10_000)
+    session.spawnEnemies([{ ...enemy(), id: 'fireball-dummy', health: 1_000, maxHealth: 1_000 }])
+    session.grantAbilityCharge('ali', 100, 10_000)
+    expect(useSessionStore.getState().launchFireball(10_000, 0, 0, 0)).toBe(true)
+
+    for (let hit = 0; hit < 12; hit += 1) {
+      useSessionStore.getState().damageEnemy('fireball-dummy', 1, 'ali', 10_100 + hit * 200, 'fireball')
+    }
+
+    expect(useSessionStore.getState().players.ali.abilityCharge).toBe(0)
+    expect(useSessionStore.getState().launchFireball(14_001, 0, 0, 0)).toBe(false)
+  })
+
+  it('locks every charge source while Ali fire and Jack shield are active', () => {
+    const session = useSessionStore.getState()
+    session.startCountdown()
+    session.tick(4, 10_000)
+    session.spawnEnemies([
+      { ...enemy(), id: 'ali-charge-dummy', health: 1_000, maxHealth: 1_000 },
+      { ...enemy(), id: 'jack-charge-dummy', health: 1_000, maxHealth: 1_000 },
+    ])
+    session.damagePlayer('ali', 20, 9_000)
+    session.damagePlayer('jack', 20, 9_000)
+    session.grantAbilityCharge('ali', 100, 10_000)
+    session.grantAbilityCharge('jack', 100, 10_000)
+    expect(useSessionStore.getState().launchFireball(10_000, 0, 0, 0)).toBe(true)
+    expect(useSessionStore.getState().activateShield(10_000)).toBe(true)
+
+    useSessionStore.getState().damageEnemy('ali-charge-dummy', 10, 'ali', 10_200, 'melee')
+    useSessionStore.getState().damageEnemy('jack-charge-dummy', 10, 'jack', 10_200, 'melee')
+    useSessionStore.getState().grantAbilityCharge('ali', 100, 10_300)
+    useSessionStore.getState().grantAbilityCharge('jack', 100, 10_300)
+    useSessionStore.getState().addPickup({ id: 'ali-active-zemzem', x: 0, type: 'zemzem' })
+    useSessionStore.getState().addPickup({ id: 'jack-active-zemzem', x: 1, type: 'zemzem' })
+    useSessionStore.getState().collectPickup('ali-active-zemzem', 'ali', 10_400)
+    useSessionStore.getState().collectPickup('jack-active-zemzem', 'jack', 10_400)
+
+    expect(useSessionStore.getState().players.ali.abilityCharge).toBe(0)
+    expect(useSessionStore.getState().players.jack.abilityCharge).toBe(0)
+
+    useSessionStore.getState().damageEnemy('ali-charge-dummy', 10, 'ali', 14_001, 'melee')
+    useSessionStore.getState().damageEnemy('jack-charge-dummy', 10, 'jack', 14_001, 'melee')
+    expect(useSessionStore.getState().players.ali.abilityCharge).toBeGreaterThan(0)
+    expect(useSessionStore.getState().players.jack.abilityCharge).toBeGreaterThan(0)
+  })
+
+  it('cancels abilities on death and rejects activation while frozen', () => {
+    const session = useSessionStore.getState()
+    session.startCountdown()
+    session.tick(4, 10_000)
+    session.grantAbilityCharge('ali', 100, 10_000)
+    session.grantAbilityCharge('jack', 100, 10_000)
+    expect(useSessionStore.getState().launchFireball(10_000, 0, 0, 0)).toBe(true)
+    expect(useSessionStore.getState().activateShield(10_000)).toBe(true)
+    session.damagePlayer('ali', DIFFICULTIES.normal.playerHealth * 3, 10_100)
+    session.damagePlayer('jack', DIFFICULTIES.normal.playerHealth * 3, 10_100)
+    expect(useSessionStore.getState().players.ali).toMatchObject({ abilityActiveUntil: 0, abilityCharge: 0, abilityShots: 0 })
+    expect(useSessionStore.getState().players.jack).toMatchObject({ abilityActiveUntil: 0, abilityCharge: 0 })
+
+    session.restart()
+    session.tick(4, 20_000)
+    session.grantAbilityCharge('ali', 100, 20_000)
+    session.grantAbilityCharge('jack', 100, 20_000)
+    session.freezePlayer('ali', 20_000)
+    session.freezePlayer('jack', 20_000)
+    expect(useSessionStore.getState().launchFireball(20_100, 0, 0, 0)).toBe(false)
+    expect(useSessionStore.getState().activateShield(20_100)).toBe(false)
+  })
+
   it('makes every difficulty materially change player survival resources', () => {
     useSessionStore.getState().setDifficulty('easy')
     expect(useSessionStore.getState().players.ali).toMatchObject({ health: 145, maxHealth: 145, lives: 5 })

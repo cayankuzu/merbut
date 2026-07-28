@@ -19,6 +19,7 @@ import type {
   ImpactKind,
   MeteorState,
   PickupState,
+  PlayerAttackSource,
   PlayerStatus,
   PortalAlertState,
   ProjectileState,
@@ -90,10 +91,10 @@ interface SessionState {
   markWaveSpawned: (id: string) => void
   spawnEnemies: (enemies: EnemyState[]) => void
   updateEnemies: (enemies: EnemyState[]) => void
-  damageEnemy: (id: string, amount: number, attacker: CharacterId, now: number) => boolean
+  damageEnemy: (id: string, amount: number, attacker: CharacterId, now: number, source?: PlayerAttackSource) => boolean
   damagePlayer: (id: CharacterId, amount: number, now: number) => 'hit' | 'down' | 'blocked'
   freezePlayer: (id: CharacterId, now: number) => void
-  grantAbilityCharge: (id: CharacterId, amount: number) => void
+  grantAbilityCharge: (id: CharacterId, amount: number, now?: number) => void
   activateShield: (now: number) => boolean
   launchFireball: (now: number, x: number, y: number, rotation: number) => boolean
   updateProjectiles: (projectiles: ProjectileState[]) => void
@@ -248,7 +249,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
               ...player,
               maxHealth: rules.bossPlayerHealth,
               health: player.dead ? 0 : rules.bossPlayerHealth,
+              abilityActiveUntil: 0,
               abilityCharge: ABILITY_MAX_CHARGE,
+              abilityShots: 0,
+              lastAbilityShotAt: -Infinity,
               invulnerableUntil: now + 2_000,
             }]
           })) as Record<CharacterId, PlayerStatus>
@@ -350,7 +354,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   markWaveSpawned: (id) => set((state) => state.spawnedWaves.includes(id) ? state : { spawnedWaves: [...state.spawnedWaves, id] }),
   spawnEnemies: (enemies) => set((state) => ({ enemies: [...state.enemies, ...enemies] })),
   updateEnemies: (enemies) => set({ enemies }),
-  damageEnemy: (id, amount, attacker, now) => {
+  damageEnemy: (id, amount, attacker, now, source = 'melee') => {
     let killed = false
     set((state) => {
       const targetBefore = state.enemies.find((enemy) => enemy.id === id)
@@ -371,6 +375,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       const hitScore = Math.max(12, Math.round(actualDamage * 1.25))
       const chargeGain = Math.round((16 + actualDamage * 0.16 + (killed ? 15 : 0)) * rules.chargeGain)
       const player = state.players[attacker]
+      const canGainCharge = source === 'melee'
+        && !player.dead
+        && player.abilityActiveUntil <= now
+        && player.frozenUntil <= now
       const prayerHeal = targetBefore.bossType === 'aku' && state.bossPhase === 'fight' ? actualDamage * rules.prayerLifesteal : 0
       const players = {
         ...state.players,
@@ -379,7 +387,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           health: Math.min(player.maxHealth, player.health + prayerHeal),
           score: player.score + hitScore + (killed ? targetBefore.score : 0),
           kills: player.kills + (killed ? 1 : 0),
-          abilityCharge: Math.min(ABILITY_MAX_CHARGE, player.abilityCharge + chargeGain),
+          abilityCharge: canGainCharge
+            ? Math.min(ABILITY_MAX_CHARGE, player.abilityCharge + chargeGain)
+            : player.abilityCharge,
         },
       }
       const feed = killed
@@ -407,7 +417,19 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       const lives = catastrophic ? 0 : Math.max(0, current.lives - 1)
       const name = id === 'ali' ? 'Hz. Ali' : 'Samuray Jack'
       return {
-        players: { ...state.players, [id]: { ...current, health: 0, lives, dead: true, healOverTime: 0, respawnAt: lives > 0 ? now + rules.respawnSeconds * 1_000 : Infinity } },
+        players: { ...state.players, [id]: {
+          ...current,
+          health: 0,
+          lives,
+          dead: true,
+          healOverTime: 0,
+          respawnAt: lives > 0 ? now + rules.respawnSeconds * 1_000 : Infinity,
+          abilityActiveUntil: 0,
+          abilityCharge: 0,
+          abilityShots: 0,
+          lastAbilityShotAt: -Infinity,
+          frozenUntil: 0,
+        } },
         feed: [...state.feed, { id: nextId('feed'), text: lives > 0 ? `${name} düştü — ${rules.respawnSeconds.toFixed(1)} sn sonra dirilecek` : `${name} savaş dışı`, tone: 'damage' as const, expiresAt: now + 4_500 }],
       }
     })
@@ -423,20 +445,24 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       feed: [...state.feed, { id: nextId('feed'), text: `${name} zaman portalında 3 sn dondu`, tone: 'damage' as const, expiresAt: now + 3_800 }],
     }
   }),
-  grantAbilityCharge: (id, amount) => set((state) => ({
-    players: { ...state.players, [id]: { ...state.players[id], abilityCharge: Math.min(ABILITY_MAX_CHARGE, state.players[id].abilityCharge + amount) } },
-  })),
+  grantAbilityCharge: (id, amount, now = performance.now()) => set((state) => {
+    const player = state.players[id]
+    if (amount <= 0 || player.dead || player.abilityActiveUntil > now || player.frozenUntil > now) return state
+    return {
+      players: { ...state.players, [id]: { ...player, abilityCharge: Math.min(ABILITY_MAX_CHARGE, player.abilityCharge + amount) } },
+    }
+  }),
   activateShield: (now) => {
     const state = get()
     const jack = state.players.jack
-    if (state.phase !== 'playing' || jack.dead || jack.abilityActiveUntil > now || jack.abilityCharge < ABILITY_MAX_CHARGE) return false
+    if (state.phase !== 'playing' || jack.dead || jack.frozenUntil > now || jack.abilityActiveUntil > now || jack.abilityCharge < ABILITY_MAX_CHARGE) return false
     set((current) => ({ players: { ...current.players, jack: { ...current.players.jack, abilityActiveUntil: now + JACK_SHIELD_DURATION_MS, abilityCharge: 0 } } }))
     return true
   },
   launchFireball: (now, x, y, rotation) => {
     const state = get()
     const ali = state.players.ali
-    if (state.phase !== 'playing' || ali.dead) return false
+    if (state.phase !== 'playing' || ali.dead || ali.frozenUntil > now) return false
     const openingWindow = ali.abilityActiveUntil <= now
     if (openingWindow && ali.abilityCharge < ABILITY_MAX_CHARGE) return false
     const activeUntil = openingWindow ? now + ALI_FIREBALL_WINDOW_MS : ali.abilityActiveUntil
@@ -468,7 +494,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const pickup = state.pickups.find((candidate) => candidate.id === pickupId)
     if (!pickup) return state
     const player = state.players[playerId]
-    if (player.dead || (player.health >= player.maxHealth && player.abilityCharge >= ABILITY_MAX_CHARGE)) return state
+    const canHeal = player.health < player.maxHealth
+    const canGainCharge = player.abilityActiveUntil <= now && player.frozenUntil <= now && player.abilityCharge < ABILITY_MAX_CHARGE
+    if (player.dead || (!canHeal && !canGainCharge)) return state
     const rules = DIFFICULTIES[state.difficulty]
     const name = playerId === 'ali' ? 'Hz. Ali' : 'Samuray Jack'
     return {
@@ -476,7 +504,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       players: { ...state.players, [playerId]: {
         ...player,
         healOverTime: Math.min(rules.healAmount * 2, player.healOverTime + rules.healAmount),
-        abilityCharge: Math.min(ABILITY_MAX_CHARGE, player.abilityCharge + 12 * rules.chargeGain),
+        abilityCharge: canGainCharge
+          ? Math.min(ABILITY_MAX_CHARGE, player.abilityCharge + 12 * rules.chargeGain)
+          : player.abilityCharge,
       } },
       impacts: appendImpact(state.impacts, { id: nextId('impact'), kind: 'holy', x: pickup.x, y: 1.15, createdAt: now, duration: 1_250, lethal: false }),
       feed: [...state.feed, { id: nextId('feed'), text: `${name} Zemzem suyu içti — iyileşme başladı`, tone: 'pickup' as const, expiresAt: now + 5_000 }],
@@ -506,7 +536,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         ...player,
         maxHealth: rules.bossPlayerHealth,
         health: player.dead ? 0 : rules.bossPlayerHealth,
+        abilityActiveUntil: 0,
         abilityCharge: ABILITY_MAX_CHARGE,
+        abilityShots: 0,
+        lastAbilityShotAt: -Infinity,
         invulnerableUntil: now + 2_000,
       }])) as Record<CharacterId, PlayerStatus>,
       feed: [...state.feed, { id: nextId('feed'), text: 'Samuray Jack duaya durdu — ilahi halkalar kalan canı koruyup şifayı uyandırdı', tone: 'system' as const, expiresAt: now + 7_000 }],
@@ -522,6 +555,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           maxHealth: rules.playerHealth,
           health: player.dead ? 0 : Math.min(rules.playerHealth, Math.max(rules.playerHealth * 0.55, player.health)),
           abilityActiveUntil: 0,
+          abilityShots: 0,
+          lastAbilityShotAt: -Infinity,
         }]
       })) as Record<CharacterId, PlayerStatus>,
       feed: [...state.feed, { id: nextId('feed'), text: 'Gölgenin kudreti dağıldı — Zemzem kontrol noktası kalan canları tazeledi', tone: 'system' as const, expiresAt: now + 5_000 }],
