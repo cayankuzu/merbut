@@ -1,6 +1,7 @@
 import { AliCharacter } from '../characters/AliCharacter'
 import { JackCharacter } from '../characters/JackCharacter'
 import { BiomeLighting } from './BiomeLighting'
+import { BiomeAtmosphere } from './BiomeAtmosphere'
 import { CombatEffects } from './CombatEffects'
 import { DustParticles } from './DustParticles'
 import { GameCamera } from './GameCamera'
@@ -28,6 +29,7 @@ export function GameWorld() {
       <GameCamera />
       <GameDirector />
       <BiomeLighting />
+      <BiomeAtmosphere />
 
       {showCombatActors ? <>
         <AliCharacter />

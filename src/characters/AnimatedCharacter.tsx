@@ -19,6 +19,8 @@ import {
 interface AnimatedCharacterProps {
   definition: CharacterDefinition
   animationState: AnimationState
+  /** Replays the current combat clip without changing gameplay animation state. */
+  animationSignal?: number
 }
 
 function enableShadows(root: Object3D) {
@@ -31,7 +33,7 @@ function enableShadows(root: Object3D) {
   })
 }
 
-export function AnimatedCharacter({ definition, animationState }: AnimatedCharacterProps) {
+export function AnimatedCharacter({ definition, animationState, animationSignal = 0 }: AnimatedCharacterProps) {
   const idleFile = useGLTF(definition.assets.idle)
   const walkFile = useGLTF(definition.assets.walk)
   const jumpFile = useGLTF(definition.assets.jump)
@@ -55,7 +57,7 @@ export function AnimatedCharacter({ definition, animationState }: AnimatedCharac
     return prepared.map((clip) => validateClipTargets(characterScene, clip))
   }, [attackFile.animations, characterScene, definition.jumpSubclip, idleFile.animations, jumpFile.animations, walkFile.animations])
 
-  useCharacterAnimations(characterScene, clips, animationState)
+  useCharacterAnimations(characterScene, clips, animationState, animationSignal)
 
   useLayoutEffect(() => {
     enableShadows(characterScene)

@@ -102,15 +102,35 @@ button {
 }
 
 .scene-backdrop {
+  --biome-accent: #ff5b72;
+  --biome-haze: #56342f;
   position: absolute;
   inset: 0;
   z-index: 0;
   overflow: hidden;
   background: #b96f70;
+  isolation: isolate;
+}
+
+.scene-backdrop::after {
+  position: absolute;
+  z-index: 1;
+  inset: -8%;
+  content: '';
+  pointer-events: none;
+  opacity: .5;
+  background:
+    radial-gradient(ellipse at 18% 48%, color-mix(in srgb, var(--biome-accent) 22%, transparent), transparent 37%),
+    radial-gradient(ellipse at 78% 41%, color-mix(in srgb, var(--biome-haze) 46%, transparent), transparent 42%);
+  mix-blend-mode: screen;
+  transform: translate3d(0, 0, 0);
+  will-change: transform, opacity;
+  animation: biome-aura-drift 15s ease-in-out infinite alternate;
 }
 
 .scene-backdrop__track {
   position: absolute;
+  z-index: 0;
   inset: 0 auto 0 0;
   display: flex;
   width: calc(var(--panel-count) * 100%);
@@ -191,6 +211,7 @@ button {
 
 .scene-backdrop__haze {
   position: absolute;
+  z-index: 2;
   inset: 0;
   overflow: hidden;
   background:
@@ -484,6 +505,11 @@ button {
   to { transform: translate3d(1.5%, -3%, 0) scale(1.07); }
 }
 
+@keyframes biome-aura-drift {
+  from { transform: translate3d(-1.25%, 0, 0) scale(1); opacity: .42; }
+  to { transform: translate3d(1.25%, -1.7%, 0) scale(1.05); opacity: .62; }
+}
+
 @media (max-height: 700px) {
   .control-card {
     bottom: 18px;
@@ -498,7 +524,8 @@ button {
 @media (prefers-reduced-motion: reduce) {
   .control-card,
   .loading-screen,
-  .scene-backdrop__haze::before {
+  .scene-backdrop__haze::before,
+  .scene-backdrop::after {
     animation: none;
   }
 }
@@ -831,7 +858,25 @@ button {
   pointer-events: none;
   background: linear-gradient(180deg, rgba(5,0,3,.38), transparent 33% 70%, rgba(5,0,3,.48));
 }
-.boss-cinematic > div { max-width: 720px; padding: 22px 50px; text-align: center; background: radial-gradient(ellipse, rgba(12,2,8,.72), transparent 72%); animation: cinematic-copy 700ms ease-out both; }
+.boss-cinematic::before,
+.boss-cinematic::after,
+.ending-overlay:not(.ending-overlay--continued)::before,
+.ending-overlay:not(.ending-overlay--continued)::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  right: 0;
+  left: 0;
+  height: clamp(26px, 6vh, 70px);
+  background: linear-gradient(180deg, #020102, #080207 78%, rgba(8,2,7,.82));
+  box-shadow: 0 0 38px rgba(0,0,0,.78);
+  animation: cinematic-letterbox 520ms cubic-bezier(.2,.76,.18,1) both;
+}
+.boss-cinematic::before,
+.ending-overlay:not(.ending-overlay--continued)::before { top: 0; transform-origin: top; }
+.boss-cinematic::after,
+.ending-overlay:not(.ending-overlay--continued)::after { bottom: 0; transform-origin: bottom; }
+.boss-cinematic > div { position: relative; z-index: 1; max-width: 720px; padding: 22px 50px; text-align: center; background: radial-gradient(ellipse, rgba(12,2,8,.72), transparent 72%); animation: cinematic-copy 700ms ease-out both; }
 .boss-cinematic small { color: #d77cff; font-size: 9px; font-weight: 800; letter-spacing: .42em; }
 .boss-cinematic h1 { margin: 9px 0; color: #fff0df; font: italic 800 clamp(54px, 8vw, 118px)/.88 'Arial Narrow', sans-serif; text-shadow: 0 0 36px rgba(255,22,74,.55), 0 16px 50px #000; }
 .boss-cinematic p { margin: 16px auto 0; color: rgba(255,236,218,.72); font-size: 12px; letter-spacing: .06em; }
@@ -840,6 +885,7 @@ button {
 @keyframes boss-hud-pulse { to { border-color: color-mix(in srgb, var(--player) 72%, white); filter: drop-shadow(0 0 9px color-mix(in srgb, var(--player) 35%, transparent)); } }
 @keyframes biome-reveal { 0% { opacity: 0; transform: translate(-50%, 16px); } 13%, 75% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -10px); } }
 @keyframes cinematic-copy { from { opacity: 0; transform: scale(.92); letter-spacing: .08em; } to { opacity: 1; transform: scale(1); } }
+@keyframes cinematic-letterbox { from { opacity: 0; transform: scaleY(0); } to { opacity: 1; transform: scaleY(1); } }
 
 @media (max-height: 760px) {
   .controls-screen { gap: 9px; padding-block: 1.4vh; }
@@ -907,6 +953,7 @@ button {
 .boss-hud--aku small { color: #aefa7b; }
 
 .ending-overlay { position: absolute; inset: 0; z-index: 14; display: grid; place-content: center; padding: 7vw; text-align: center; pointer-events: none; background: radial-gradient(circle,transparent 0 26%,rgba(3,0,4,.72) 78%); }
+.ending-overlay > * { position: relative; z-index: 1; }
 .ending-overlay small { color: #8beaff; font-size: 9px; font-weight: 800; letter-spacing: .42em; }
 .ending-overlay h1 { margin: 10px 0; color: #fff1d0; font: italic 900 clamp(58px,9vw,145px)/.9 'Arial Narrow',sans-serif; text-shadow: 0 0 35px rgba(91,220,255,.35),0 18px 60px #000; animation: cinematic-copy 700ms ease-out both; }
 .ending-overlay--portal h1 { font-size: clamp(45px,6vw,92px); }

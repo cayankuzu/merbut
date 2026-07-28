@@ -1,7 +1,7 @@
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { ContactShadows, useAnimations, useGLTF, useProgress } from '@react-three/drei'
-import { type AnimationClip, Box3, Group, LoopOnce, LoopRepeat, MathUtils, type Object3D, Vector3 } from 'three'
+import { AnimationClip, Box3, Group, LoopOnce, MathUtils, type Object3D, Vector3 } from 'three'
 import { SkeletonUtils } from 'three-stdlib'
 import { AnimatedCharacter } from '../characters/AnimatedCharacter'
 import { prepareAnimationClip } from '../animation/animationLoader'
@@ -20,7 +20,6 @@ type MotionSet = readonly [string, string, string, string, string]
 type EffectSet = readonly [MenuAttackEffectKind, MenuAttackEffectKind, MenuAttackEffectKind, MenuAttackEffectKind, MenuAttackEffectKind]
 
 interface AttackState {
-  attacking: boolean
   trigger: number
   variant: number
 }
@@ -54,6 +53,8 @@ interface EnemyShowcaseDefinition {
 const repeatMotion = (motion: string): MotionSet => [motion, motion, motion, motion, motion]
 
 const ENEMY_SHOWCASE: readonly EnemyShowcaseDefinition[] = [
+  // `base` supplies the skinned mesh. It is never played as locomotion: the
+  // action mixer below starts an attack clip immediately after mounting.
   { id: 'myrkhan', name: 'Myrkhan', row: 0, column: 0, rowCount: 3, base: ENEMIES[1].walk, motions: repeatMotion(ENEMIES[1].attack), modelScale: ENEMIES[1].scale, displayScale: 1, accent: ENEMIES[1].accent, effects: ['impact-ember', 'slash', 'impact-quake', 'shockwave', 'flame'] },
   { id: 'zorvex', name: 'Zorvex', row: 0, column: 1, rowCount: 3, base: ENEMIES[2].walk, motions: repeatMotion(ENEMIES[2].attack), modelScale: ENEMIES[2].scale, displayScale: 1, accent: ENEMIES[2].accent, effects: ['impact-void', 'slash', 'projectile', 'impact-void', 'shockwave'] },
   { id: 'kharzul', name: 'Kharzul', row: 0, column: 2, rowCount: 3, base: ENEMIES[3].walk, motions: repeatMotion(ENEMIES[3].attack), modelScale: ENEMIES[3].scale, displayScale: 1, accent: ENEMIES[3].accent, effects: ['impact-quake', 'shockwave', 'slash', 'impact-boss', 'slash'] },
@@ -117,8 +118,32 @@ function keepShowcaseClipInPlace(clip: AnimationClip, anchors: RootMotionAnchors
 }
 
 function prepareShowcaseClip(scene: Object3D, source: AnimationClip | undefined, name: string, anchors?: RootMotionAnchors) {
-  const clip = validateClipTargets(scene, prepareAnimationClip(source, name))
-  return keepShowcaseClipInPlace(clip, anchors ?? getRootMotionAnchors(clip))
+  if (!source) return new AnimationClip(name, 0.86, [])
+  try {
+    const clip = validateClipTargets(scene, prepareAnimationClip(source, name))
+    return keepShowcaseClipInPlace(clip, anchors ?? getRootMotionAnchors(clip))
+  } catch {
+    // A damaged or mismatched optional action should never block the menu.
+    // The caller turns this into a procedural strike while its matching combat
+    // effect still plays.
+    return new AnimationClip(name, 0.86, [])
+  }
+}
+
+function prepareShowcaseAttackClip(
+  scene: Object3D,
+  source: AnimationClip | undefined,
+  name: string,
+  fallback: AnimationClip,
+  anchors: RootMotionAnchors,
+) {
+  if (!source) return { clip: Object.assign(fallback.clone(), { name }), fallback: true }
+  try {
+    const clip = validateClipTargets(scene, prepareAnimationClip(source, name))
+    return { clip: keepShowcaseClipInPlace(clip, anchors), fallback: false }
+  } catch {
+    return { clip: Object.assign(fallback.clone(), { name }), fallback: true }
+  }
 }
 
 function shuffledVariants(count: number, previous: number) {
@@ -134,7 +159,6 @@ function shuffledVariants(count: number, previous: number) {
 }
 
 function useRandomAttackCycle(forced: boolean, seed: number, variantCount: number): AttackState {
-  const [attacking, setAttacking] = useState(false)
   const [trigger, setTrigger] = useState(0)
   const [variant, setVariant] = useState(seed % variantCount)
   const bag = useRef<number[]>([])
@@ -149,21 +173,20 @@ function useRandomAttackCycle(forced: boolean, seed: number, variantCount: numbe
     let endTimer = 0
     let disposed = false
 
-    const schedule = () => {
-      const delay = 1_250 + Math.random() * 2_750 + (seed % 4) * 90
-      startTimer = window.setTimeout(() => {
+    const strike = () => {
+      if (disposed) return
+      drawVariant()
+      setTrigger((value) => value + 1)
+      endTimer = window.setTimeout(() => {
         if (disposed) return
-        drawVariant()
-        setTrigger((value) => value + 1)
-        setAttacking(true)
-        endTimer = window.setTimeout(() => {
-          setAttacking(false)
-          schedule()
-        }, 680 + Math.random() * 420)
-      }, delay)
+        // Keep the final combat pose instead of returning to an idle or walk
+        // state. The short recovery makes the next strike readable without
+        // ever exposing locomotion on the menu stage.
+        startTimer = window.setTimeout(strike, 110 + Math.random() * 210)
+      }, 650 + Math.random() * 260)
     }
 
-    schedule()
+    startTimer = window.setTimeout(strike, 70 + (seed % 4) * 55)
     return () => {
       disposed = true
       window.clearTimeout(startTimer)
@@ -175,15 +198,12 @@ function useRandomAttackCycle(forced: boolean, seed: number, variantCount: numbe
     if (!forced) return
     drawVariant()
     setTrigger((value) => value + 1)
-    setAttacking(true)
-    const timeout = window.setTimeout(() => setAttacking(false), 880)
-    return () => window.clearTimeout(timeout)
   }, [drawVariant, forced])
 
-  return { attacking, trigger, variant }
+  return { trigger, variant }
 }
 
-function ActionModel({ attacking, base, motions, scale, variant }: { attacking: boolean; base: string; motions: MotionSet; scale: number; variant: number }) {
+function ActionModel({ base, motions, scale, trigger, variant }: { base: string; motions: MotionSet; scale: number; trigger: number; variant: number }) {
   const baseFile = useGLTF(base)
   const motionFile0 = useGLTF(motions[0])
   const motionFile1 = useGLTF(motions[1])
@@ -191,20 +211,21 @@ function ActionModel({ attacking, base, motions, scale, variant }: { attacking: 
   const motionFile3 = useGLTF(motions[3])
   const motionFile4 = useGLTF(motions[4])
   const scene = useMemo(() => SkeletonUtils.clone(baseFile.scene), [baseFile.scene])
-  const clips = useMemo(() => {
-    const stance = prepareShowcaseClip(scene, baseFile.animations[0], 'stance')
-    const anchors = getRootMotionAnchors(stance)
+  const preparedActions = useMemo(() => {
+    const fallback = prepareShowcaseClip(scene, baseFile.animations[0], 'fallback-strike')
+    const anchors = getRootMotionAnchors(fallback)
     return [
-      stance,
-      prepareShowcaseClip(scene, motionFile0.animations[0], 'attack-0', anchors),
-      prepareShowcaseClip(scene, motionFile1.animations[0], 'attack-1', anchors),
-      prepareShowcaseClip(scene, motionFile2.animations[0], 'attack-2', anchors),
-      prepareShowcaseClip(scene, motionFile3.animations[0], 'attack-3', anchors),
-      prepareShowcaseClip(scene, motionFile4.animations[0], 'attack-4', anchors),
+      prepareShowcaseAttackClip(scene, motionFile0.animations[0], 'attack-0', fallback, anchors),
+      prepareShowcaseAttackClip(scene, motionFile1.animations[0], 'attack-1', fallback, anchors),
+      prepareShowcaseAttackClip(scene, motionFile2.animations[0], 'attack-2', fallback, anchors),
+      prepareShowcaseAttackClip(scene, motionFile3.animations[0], 'attack-3', fallback, anchors),
+      prepareShowcaseAttackClip(scene, motionFile4.animations[0], 'attack-4', fallback, anchors),
     ]
   }, [baseFile.animations, motionFile0.animations, motionFile1.animations, motionFile2.animations, motionFile3.animations, motionFile4.animations, scene])
+  const clips = useMemo(() => preparedActions.map((action) => action.clip), [preparedActions])
   const { actions } = useAnimations(clips, scene)
-  const activeAction = useRef<string | null>(null)
+  const proceduralRoot = useRef<Group>(null)
+  const actionStartedAt = useRef(performance.now())
   const actionsPrimed = useRef(false)
 
   // Keep showcase actions registered with their mixer for the lifetime of the
@@ -215,67 +236,63 @@ function ActionModel({ attacking, base, motions, scale, variant }: { attacking: 
       if (!action) return
       action.enabled = true
       action.paused = false
-      action.clampWhenFinished = false
-      action.setLoop(LoopRepeat, Infinity)
+      action.clampWhenFinished = true
+      action.setLoop(LoopOnce, 1)
       action.reset().play()
       action.setEffectiveWeight(0)
     })
-    actions.stance?.setEffectiveWeight(1)
-    if (actions.stance) {
-      actions.stance.time = 0
-      actions.stance.paused = true
-    }
-    activeAction.current = 'stance'
     actionsPrimed.current = true
     return () => {
       actionsPrimed.current = false
-      activeAction.current = null
       Object.values(actions).forEach((action) => action?.stop())
     }
   }, [actions])
 
   useEffect(() => {
     if (!actionsPrimed.current) return
-    const actionName = attacking ? `attack-${variant}` : 'stance'
+    const actionName = `attack-${variant}`
     const selected = actions[actionName]
     if (!selected) return
 
-    const clipDuration = clips.find((clip) => clip.name === actionName)?.duration ?? 1
-    const changed = activeAction.current !== actionName
+    const clipDuration = clips[variant]?.duration ?? 0.86
     selected.enabled = true
     selected.paused = false
-    selected.clampWhenFinished = attacking
-    selected.setLoop(attacking ? LoopOnce : LoopRepeat, attacking ? 1 : Infinity)
-    selected.timeScale = attacking ? Math.max(0.8, clipDuration / 0.86) : 0.32
-    if (changed) selected.reset()
-    if (!attacking) {
-      selected.time = 0
-      selected.paused = true
-    }
+    selected.clampWhenFinished = true
+    selected.setLoop(LoopOnce, 1)
+    selected.timeScale = Math.max(0.8, clipDuration / 0.86)
+    selected.reset()
     Object.entries(actions).forEach(([name, candidate]) => {
       if (!candidate) return
       candidate.enabled = true
       candidate.setEffectiveWeight(name === actionName ? 1 : 0)
       if (name !== actionName) candidate.paused = true
     })
-    activeAction.current = actionName
-  }, [actions, attacking, clips, variant])
+    actionStartedAt.current = performance.now()
+  }, [actions, clips, trigger, variant])
 
-  return <primitive object={scene} scale={scale} />
+  const usesFallback = preparedActions[variant]?.fallback ?? true
+  useFrame((_, delta) => {
+    const root = proceduralRoot.current
+    if (!root) return
+    const progress = Math.min(1, (performance.now() - actionStartedAt.current) / 820)
+    const recoil = usesFallback ? Math.sin(progress * Math.PI) : 0
+    root.position.x = MathUtils.damp(root.position.x, -recoil * 0.12, 18, delta)
+    root.rotation.z = MathUtils.damp(root.rotation.z, recoil * 0.12, 18, delta)
+  })
+
+  return <group ref={proceduralRoot}><primitive object={scene} scale={scale} /></group>
 }
 
-function Hero({ attacking, id, variant }: { attacking: boolean; id: 'ali' | 'jack'; variant: number }) {
-  const animation: AnimationState = !attacking
-    ? 'idle'
-    : id === 'ali' && (variant === 1 || variant === 3)
+function Hero({ id, trigger, variant }: { id: 'ali' | 'jack'; trigger: number; variant: number }) {
+  const animation: AnimationState = id === 'ali' && (variant === 1 || variant === 3)
       ? 'fireball'
       : id === 'jack' && (variant === 1 || variant === 3)
         ? 'shield'
         : 'attack'
-  return <AnimatedCharacter definition={CHARACTERS[id]} animationState={animation} />
+  return <AnimatedCharacter definition={CHARACTERS[id]} animationState={animation} animationSignal={trigger} />
 }
 
-function FootAlignedModel({ children }: { children: ReactNode }) {
+function FootAlignedModel({ children, effectOriginY, effectScale }: { children: ReactNode; effectOriginY: MutableRefObject<number>; effectScale: number }) {
   const anchor = useRef<Group>(null)
   const visual = useRef<Group>(null)
   const bounds = useMemo(() => new Box3(), [])
@@ -283,30 +300,38 @@ function FootAlignedModel({ children }: { children: ReactNode }) {
   const anchorScale = useMemo(() => new Vector3(), [])
   const nextMeasurementAt = useRef(0)
   const initialized = useRef(false)
+  const hiddenWeapons = useRef<Object3D[]>([])
 
   useFrame(({ clock }) => {
     if (!anchor.current || !visual.current || clock.elapsedTime < nextMeasurementAt.current) return
     nextMeasurementAt.current = clock.elapsedTime + 0.08
 
-    const hiddenWeapons: Object3D[] = []
+    const hidden = hiddenWeapons.current
+    hidden.length = 0
     visual.current.traverse((node) => {
       if (node.name === 'WeaponSocket' && node.visible) {
-        hiddenWeapons.push(node)
+        hidden.push(node)
         node.visible = false
       }
     })
     visual.current.updateWorldMatrix(true, true)
     bounds.makeEmpty().setFromObject(visual.current, true)
-    hiddenWeapons.forEach((weapon) => { weapon.visible = true })
+    hidden.forEach((weapon) => { weapon.visible = true })
     if (bounds.isEmpty() || !Number.isFinite(bounds.min.y)) return
 
     anchor.current.getWorldPosition(anchorPosition)
     anchor.current.getWorldScale(anchorScale)
-    const targetY = visual.current.position.y
-      + (anchorPosition.y - bounds.min.y) / Math.max(0.0001, Math.abs(anchorScale.y))
+    const scaleY = Math.max(0.0001, Math.abs(anchorScale.y))
+    const targetY = visual.current.position.y + (anchorPosition.y - bounds.min.y) / scaleY
     visual.current.position.y = initialized.current
       ? MathUtils.damp(visual.current.position.y, targetY, 20, 0.08)
       : targetY
+    const localFloor = (bounds.min.y - anchorPosition.y) / scaleY
+    const localHeight = (bounds.max.y - bounds.min.y) / scaleY
+    // Combat effects live outside the scaled visual group. Store a live,
+    // model-derived torso/weapon height in fighter coordinates so every body
+    // size receives the same alignment as its in-game counterpart.
+    effectOriginY.current = (localFloor + Math.max(0.42, localHeight * 0.56)) * effectScale
     initialized.current = true
   })
 
@@ -315,6 +340,7 @@ function FootAlignedModel({ children }: { children: ReactNode }) {
 
 function Fighter({ accent, children, displayScale, effects, forced, id, index, originY, side }: FighterProps) {
   const root = useRef<Group>(null)
+  const effectOriginY = useRef(originY * displayScale)
   const viewportWidth = useThree((state) => state.viewport.width)
   const viewportHeight = useThree((state) => state.viewport.height)
   const shadows = usePerformanceStore((state) => PERFORMANCE_PROFILES[state.tier].shadows)
@@ -337,14 +363,15 @@ function Fighter({ accent, children, displayScale, effects, forced, id, index, o
   return (
     <group ref={root} name={id} position={[baseX, baseY, side === 'heroes' ? -0.08 : -0.28]}>
       <group rotation={[0, side === 'heroes' ? 0 : -Math.PI / 2, 0]} scale={displayScale}>
-        <FootAlignedModel>{children(attack)}</FootAlignedModel>
+        <FootAlignedModel effectOriginY={effectOriginY} effectScale={displayScale}>{children(attack)}</FootAlignedModel>
       </group>
       {shadows ? <ContactShadows position={[0, 0.01, 0]} scale={side === 'heroes' ? 5 : 7} opacity={0.32} blur={2.4} far={4} color="#060104" /> : null}
       <MenuAttackEffect
         accent={accent}
         direction={side === 'heroes' ? 1 : -1}
         kind={effects[attack.variant] ?? effects[0]}
-        originY={originY}
+        originY={originY * displayScale}
+        originYRef={effectOriginY}
         presentationScale={displayScale}
         trigger={attack.trigger}
         variant={attack.variant}
@@ -363,7 +390,7 @@ function StageCast({ action, activeEnemyIndex, activeHeroIndex }: { action: Menu
     <>
       <Suspense fallback={null}>
         <Fighter key={hero.id} id={hero.id} side="heroes" index={activeHeroIndex} displayScale={1} originY={hero.originY} accent={hero.accent} effects={hero.effects} forced={action === 'heroes'}>
-          {({ attacking, variant }) => <Hero id={heroId} attacking={attacking} variant={variant} />}
+          {({ trigger, variant }) => <Hero id={heroId} trigger={trigger} variant={variant} />}
         </Fighter>
       </Suspense>
       <Suspense fallback={null}>
@@ -378,7 +405,7 @@ function StageCast({ action, activeEnemyIndex, activeHeroIndex }: { action: Menu
           effects={enemy.effects}
           forced={action === 'enemies'}
         >
-          {({ attacking, variant }) => <ActionModel attacking={attacking} base={enemy.base} motions={enemy.motions} scale={enemy.modelScale} variant={variant} />}
+          {({ trigger, variant }) => <ActionModel base={enemy.base} motions={enemy.motions} scale={enemy.modelScale} trigger={trigger} variant={variant} />}
         </Fighter>
       </Suspense>
     </>

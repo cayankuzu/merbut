@@ -7,6 +7,8 @@ export type Vec3Tuple = [number, number, number]
 export interface WeaponTransform {
   /** False keeps the authored local rotation instead of counter-aligning the blade. */
   alignBlade?: boolean
+  /** Rolls the mesh around its own grip-to-tip axis without moving either endpoint. */
+  bladeRoll?: number
   bladeDirection: Vec3Tuple
   gripPoint: Vec3Tuple
   palmLerp?: number

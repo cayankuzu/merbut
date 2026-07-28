@@ -19,7 +19,7 @@ import type {
 } from '../types/session'
 import { currentPerformanceProfile } from './performanceStore'
 
-const FIREBALL_WINDOW_DURATION = 6_000
+const FIREBALL_WINDOW_DURATION = 4_000
 const SHIELD_DURATION = 4_000
 const ABILITY_MAX_CHARGE = 100
 const WORLD_START = -4.8

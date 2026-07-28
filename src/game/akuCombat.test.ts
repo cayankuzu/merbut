@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { EnemyState } from '../types/session'
 import { isActiveAkuFight } from './akuCombat'
-import { getMiniAkuMotion, MINI_AKU_ATTACK_TIMES, MINI_AKU_COUNT } from './akuMiniSwarm'
+import { getMiniAkuMotion, MINI_AKU_ATTACK_TIMES, MINI_AKU_COUNT, MINI_AKU_LANE_Y, MINI_AKU_LANE_Z } from './akuMiniSwarm'
 
 const aku = {
   id: 'aku-final', finalBoss: true, bossType: 'aku', animation: 'attack',
@@ -21,7 +21,8 @@ describe('Aku encounter guards', () => {
     MINI_AKU_ATTACK_TIMES.forEach((attackAt, index) => {
       const motion = getMiniAkuMotion(index, attackAt + 100, 20, 25)
       expect(motion.attacking).toBe(true)
-      expect(motion.y).toBe(0)
+      expect(motion.y).toBe(MINI_AKU_LANE_Y)
+      expect(motion.z).toBe(MINI_AKU_LANE_Z)
       expect(Math.abs(motion.x - 25)).toBeLessThan(1.2)
       expect(Math.abs(motion.x - 20)).toBeLessThan(6)
     })

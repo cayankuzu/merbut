@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useRef } from 'react'
+import { lazy, Suspense, useEffect, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { ACESFilmicToneMapping, PCFShadowMap, SRGBColorSpace } from 'three'
 import { GameWorld } from './GameWorld'
@@ -11,6 +11,7 @@ const LOWER_TIER: Record<PerformanceTier, PerformanceTier> = {
 const HIGHER_TIER: Record<PerformanceTier, PerformanceTier> = {
   high: 'high', balanced: 'high', performance: 'balanced', minimal: 'performance',
 }
+const AdaptiveVisualGrade = lazy(() => import('./AdaptiveVisualGrade').then((module) => ({ default: module.AdaptiveVisualGrade })))
 
 function ShadowRenderBudget() {
   const gl = useThree((state) => state.gl)
@@ -128,6 +129,9 @@ export function GameScene() {
         <RuntimePerformanceGovernor active={active} />
         <ShadowRenderBudget />
         <GameWorld />
+        {tier === 'balanced' || tier === 'high' ? (
+          <Suspense fallback={null}><AdaptiveVisualGrade tier={tier} /></Suspense>
+        ) : null}
       </Suspense>
     </Canvas>
   )

@@ -10,9 +10,11 @@ import {
   Object3D,
   PointLight,
 } from 'three'
+import { biomeAtmosphere } from '../config/biomeAtmosphere'
 import { getBiomeBlend } from '../config/biomes'
 import { useGameStore } from '../store/gameStore'
 import { PERFORMANCE_PROFILES, usePerformanceStore } from '../store/performanceStore'
+import { useSessionStore } from '../store/sessionStore'
 
 const targetFog = new Color()
 const targetSky = new Color()
@@ -48,7 +50,15 @@ export function BiomeLighting() {
   useFrame((_, delta) => {
     const cameraX = useGameStore.getState().cameraX
     const blend = getBiomeBlend(cameraX)
+    const fromAtmosphere = biomeAtmosphere(blend.from)
+    const toAtmosphere = biomeAtmosphere(blend.to)
+    const session = useSessionStore.getState()
+    const cinematic = session.phase === 'boss-intro' || session.phase === 'final-intro' || session.phase === 'ending'
+    const terminal = session.bossPhase === 'portal' || session.bossPhase === 'falling'
     const smoothing = 1 - Math.exp(-Math.min(delta, 0.1) * 2.8)
+    const fogNear = fromAtmosphere.fogNear + (toAtmosphere.fogNear - fromAtmosphere.fogNear) * blend.mix
+    const fogFar = fromAtmosphere.fogFar + (toAtmosphere.fogFar - fromAtmosphere.fogFar) * blend.mix
+    const pulse = 1 + Math.sin(performance.now() * 0.0034) * (terminal ? 0.12 : cinematic ? 0.045 : 0.018)
 
     targetFog.set(blend.from.fogColor).lerp(nextFog.set(blend.to.fogColor), blend.mix)
     targetSky.set(blend.from.skyColor).lerp(nextSky.set(blend.to.skyColor), blend.mix)
@@ -56,14 +66,26 @@ export function BiomeLighting() {
     targetAccent.set(blend.from.accentColor).lerp(nextAccent.set(blend.to.accentColor), blend.mix)
 
     fog.color.lerp(targetFog, smoothing)
+    fog.near += (fogNear - fog.near) * smoothing
+    fog.far += (fogFar - fog.far) * smoothing
     if (group.current) group.current.position.x = cameraX
-    if (ambient.current) ambient.current.color.lerp(targetSky, smoothing)
+    if (ambient.current) {
+      ambient.current.color.lerp(targetSky, smoothing)
+      ambient.current.intensity += ((cinematic ? 1.38 : 1.25) - ambient.current.intensity) * smoothing
+    }
     if (hemisphere.current) {
       hemisphere.current.color.lerp(targetSky, smoothing)
       hemisphere.current.groundColor.lerp(targetGround, smoothing)
+      hemisphere.current.intensity += ((cinematic ? 1.14 : 1.02) - hemisphere.current.intensity) * smoothing
     }
-    if (directional.current) directional.current.color.lerp(targetSky, smoothing)
-    if (accent.current) accent.current.color.lerp(targetAccent, smoothing)
+    if (directional.current) {
+      directional.current.color.lerp(targetSky, smoothing)
+      directional.current.intensity += ((cinematic ? (terminal ? 2.78 : 2.46) : 2.15) - directional.current.intensity) * smoothing
+    }
+    if (accent.current) {
+      accent.current.color.lerp(targetAccent, smoothing)
+      accent.current.intensity += ((cinematic ? (terminal ? 10.6 : 8.6) : 7) * pulse - accent.current.intensity) * smoothing
+    }
   })
 
   return (

@@ -7,7 +7,7 @@ export type SoundEffect =
   | EnemyVoice
   | 'shadow-hurt' | 'shadow-roar' | 'shadow-death'
   | 'aku-hurt' | 'aku-roar' | 'aku-death'
-  | 'xp' | 'fireball' | 'shield' | 'heal' | 'wave' | 'portal' | 'time-portal'
+  | 'xp' | 'fireball' | 'shield' | 'heal' | 'wave' | 'biome-shift' | 'portal' | 'time-portal'
   | 'stone-throw' | 'dark-orb' | 'aku-fire' | 'meteor-warning' | 'victory'
 
 const MIN_INTERVAL: Record<SoundEffect, number> = {
@@ -18,18 +18,25 @@ const MIN_INTERVAL: Record<SoundEffect, number> = {
   'enemy-5-hurt': 210, 'enemy-5-death': 300,
   'shadow-hurt': 250, 'shadow-roar': 850, 'shadow-death': 1_200,
   'aku-hurt': 260, 'aku-roar': 850, 'aku-death': 1_200,
-  xp: 120, fireball: 180, shield: 600, heal: 300, wave: 600, portal: 650, 'time-portal': 420,
+  xp: 120, fireball: 180, shield: 600, heal: 300, wave: 600, 'biome-shift': 900, portal: 650, 'time-portal': 420,
   'stone-throw': 180, 'dark-orb': 200, 'aku-fire': 180, 'meteor-warning': 520, victory: 1_500,
 }
 
 class GameAudioEngine {
   private context: AudioContext | null = null
+  private masterGain: GainNode | null = null
+  private masterLimiter: DynamicsCompressorNode | null = null
   private noiseBuffer: AudioBuffer | null = null
   private volume = 0.78
   private lastPlayed = new Map<SoundEffect, number>()
+  private effectPan = 0
+  private pitchVariation = 1
 
   setVolume(volume: number) {
     this.volume = Math.max(0, Math.min(1, volume))
+    if (this.context && this.masterGain) {
+      this.masterGain.gain.setTargetAtTime(this.volume, this.context.currentTime, 0.018)
+    }
   }
 
   unlock() {
@@ -41,7 +48,7 @@ class GameAudioEngine {
     if (this.context?.state === 'running') void this.context.suspend()
   }
 
-  play(effect: SoundEffect) {
+  play(effect: SoundEffect, pan = 0) {
     if (this.volume <= 0) return
     const now = performance.now()
     if (now - (this.lastPlayed.get(effect) ?? -Infinity) < MIN_INTERVAL[effect]) return
@@ -49,6 +56,10 @@ class GameAudioEngine {
     if (!context) return
     if (context.state === 'suspended') void context.resume()
     this.lastPlayed.set(effect, now)
+    this.effectPan = Math.max(-1, Math.min(1, pan))
+    // Tiny per-hit variation prevents repeated attacks from sounding like the
+    // exact same sample while keeping each character's sonic identity intact.
+    this.pitchVariation = 0.965 + Math.random() * 0.07
 
     if (effect.startsWith('enemy-')) {
       const [, kindValue, state] = effect.split('-')
@@ -136,6 +147,11 @@ class GameAudioEngine {
       case 'wave':
         this.tone(82, 164, 0.65, 0.18, 'sawtooth'); this.noise(0.45, 0.1, 420, 'lowpass')
         break
+      case 'biome-shift':
+        this.tone(196, 392, 0.46, 0.07, 'sine')
+        this.tone(294, 588, 0.5, 0.055, 'triangle', 0.07)
+        this.noise(0.28, 0.045, 1_620, 'bandpass', 0.02)
+        break
       case 'portal':
         this.tone(780, 42, 0.9, 0.18, 'sine'); this.noise(0.8, 0.12, 1_500, 'bandpass')
         break
@@ -165,8 +181,32 @@ class GameAudioEngine {
     const AudioContextConstructor = window.AudioContext
       ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     if (!AudioContextConstructor) return null
-    this.context ??= new AudioContextConstructor({ latencyHint: 'interactive' })
+    if (!this.context) {
+      this.context = new AudioContextConstructor({ latencyHint: 'interactive' })
+      this.masterGain = this.context.createGain()
+      this.masterLimiter = this.context.createDynamicsCompressor()
+      this.masterGain.gain.value = this.volume
+      this.masterLimiter.threshold.value = -8
+      this.masterLimiter.knee.value = 12
+      this.masterLimiter.ratio.value = 7
+      this.masterLimiter.attack.value = 0.002
+      this.masterLimiter.release.value = 0.12
+      this.masterGain.connect(this.masterLimiter).connect(this.context.destination)
+    }
     return this.context
+  }
+
+  private connectToMix(node: AudioNode) {
+    const context = this.context
+    const output = this.masterGain
+    if (!context || !output) return
+    if ('createStereoPanner' in context) {
+      const panner = context.createStereoPanner()
+      panner.pan.value = this.effectPan
+      node.connect(panner).connect(output)
+      return
+    }
+    node.connect(output)
   }
 
   private getNoiseBuffer(context: AudioContext) {
@@ -185,12 +225,13 @@ class GameAudioEngine {
     const oscillator = context.createOscillator()
     const gain = context.createGain()
     oscillator.type = type
-    oscillator.frequency.setValueAtTime(Math.max(1, startFrequency), start)
-    oscillator.frequency.exponentialRampToValueAtTime(Math.max(1, endFrequency), start + duration)
+    oscillator.frequency.setValueAtTime(Math.max(1, startFrequency * this.pitchVariation), start)
+    oscillator.frequency.exponentialRampToValueAtTime(Math.max(1, endFrequency * this.pitchVariation), start + duration)
     gain.gain.setValueAtTime(0.0001, start)
-    gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, level * this.volume), start + 0.018)
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, level), start + 0.018)
     gain.gain.exponentialRampToValueAtTime(0.0001, start + duration)
-    oscillator.connect(gain).connect(context.destination)
+    oscillator.connect(gain)
+    this.connectToMix(gain)
     oscillator.start(start)
     oscillator.stop(start + duration + 0.03)
   }
@@ -206,9 +247,10 @@ class GameAudioEngine {
     filter.frequency.value = frequency
     filter.Q.value = type === 'bandpass' ? 1.8 : 0.7
     const start = context.currentTime + delay
-    gain.gain.setValueAtTime(Math.max(0.0001, level * this.volume), start)
+    gain.gain.setValueAtTime(Math.max(0.0001, level), start)
     gain.gain.exponentialRampToValueAtTime(0.0001, start + duration)
-    source.connect(filter).connect(gain).connect(context.destination)
+    source.connect(filter).connect(gain)
+    this.connectToMix(gain)
     source.start(start)
     source.stop(start + duration + 0.02)
   }

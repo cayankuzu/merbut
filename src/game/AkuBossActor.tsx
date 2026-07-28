@@ -276,7 +276,7 @@ export function AkuBossActor({ id }: AkuBossActorProps) {
         const fallback = preferred === 'ali' ? 'jack' : 'ali'
         const targetId = !players[preferred].dead ? preferred : fallback
         const motion = getMiniAkuMotion(index, elapsed, current.x, game.positions[targetId][0])
-        mini.position.set(motion.x - current.x, 0, 0)
+        mini.position.set(motion.x - current.x, motion.y, motion.z)
         mini.rotation.set(0, motion.direction > 0 ? Math.PI / 2 : -Math.PI / 2, 0)
         mini.scale.setScalar(current.scale * 0.28 * (motion.attacking ? 1.08 : 1))
       })

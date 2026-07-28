@@ -20,6 +20,7 @@ const copyTransform = (value: CharacterTransform): CharacterTransform => ({
   modelRotation: [...value.modelRotation],
   weapon: {
     alignBlade: value.weapon.alignBlade,
+    bladeRoll: value.weapon.bladeRoll,
     palmLerp: value.weapon.palmLerp,
     bladeDirection: [...value.weapon.bladeDirection],
     gripPoint: [...value.weapon.gripPoint],

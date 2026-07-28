@@ -3,6 +3,8 @@
 export const MINI_AKU_OFFSETS = [-1.5, -0.9, -0.3, 0.3, 0.9, 1.5] as const
 export const MINI_AKU_ATTACK_TIMES = [700, 1_250, 1_800, 2_350, 2_900, 3_450] as const
 export const MINI_AKU_COUNT = MINI_AKU_OFFSETS.length
+export const MINI_AKU_LANE_Y = 0
+export const MINI_AKU_LANE_Z = 0
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value))
 const smoothstep = (value: number) => value * value * (3 - 2 * value)
@@ -11,6 +13,7 @@ const lerp = (from: number, to: number, amount: number) => from + (to - from) * 
 export interface MiniAkuMotion {
   x: number
   y: number
+  z: number
   direction: -1 | 1
   attacking: boolean
 }
@@ -34,5 +37,11 @@ export function getMiniAkuMotion(index: number, elapsedMs: number, bossX: number
   if (elapsedMs > attackAt + 440) x = lerp(x, bossX + offset * 0.56, retreat)
 
   const direction: -1 | 1 = targetX >= x ? 1 : -1
-  return { x, y: 0, direction, attacking: elapsedMs >= attackAt - 110 && elapsedMs <= attackAt + 460 }
+  return {
+    x,
+    y: MINI_AKU_LANE_Y,
+    z: MINI_AKU_LANE_Z,
+    direction,
+    attacking: elapsedMs >= attackAt - 110 && elapsedMs <= attackAt + 460,
+  }
 }

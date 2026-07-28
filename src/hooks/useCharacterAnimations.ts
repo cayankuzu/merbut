@@ -9,15 +9,17 @@ export function useCharacterAnimations(
   root: Object3D,
   clips: AnimationClip[],
   state: AnimationState,
+  replayToken = 0,
 ) {
   const { actions } = useAnimations(clips, root)
   const currentAction = useRef<AnimationAction | null>(null)
   const currentState = useRef<AnimationState | null>(null)
+  const currentReplayToken = useRef<number | null>(null)
 
   useEffect(() => {
     const clipState = state === 'shield' || state === 'fireball' ? 'attack' : state === 'dead' ? 'idle' : state
     const next = actions[clipState]
-    if (!next || currentState.current === state) return
+    if (!next || (currentState.current === state && currentReplayToken.current === replayToken)) return
 
     const looping = state === 'idle' || state === 'walk' || state === 'fireball'
     next.enabled = true
@@ -43,7 +45,8 @@ export function useCharacterAnimations(
     if (currentAction.current !== next) currentAction.current?.fadeOut(CROSSFADE_SECONDS)
     currentAction.current = next
     currentState.current = state
-  }, [actions, clips, state])
+    currentReplayToken.current = replayToken
+  }, [actions, clips, replayToken, state])
 
   useEffect(
     () => () => {

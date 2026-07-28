@@ -6,6 +6,7 @@ import { useGameStore } from '../store/gameStore'
 const trackStyle = { '--panel-count': BACKDROP_PANEL_COUNT } as CSSProperties
 
 export function Background() {
+  const rootRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -25,6 +26,13 @@ export function Background() {
         }
         const activePanel = Math.round(progress * (BACKDROP_PANEL_COUNT - 1))
         if (activePanel !== lastPanel) {
+          const panelDefinition = BACKDROP_PANELS[activePanel]
+          if (rootRef.current && panelDefinition) {
+            rootRef.current.dataset.biome = panelDefinition.id
+            rootRef.current.dataset.weather = panelDefinition.weather
+            rootRef.current.style.setProperty('--biome-accent', panelDefinition.accentColor)
+            rootRef.current.style.setProperty('--biome-haze', panelDefinition.fogColor)
+          }
           track.querySelectorAll<HTMLElement>('.scene-backdrop__panel').forEach((panel, index) => {
             panel.style.visibility = Math.abs(index - activePanel) <= 1 ? 'visible' : 'hidden'
           })
@@ -44,7 +52,7 @@ export function Background() {
   }, [])
 
   return (
-    <div className="scene-backdrop" aria-hidden="true">
+    <div ref={rootRef} className="scene-backdrop" aria-hidden="true">
       <div
         ref={trackRef}
         className="scene-backdrop__track"

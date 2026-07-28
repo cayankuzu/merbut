@@ -6,8 +6,10 @@ import { gameAudio, type SoundEffect } from './gameAudio'
 
 const ACTIVE_PHASES = ['playing', 'boss-intro', 'final-intro', 'ending'] as const
 
-function playEffect(effect: SoundEffect) {
-  gameAudio.play(effect)
+function playEffect(effect: SoundEffect, worldX?: number) {
+  const cameraX = useGameStore.getState().cameraX
+  const pan = worldX === undefined ? 0 : Math.max(-0.9, Math.min(0.9, (worldX - cameraX) / 12))
+  gameAudio.play(effect, pan)
   useAudioStore.getState().noteEffect(effect)
 }
 
@@ -32,8 +34,8 @@ export function AudioDirector() {
 
     const unsubscribeGame = useGameStore.subscribe((state, previous) => {
       if (useSessionStore.getState().phase !== 'playing') return
-      if (state.animationStates.ali === 'attack' && previous.animationStates.ali !== 'attack') playEffect('ali-slash')
-      if (state.animationStates.jack === 'attack' && previous.animationStates.jack !== 'attack') playEffect('jack-slash')
+      if (state.animationStates.ali === 'attack' && previous.animationStates.ali !== 'attack') playEffect('ali-slash', state.positions.ali[0])
+      if (state.animationStates.jack === 'attack' && previous.animationStates.jack !== 'attack') playEffect('jack-slash', state.positions.jack[0])
     })
 
     const unsubscribeSession = useSessionStore.subscribe((state, previous) => {
@@ -42,7 +44,7 @@ export function AudioDirector() {
       if (state.projectiles.length > previous.projectiles.length) playEffect('fireball')
       if (state.enemyProjectiles.length > previous.enemyProjectiles.length) {
         const projectile = state.enemyProjectiles.at(-1)
-        if (projectile) playEffect(projectile.kind === 'stone' ? 'stone-throw' : projectile.kind === 'dark-orb' ? 'dark-orb' : projectile.kind === 'time-portal' ? 'time-portal' : 'aku-fire')
+        if (projectile) playEffect(projectile.kind === 'stone' ? 'stone-throw' : projectile.kind === 'dark-orb' ? 'dark-orb' : projectile.kind === 'time-portal' ? 'time-portal' : 'aku-fire', projectile.x)
       }
       if (state.meteors.length > previous.meteors.length) playEffect('meteor-warning')
       if (state.pickups.length < previous.pickups.length) playEffect('heal')
@@ -50,19 +52,21 @@ export function AudioDirector() {
       if (state.players.ali.kills > previous.players.ali.kills || state.players.jack.kills > previous.players.jack.kills) playEffect('xp')
 
       if (active) {
+        if (state.currentBiome !== previous.currentBiome) playEffect('biome-shift')
         for (const id of ['ali', 'jack'] as const) {
           const player = state.players[id]
           const oldPlayer = previous.players[id]
-          if (player.health < oldPlayer.health) playEffect(`${id}-${player.dead && !oldPlayer.dead ? 'down' : 'hurt'}`)
+          if (player.health < oldPlayer.health) playEffect(`${id}-${player.dead && !oldPlayer.dead ? 'down' : 'hurt'}`, useGameStore.getState().positions[id][0])
         }
 
+        const previousEnemies = new Map(previous.enemies.map((enemy) => [enemy.id, enemy]))
         for (const enemy of state.enemies) {
-          const oldEnemy = previous.enemies.find((candidate) => candidate.id === enemy.id)
+          const oldEnemy = previousEnemies.get(enemy.id)
           if (!oldEnemy || enemy.health >= oldEnemy.health) continue
           const defeated = enemy.animation === 'dead' && oldEnemy.animation !== 'dead'
-          if (enemy.bossType === 'aku') playEffect(defeated ? 'aku-death' : 'aku-hurt')
-          else if (enemy.bossType === 'shadow') playEffect(defeated ? 'shadow-death' : 'shadow-hurt')
-          else playEffect(`enemy-${enemy.kind}-${defeated ? 'death' : 'hurt'}`)
+          if (enemy.bossType === 'aku') playEffect(defeated ? 'aku-death' : 'aku-hurt', enemy.x)
+          else if (enemy.bossType === 'shadow') playEffect(defeated ? 'shadow-death' : 'shadow-hurt', enemy.x)
+          else playEffect(`enemy-${enemy.kind}-${defeated ? 'death' : 'hurt'}`, enemy.x)
         }
       }
 

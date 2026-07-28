@@ -21,8 +21,8 @@ export interface RosterEntry {
 }
 
 export const CHARACTER_ROSTER: readonly RosterEntry[] = [
-  { id: 'ali', name: 'Hz. Ali', role: 'Kahraman · Ateş Ustası', health: 110, attackType: 'Kılıç / Alev topu', range: 'Yakın + Uzak', mobility: 'Çevik', accent: '#f7c65f', traits: ['6 sn sınırsız alev topu', '360° serbest dönüş', 'Zemzem ile güç yenileme'], preview: { type: 'hero', id: 'ali' } },
-  { id: 'jack', name: 'Samuray Jack', role: 'Kahraman · Koruyucu', health: 110, attackType: 'Katana / Kalkan', range: 'Yakın', mobility: 'Dengeli', accent: '#ff4c87', traits: ['6 sn hareketli kalkan', 'Takım alanını korur', 'Finalde dua kudreti'], preview: { type: 'hero', id: 'jack' } },
+  { id: 'ali', name: 'Hz. Ali', role: 'Kahraman · Ateş Ustası', health: 110, attackType: 'Kılıç / Alev topu', range: 'Yakın + Uzak', mobility: 'Çevik', accent: '#f7c65f', traits: ['4 sn sınırsız alev topu', '360° serbest dönüş', 'Zemzem ile güç yenileme'], preview: { type: 'hero', id: 'ali' } },
+  { id: 'jack', name: 'Samuray Jack', role: 'Kahraman · Koruyucu', health: 110, attackType: 'Katana / Kalkan', range: 'Yakın', mobility: 'Dengeli', accent: '#ff4c87', traits: ['4 sn hareketli kalkan', 'Takım alanını korur', 'Finalde dua kudreti'], preview: { type: 'hero', id: 'jack' } },
   { id: 'myrkhan', name: 'Myrkhan', role: 'Aku Lejyonu · Avcı', health: 70, attackType: 'Döner pençe', range: 'Yakın', mobility: 'Çok hızlı', accent: '#ff6a42', traits: ['Seri yaklaşma', 'Düşük dayanıklılık', 'Ani yön değişimi'], preview: { type: 'enemy', kind: 1 } },
   { id: 'zorvex', name: 'Zorvex', role: 'Aku Lejyonu · Akıncı', health: 90, attackType: 'Atılma darbesi', range: 'Yakın', mobility: 'Hızlı', accent: '#c655ff', traits: ['Mesafe kapatma', 'Orta dayanıklılık', 'Çift taraflı baskı'], preview: { type: 'enemy', kind: 2 } },
   { id: 'kharzul', name: 'Kharzul', role: 'Aku Lejyonu · Ezici', health: 120, attackType: 'Yer sarsıntısı', range: 'Orta alan', mobility: 'Ağır', accent: '#dcdf4c', traits: ['Alan hasarı', 'Yüksek sendeletme', 'Yavaş yaklaşma'], preview: { type: 'enemy', kind: 3 } },

@@ -32,14 +32,14 @@ describe('session store', () => {
     session.tick(4, 10_000)
     expect(useSessionStore.getState().launchFireball(10_000, 0, 0, 0)).toBe(false)
     session.grantAbilityCharge('ali', 100)
-    for (let shot = 0; shot < 18; shot += 1) {
+    for (let shot = 0; shot < 14; shot += 1) {
       expect(useSessionStore.getState().launchFireball(10_000 + shot * 280, 0, 0, 0)).toBe(true)
     }
-    expect(useSessionStore.getState().launchFireball(15_100, 0, 0, 0)).toBe(true)
-    expect(useSessionStore.getState().players.ali.abilityShots).toBe(19)
-    expect(useSessionStore.getState().players.ali.abilityActiveUntil).toBe(16_000)
+    expect(useSessionStore.getState().launchFireball(13_920, 0, 0, 0)).toBe(true)
+    expect(useSessionStore.getState().players.ali.abilityShots).toBe(15)
+    expect(useSessionStore.getState().players.ali.abilityActiveUntil).toBe(14_000)
     expect(useSessionStore.getState().players.ali.abilityCharge).toBe(0)
-    expect(useSessionStore.getState().launchFireball(16_100, 0, 0, 0)).toBe(false)
+    expect(useSessionStore.getState().launchFireball(14_001, 0, 0, 0)).toBe(false)
   })
 
   it('makes every difficulty materially change player survival resources', () => {
@@ -114,7 +114,7 @@ describe('session store', () => {
     expect(useSessionStore.getState().impacts.at(-1)?.x).toBe(59)
   })
 
-  it('keeps Jack shield at four seconds and Ali fireball window at six seconds', () => {
+  it('keeps Jack shield and Ali fireball window at exactly four seconds', () => {
     const session = useSessionStore.getState()
     session.startCountdown()
     session.tick(4, 10_000)
@@ -123,7 +123,7 @@ describe('session store', () => {
     expect(useSessionStore.getState().activateShield(11_000)).toBe(true)
     expect(useSessionStore.getState().players.jack.abilityActiveUntil).toBe(15_000)
     expect(useSessionStore.getState().launchFireball(11_000, 0, 0, 0)).toBe(true)
-    expect(useSessionStore.getState().players.ali.abilityActiveUntil).toBe(17_000)
+    expect(useSessionStore.getState().players.ali.abilityActiveUntil).toBe(15_000)
   })
 
   it('applies final prayer lifesteal and time-based regeneration to both sides', () => {

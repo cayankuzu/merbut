@@ -11,6 +11,8 @@ const currentBladeDirection = new Vector3()
 const palmWorldPosition = new Vector3()
 const palmBoneWorldPosition = new Vector3()
 const desiredBladeDirection = new Vector3(0, -1.08, 0.72).normalize()
+const localBladeAxis = new Vector3()
+const bladeRollRotation = new Quaternion()
 
 export interface WeaponAttachment {
   root: Object3D
@@ -144,9 +146,14 @@ export function alignWeaponAttachment(
 
 export function applyWeaponTransform(weapon: Object3D, transform: WeaponTransform) {
   weapon.rotation.set(...transform.rotation)
+  if (transform.bladeRoll) {
+    localBladeAxis.set(...transform.bladeDirection).normalize()
+    bladeRollRotation.setFromAxisAngle(localBladeAxis, transform.bladeRoll)
+    weapon.quaternion.multiply(bladeRollRotation)
+  }
   weapon.scale.set(...transform.scale)
   const gripOffset = new Vector3(...transform.gripPoint)
     .multiply(weapon.scale)
-    .applyEuler(weapon.rotation)
+    .applyQuaternion(weapon.quaternion)
   weapon.position.set(...transform.position).sub(gripOffset)
 }

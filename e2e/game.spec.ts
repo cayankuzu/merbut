@@ -18,7 +18,7 @@ test('ana menü, kontrol brifingi ve duraklatma akışı çalışır', async ({ 
   await page.goto('/')
   await waitForAssets(page)
   await expect(page.getByRole('heading', { name: 'MERBUT' })).toBeVisible()
-  await expect(page.locator('.merbut-copyright')).toContainText('SÜRÜM v1.0.0')
+  await expect(page.locator('.merbut-copyright')).toContainText('SÜRÜM v1.1.0')
   await page.getByRole('button', { name: 'OYUNA BAŞLA' }).click()
   await expect(page.getByText('R', { exact: true })).toBeVisible()
   await expect(page.getByText('L', { exact: true })).toBeVisible()
@@ -92,10 +92,13 @@ test('iki oyuncu bağımsız hareket eder, zıplar, saldırır ve doğru yöne b
 
   await page.keyboard.press('KeyS')
   await page.keyboard.press('ArrowDown')
-  await page.waitForTimeout(120)
-  const animations = await page.evaluate(() => window.__MERBUT__!.getState().animationStates)
-  expect(animations.ali).toBe('attack')
-  expect(animations.jack).toBe('attack')
+  // Firefox can deliver the two synthetic attack keys on adjacent render
+  // frames while the jump clip is still visible. Verify the observable
+  // transition instead of sampling one fixed 120 ms instant.
+  await expect.poll(() => page.evaluate(() => {
+    const animations = window.__MERBUT__!.getState().animationStates
+    return `${animations.ali}/${animations.jack}`
+  }), { timeout: 1_000 }).toBe('attack/attack')
 })
 
 test('özel yetenekler etkinleşir ve sahne sınırları korunur', async ({ page }) => {
@@ -111,7 +114,7 @@ test('özel yetenekler etkinleşir ve sahne sınırları korunur', async ({ page
     return {
       aliActivated,
       jackActivated,
-      aliActive: current.players.ali.abilityActiveUntil === now + 6_000,
+      aliActive: current.players.ali.abilityActiveUntil === now + 4_000,
       jackActive: current.players.jack.abilityActiveUntil === now + 4_000,
       aliCharge: current.players.ali.abilityCharge,
       jackCharge: current.players.jack.abilityCharge,

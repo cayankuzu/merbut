@@ -22,7 +22,7 @@ export function ControlsScreen() {
         <article className="hero-brief hero-brief--ali">
           {previewsReady ? <CharacterPreview3D id="ali" /> : <div className="character-preview" aria-hidden="true" />}
           <div className="hero-brief__copy"><h2>Hz. Ali</h2>
-            <dl><div><dt>A / D</dt><dd>Hareket</dd></div><div><dt>W</dt><dd>Zıpla</dd></div><div><dt>S</dt><dd>Kılıç izinden alevli kesiş</dd></div><div><dt>Z / X</dt><dd>360° dön</dd></div><div><dt>R</dt><dd>Dolu güçle 6 sn boyunca sınırsız alev topu</dd></div></dl>
+            <dl><div><dt>A / D</dt><dd>Hareket</dd></div><div><dt>W</dt><dd>Zıpla</dd></div><div><dt>S</dt><dd>Kılıç izinden alevli kesiş</dd></div><div><dt>Z / X</dt><dd>360° dön</dd></div><div><dt>R</dt><dd>Dolu güçle 4 sn boyunca sınırsız alev topu</dd></div></dl>
           </div>
         </article>
         <article className="hero-brief hero-brief--jack">
