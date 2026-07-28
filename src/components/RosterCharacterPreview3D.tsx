@@ -39,6 +39,7 @@ import { SHADOW_WEAPON_TRANSFORM } from '../config/characterTransforms'
 import type { RosterPreview } from '../config/characterRoster'
 import { CHARACTERS } from '../config/gameConfig'
 import { useDebugStore } from '../store/debugStore'
+import { PERFORMANCE_PROFILES, usePerformanceStore } from '../store/performanceStore'
 import type { CharacterId } from '../types/character'
 import type { GalleryRotation } from './characterGalleryRotation'
 import {
@@ -319,6 +320,9 @@ interface RosterCharacterPreview3DProps {
 }
 
 export function RosterCharacterPreview3D({ preview, rotation, pan, zoom, label }: RosterCharacterPreview3DProps) {
+  const tier = usePerformanceStore((state) => state.tier)
+  const renderDpr = usePerformanceStore((state) => state.renderDpr)
+  const profile = PERFORMANCE_PROFILES[tier]
   const [fit, setFit] = useState<RosterPreviewFit>({
     center: [0, 0, 0],
     halfHeight: 1.5,
@@ -335,10 +339,11 @@ export function RosterCharacterPreview3D({ preview, rotation, pan, zoom, label }
       aria-label={`${label} döndürülebilir 3B modeli`}
     >
       <Canvas
+        key={`roster-renderer-${profile.antialias ? 'aa' : 'raw'}`}
         frameloop="demand"
-        dpr={[0.8, 1.1]}
+        dpr={renderDpr}
         camera={{ position: [0, 0, 8], fov: 34 }}
-        gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}
+        gl={{ alpha: true, antialias: profile.antialias, powerPreference: 'high-performance' }}
       >
         <ambientLight intensity={1.5} />
         <directionalLight position={[4, 6, 4]} intensity={3.5} color="#fff0d6" />

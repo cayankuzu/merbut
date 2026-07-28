@@ -27,6 +27,7 @@ function CombatImpact({ impact, detail }: { impact: CombatImpactState; detail: b
 export function CombatImpactEffects() {
   const impacts = useSessionStore((state) => state.impacts)
   const tier = usePerformanceStore((state) => state.tier)
-  const detail = PERFORMANCE_PROFILES[tier].particleRatio >= 0.36
+  const qualityFactor = usePerformanceStore((state) => state.qualityFactor)
+  const detail = PERFORMANCE_PROFILES[tier].particleRatio * qualityFactor >= 0.36
   return <>{impacts.map((impact) => <CombatImpact impact={impact} detail={detail} key={impact.id} />)}</>
 }

@@ -11,6 +11,9 @@ import { useAudioStore } from '../audio/audioStore'
 import { usePerformanceStore } from '../store/performanceStore'
 import { APP_VERSION } from '../config/version'
 import { AudioSettingsPanel } from '../components/AudioSettingsPanel'
+import { GraphicsAutoNotice } from '../components/GraphicsAutoNotice'
+import { MobileUnsupported } from '../components/MobileUnsupported'
+import { isMobileDevice } from '../utils/deviceSupport'
 import './app.css'
 
 const DebugCalibrationPanel = lazy(() =>
@@ -32,6 +35,7 @@ declare global {
 }
 
 export default function App() {
+  const [mobileUnsupported] = useState(isMobileDevice)
   const [assetsReady, setAssetsReady] = useState(false)
   const handleAssetsReady = useCallback(() => setAssetsReady(true), [])
   const debugEnabled = new URLSearchParams(window.location.search).get('debug') === '1'
@@ -47,6 +51,8 @@ export default function App() {
     }
   }, [])
 
+  if (mobileUnsupported) return <MobileUnsupported />
+
   return (
     <>
       <main className={`game-shell${paused ? ' is-paused' : ''}`}>
@@ -58,6 +64,7 @@ export default function App() {
           <div className="scene-grade" aria-hidden="true" />
           <SessionController />
           <GameInterface />
+          <GraphicsAutoNotice />
           {debugEnabled ? (
             <Suspense fallback={null}>
               <DebugCalibrationPanel />

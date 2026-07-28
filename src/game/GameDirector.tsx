@@ -368,7 +368,7 @@ function runAkuBoss(enemy: EnemyState, now: number, positions: ReturnType<typeof
 
 export function GameDirector() {
   const accumulator = useRef(0)
-  const previousAttacks = useRef({ ali: false, jack: false })
+  const previousAttackSequences = useRef({ ali: 0, jack: 0 })
 
   useFrame((_, rawDelta) => {
     const delta = Math.min(rawDelta, 0.1)
@@ -411,10 +411,10 @@ export function GameDirector() {
     }
 
     const rules = DIFFICULTIES[session.difficulty]
-    const animations = game.animationStates
     for (const id of ['ali', 'jack'] as CharacterId[]) {
-      const attacking = animations[id] === 'attack'
-      if (attacking && !previousAttacks.current[id] && !session.players[id].dead) {
+      const sequence = game.attackSequences[id]
+      const newAttack = sequence > previousAttackSequences.current[id]
+      if (newAttack && !session.players[id].dead) {
         const playerX = game.positions[id][0]
         const facingX = Math.cos(game.rotations[id])
         for (const enemy of useSessionStore.getState().enemies) {
@@ -424,7 +424,7 @@ export function GameDirector() {
           }
         }
       }
-      previousAttacks.current[id] = attacking
+      previousAttackSequences.current[id] = sequence
     }
 
     accumulator.current += delta

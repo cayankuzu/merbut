@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DIFFICULTIES } from '../config/difficulty'
 import type { EnemyState } from '../types/session'
 import { useSessionStore } from './sessionStore'
-import { currentPerformanceProfile } from './performanceStore'
+import { currentRuntimeImpactBudget } from './performanceStore'
 
 const enemy = (): EnemyState => ({
   id: 'test-enemy', biome: 0, kind: 1, title: 'Myrkhan', x: 1, health: 70, maxHealth: 70,
@@ -110,7 +110,7 @@ describe('session store', () => {
     for (let index = 0; index < 60; index += 1) {
       session.addImpact({ kind: 'ember', x: index, y: 1, createdAt: 10_000, duration: 2_000, lethal: false })
     }
-    expect(useSessionStore.getState().impacts).toHaveLength(currentPerformanceProfile().impactBudget)
+    expect(useSessionStore.getState().impacts).toHaveLength(currentRuntimeImpactBudget())
     expect(useSessionStore.getState().impacts.at(-1)?.x).toBe(59)
   })
 

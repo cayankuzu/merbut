@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { EnemyActor } from './EnemyActor'
 import { useSessionStore } from '../store/sessionStore'
 import { EvilJackBossActor } from './EvilJackBossActor'
@@ -7,16 +7,19 @@ import { useShallow } from 'zustand/react/shallow'
 import { useGameStore } from '../store/gameStore'
 import { PERFORMANCE_PROFILES, usePerformanceStore } from '../store/performanceStore'
 import { CrowdEnemyProxies } from './CrowdEnemyProxies'
-import { buildEnemyRenderPlan } from './enemyRenderPlan'
+import { buildEnemyRenderPlan, FULL_ENEMY_ACTOR_LIMITS } from './enemyRenderPlan'
 
 export function EnemySystem() {
   const roster = useSessionStore(useShallow((state) => state.enemies.map((enemy) => `${enemy.id}|${enemy.bossType ?? 'enemy'}`)))
   const tier = usePerformanceStore((state) => state.tier)
+  const qualityFactor = usePerformanceStore((state) => state.qualityFactor)
   const mountDistance = PERFORMANCE_PROFILES[tier].actorMountDistance
+  const fullActorLimit = Math.max(tier === 'minimal' ? 3 : 2, Math.round(FULL_ENEMY_ACTOR_LIMITS[tier] * qualityFactor))
   const [visibilityTick, setVisibilityTick] = useState(0)
+  const stickyFullActors = useRef<string[]>([])
 
   useEffect(() => {
-    const timer = window.setInterval(() => setVisibilityTick((tick) => tick + 1), 180)
+    const timer = window.setInterval(() => setVisibilityTick((tick) => tick + 1), 500)
     return () => window.clearInterval(timer)
   }, [])
 
@@ -25,13 +28,14 @@ export function EnemySystem() {
     void visibilityTick
     const cameraX = useGameStore.getState().cameraX
     const enemies = useSessionStore.getState().enemies
-    const plan = buildEnemyRenderPlan(enemies, cameraX, mountDistance, tier)
+    const plan = buildEnemyRenderPlan(enemies, cameraX, mountDistance, tier, stickyFullActors.current, fullActorLimit)
+    stickyFullActors.current = plan.fullActorIds
     const bossTypes = new Map(enemies.map((enemy) => [enemy.id, enemy.bossType]))
     return {
       actorKeys: plan.fullActorIds.map((id) => `${id}|${bossTypes.get(id) ?? 'enemy'}`),
       proxyIds: plan.proxyIds,
     }
-  }, [mountDistance, roster, tier, visibilityTick])
+  }, [fullActorLimit, mountDistance, roster, tier, visibilityTick])
 
   return <>{renderPlan.actorKeys.map((actor) => {
     const [id, bossType] = actor.split('|')

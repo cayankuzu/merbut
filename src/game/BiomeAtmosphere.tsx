@@ -14,7 +14,7 @@ import {
 import { biomeAtmosphere } from '../config/biomeAtmosphere'
 import { BIOMES, BIOME_WORLD_WIDTH, WORLD_VISUAL_LEFT, getBiomeBlend } from '../config/biomes'
 import { useGameStore } from '../store/gameStore'
-import { PERFORMANCE_PROFILES, usePerformanceStore } from '../store/performanceStore'
+import { PERFORMANCE_PROFILES, runtimeParticleRatio, usePerformanceStore } from '../store/performanceStore'
 import { useSessionStore } from '../store/sessionStore'
 
 const MOTIFS_PER_BIOME = 12
@@ -59,6 +59,7 @@ function MotifField() {
   const dummy = useMemo(() => new Object3D(), [])
   const colors = useMemo(() => MOTIFS.map((motif) => new Color(motif.color).lerp(new Color('#fff6d4'), 0.18)), [])
   const tier = usePerformanceStore((state) => state.tier)
+  const qualityFactor = usePerformanceStore((state) => state.qualityFactor)
   const accumulator = useRef(0)
 
   useLayoutEffect(() => {
@@ -81,7 +82,7 @@ function MotifField() {
     if (!instance) return
     const cameraX = useGameStore.getState().cameraX
     const cinematic = isCinematicPhase()
-    const motifBudget = Math.max(1, Math.ceil(MOTIFS_PER_BIOME * profile.particleRatio))
+    const motifBudget = Math.max(1, Math.ceil(MOTIFS_PER_BIOME * runtimeParticleRatio(tier, qualityFactor)))
     const now = clock.elapsedTime
 
     MOTIFS.forEach((motif, index) => {

@@ -467,8 +467,15 @@ export function MenuBattleStage({ action = 'idle', variant = 'menu' }: { action?
   const activeHeroName = HERO_SHOWCASE[activeHeroIndex] === 'jack' ? 'Samuray Jack' : 'Hz. Ali'
   const activeEnemyName = (ENEMY_SHOWCASE[activeEnemyIndex] ?? ENEMY_SHOWCASE[0]).name
   const tier = usePerformanceStore((state) => state.tier)
+  const graphicsPreference = usePerformanceStore((state) => state.preference)
+  const qualityFactor = usePerformanceStore((state) => state.qualityFactor)
+  const renderDpr = usePerformanceStore((state) => state.renderDpr)
   const profile = PERFORMANCE_PROFILES[tier]
-  const budgetMenuFrames = isSafariWebkitEngine() || tier === 'minimal' || tier === 'performance'
+  const budgetMenuFrames = tier === 'minimal'
+    || tier === 'performance'
+    || qualityFactor < 0.72
+    || (graphicsPreference === 'auto' && isSafariWebkitEngine())
+  const effectiveMenuFps = qualityFactor < 0.5 ? 30 : qualityFactor < 0.75 ? 45 : profile.menuFps
 
   const rotateHero = useCallback(() => {
     setHeroMoveNumber(0)
@@ -486,8 +493,8 @@ export function MenuBattleStage({ action = 'idle', variant = 'menu' }: { action?
       data-enemy-move={enemyMoveNumber}
       data-hero-move={heroMoveNumber}
     >
-      <Canvas orthographic frameloop={budgetMenuFrames ? 'demand' : 'always'} dpr={profile.dpr} camera={{ position: [0, CAMERA_CENTER_Y, 14], rotation: [0, 0, 0], zoom: splash ? 75 : 94 }} gl={{ alpha: true, antialias: profile.antialias, powerPreference: 'high-performance' }}>
-        <BudgetedMenuFrames enabled={budgetMenuFrames} fps={profile.menuFps} />
+      <Canvas key={`menu-renderer-${profile.antialias ? 'aa' : 'raw'}`} orthographic frameloop={budgetMenuFrames ? 'demand' : 'always'} dpr={renderDpr} camera={{ position: [0, CAMERA_CENTER_Y, 14], rotation: [0, 0, 0], zoom: splash ? 75 : 94 }} gl={{ alpha: true, antialias: profile.antialias, powerPreference: 'high-performance' }}>
+        <BudgetedMenuFrames enabled={budgetMenuFrames} fps={effectiveMenuFps} />
         <ambientLight intensity={splash ? 2.28 : 1.72} />
         <directionalLight position={[-4, 8, 8]} intensity={splash ? 5.4 : 4.2} color="#ffe0b0" />
         {profile.dynamicLights ? <>

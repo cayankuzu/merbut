@@ -19,7 +19,8 @@ interface CharacterControllerProps {
   definition: CharacterDefinition
 }
 
-const ATTACK_DURATION = 1.5333 / 1.25
+const ATTACK_DURATION = 0.72
+const ATTACK_CHAIN_WINDOW = 0.3
 const FULL_TURN = Math.PI * 2
 
 function PlayerWorldHealth({ definition, visible }: { definition: CharacterDefinition; visible: boolean }) {
@@ -62,6 +63,8 @@ interface MotionState {
   jumpBufferRemaining: number
   airJumpsRemaining: number
   attackRemaining: number
+  attackElapsed: number
+  attackQueued: boolean
   accumulator: number
   facing: number
   manualRotation: number
@@ -81,10 +84,13 @@ export function CharacterController({ definition }: CharacterControllerProps) {
   const setPlayerRotation = useGameStore((state) => state.setPlayerRotation)
   const setPlayerTransform = useGameStore((state) => state.setPlayerTransform)
   const setPlayerAnimation = useGameStore((state) => state.setPlayerAnimation)
+  const triggerPlayerAttack = useGameStore((state) => state.triggerPlayerAttack)
   const setTogetherWarning = useGameStore((state) => state.setTogetherWarning)
   const teleportRequest = useGameStore((state) => state.teleports[definition.id])
   const appliedTeleportToken = useRef(0)
+  const transformPublishElapsed = useRef(0)
   const [animationState, setAnimationState] = useState<AnimationState>('idle')
+  const [animationSignal, setAnimationSignal] = useState(0)
   const activeAnimation = useRef<AnimationState>('idle')
   const motion = useRef<MotionState>({
     x: definition.startPosition[0],
@@ -96,6 +102,8 @@ export function CharacterController({ definition }: CharacterControllerProps) {
     jumpBufferRemaining: 0,
     airJumpsRemaining: GAME_CONFIG.movement.airJumps,
     attackRemaining: 0,
+    attackElapsed: 0,
+    attackQueued: false,
     accumulator: 0,
     facing: 0,
     manualRotation: 0,
@@ -112,12 +120,16 @@ export function CharacterController({ definition }: CharacterControllerProps) {
     value.jumpBufferRemaining = 0
     value.airJumpsRemaining = GAME_CONFIG.movement.airJumps
     value.attackRemaining = 0
+    value.attackElapsed = 0
+    value.attackQueued = false
     value.accumulator = 0
     value.facing = 0
     value.manualRotation = 0
+    transformPublishElapsed.current = 0
     if (facingGroup.current) facingGroup.current.rotation.y = 0
     activeAnimation.current = 'idle'
     setAnimationState('idle')
+    setAnimationSignal(0)
     setPlayerAnimation(definition.id, 'idle')
     setPlayerRotation(definition.id, 0)
     keyboard.clear()
@@ -150,6 +162,9 @@ export function CharacterController({ definition }: CharacterControllerProps) {
     if (session.phase !== 'playing' || status.dead || frozen) {
       value.velocityX = 0
       value.accumulator = 0
+      value.attackRemaining = 0
+      value.attackElapsed = 0
+      value.attackQueued = false
       const drinking = session.phase === 'boss-intro' && session.bossPhase === 'drinking'
       const praying = session.phase === 'final-intro' && session.bossPhase === 'prayer'
       const inactiveState: AnimationState = status.dead
@@ -197,15 +212,26 @@ export function CharacterController({ definition }: CharacterControllerProps) {
     const abilityActive = useSessionStore.getState().players[definition.id].abilityActiveUntil > now
     const shielding = definition.id === 'jack' && abilityActive
     const castingFireball = definition.id === 'ali' && abilityActive
+    let attackTriggered = false
 
     if (keyboard.consumePress(bindings.jump)) {
       value.jumpBufferRemaining = GAME_CONFIG.movement.jumpBuffer
     }
-    if (!abilityActive && keyboard.consumePress(bindings.attack) && value.attackRemaining <= 0) {
-      value.attackRemaining = ATTACK_DURATION
+    if (!abilityActive && keyboard.consumePress(bindings.attack)) {
+      if (value.attackRemaining <= 0 || value.attackElapsed >= ATTACK_CHAIN_WINDOW) {
+        value.attackRemaining = ATTACK_DURATION
+        value.attackElapsed = 0
+        value.attackQueued = false
+        attackTriggered = true
+      } else {
+        value.attackQueued = true
+      }
+    } else if (abilityActive) {
+      value.attackQueued = false
     }
 
-    value.accumulator = Math.min(value.accumulator + delta, 0.15)
+    // Never repay a long render stall with a second CPU-heavy catch-up frame.
+    value.accumulator = Math.min(value.accumulator + delta, 0.075)
     let movementAxis: -1 | 0 | 1 = 0
 
     while (value.accumulator >= GAME_CONFIG.movement.fixedStep) {
@@ -239,7 +265,14 @@ export function CharacterController({ definition }: CharacterControllerProps) {
         ? GAME_CONFIG.movement.coyoteTime
         : Math.max(0, value.coyoteRemaining - step)
       value.jumpBufferRemaining = Math.max(0, value.jumpBufferRemaining - step)
+      if (value.attackRemaining > 0) value.attackElapsed += step
       value.attackRemaining = Math.max(0, value.attackRemaining - step)
+      if (value.attackQueued && (value.attackRemaining <= 0 || value.attackElapsed >= ATTACK_CHAIN_WINDOW)) {
+        value.attackRemaining = ATTACK_DURATION
+        value.attackElapsed = 0
+        value.attackQueued = false
+        attackTriggered = true
+      }
 
       const canGroundJump = value.grounded || value.coyoteRemaining > 0
       const canAirJump = !canGroundJump && value.airJumpsRemaining > 0
@@ -308,24 +341,40 @@ export function CharacterController({ definition }: CharacterControllerProps) {
           grounded: value.grounded,
           speed: Math.abs(value.velocityX),
         })
-    if (nextAnimation !== activeAnimation.current) {
+    if (attackTriggered) {
+      if (activeAnimation.current !== 'attack') {
+        activeAnimation.current = 'attack'
+        setAnimationState('attack')
+      }
+      setAnimationSignal((signal) => signal + 1)
+      triggerPlayerAttack(definition.id)
+    } else if (nextAnimation !== activeAnimation.current) {
       activeAnimation.current = nextAnimation
       setAnimationState(nextAnimation)
       setPlayerAnimation(definition.id, nextAnimation)
     }
 
-    setPlayerTransform(definition.id, [value.x, value.y, 0], targetRotation)
-    const positions = useGameStore.getState().positions
-    const bothAlive = !useSessionStore.getState().players.ali.dead && !useSessionStore.getState().players.jack.dead
-    setTogetherWarning(
-      bothAlive && Math.abs(positions.ali[0] - positions.jack[0]) >= GAME_CONFIG.world.warningDistance,
-    )
+    transformPublishElapsed.current += delta
+    if (attackTriggered || transformPublishElapsed.current >= 1 / 30) {
+      transformPublishElapsed.current %= 1 / 30
+      setPlayerTransform(definition.id, [value.x, value.y, 0], targetRotation)
+      const positions = useGameStore.getState().positions
+      const bothAlive = !useSessionStore.getState().players.ali.dead && !useSessionStore.getState().players.jack.dead
+      setTogetherWarning(
+        bothAlive && Math.abs(positions.ali[0] - positions.jack[0]) >= GAME_CONFIG.world.warningDistance,
+      )
+    }
   })
 
   return (
     <group ref={root} name={definition.id} position={definition.startPosition}>
       <group ref={facingGroup}>
-        <AnimatedCharacter definition={definition} animationState={animationState} />
+        <AnimatedCharacter
+          definition={definition}
+          animationDurationSeconds={animationState === 'attack' ? ATTACK_DURATION : undefined}
+          animationSignal={animationSignal}
+          animationState={animationState}
+        />
       </group>
       <PlayerWorldHealth definition={definition} visible={showWorldHud} />
       <PrayerHalo active={prayerActive} id={definition.id} />

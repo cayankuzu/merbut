@@ -10,12 +10,18 @@ export function JackSlashEffect() {
   const slashMeshes = useRef<Mesh[]>([])
   const slashMaterials = useRef<MeshBasicMaterial[]>([])
   const elapsed = useRef(2)
-  const previousAnimation = useRef(useGameStore.getState().animationStates.jack)
+  const previousAttack = useRef(useGameStore.getState().attackSequences.jack)
+  const warmupFrame = useRef(0)
 
   useFrame((_, delta) => {
+    if (warmupFrame.current < 2) {
+      warmupFrame.current += 1
+      if (warmupFrame.current === 2 && group.current) group.current.visible = false
+      return
+    }
     const game = useGameStore.getState()
-    const animation = game.animationStates.jack
-    if (animation === 'attack' && previousAnimation.current !== 'attack' && group.current) {
+    const attack = game.attackSequences.jack
+    if (attack > previousAttack.current && group.current) {
       const [x, y] = game.positions.jack
       const rotation = game.rotations.jack
       group.current.position.set(
@@ -27,7 +33,7 @@ export function JackSlashEffect() {
       group.current.visible = true
       elapsed.current = 0
     }
-    previousAnimation.current = animation
+    previousAttack.current = attack
 
     if (!group.current || elapsed.current > 1) return
     elapsed.current += Math.min(delta, 0.1)
@@ -46,7 +52,7 @@ export function JackSlashEffect() {
   })
 
   return (
-    <group ref={group} visible={false} name="jack-white-slash">
+    <group ref={group} visible scale={0.0001} name="jack-white-slash">
       <JackSlashVisual meshes={slashMeshes} materials={slashMaterials} />
     </group>
   )

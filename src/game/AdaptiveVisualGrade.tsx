@@ -1,7 +1,8 @@
 import { Bloom, EffectComposer, Vignette } from '@react-three/postprocessing'
-import type { PerformanceTier } from '../store/performanceStore'
+import { PERFORMANCE_PROFILES, type PerformanceTier } from '../store/performanceStore'
 
 interface AdaptiveVisualGradeProps {
+  qualityFactor: number
   tier: Extract<PerformanceTier, 'balanced' | 'high'>
 }
 
@@ -9,12 +10,20 @@ interface AdaptiveVisualGradeProps {
  * Costlier color finishing is isolated in its own lazy chunk. Low-end tiers
  * never download or execute the post-processing pipeline.
  */
-export function AdaptiveVisualGrade({ tier }: AdaptiveVisualGradeProps) {
+export function AdaptiveVisualGrade({ qualityFactor, tier }: AdaptiveVisualGradeProps) {
   const high = tier === 'high'
+  const profile = PERFORMANCE_PROFILES[tier]
+  const multisampling = qualityFactor >= 0.85
+    ? profile.postprocessMultisampling
+    : qualityFactor >= 0.7 ? 2 : 0
   return (
-    <EffectComposer multisampling={0} resolutionScale={high ? 0.92 : 0.72}>
+    <EffectComposer
+      enabled={qualityFactor >= 0.6}
+      multisampling={multisampling}
+      resolutionScale={profile.postprocessResolutionScale * (0.72 + qualityFactor * 0.28)}
+    >
       <Bloom
-        intensity={high ? 0.42 : 0.24}
+        intensity={(high ? 0.46 : 0.28) * (0.72 + qualityFactor * 0.28)}
         luminanceThreshold={0.82}
         luminanceSmoothing={0.3}
         mipmapBlur={high}

@@ -13,6 +13,7 @@ export function GameCamera() {
   const cameraRef = useRef<ThreePerspectiveCamera>(null)
   const lookTarget = useRef(new Vector3())
   const previousShake = useRef(new Vector3())
+  const publishElapsed = useRef(0)
   const cameraHeight = useDebugStore((state) => state.cameraHeight)
   const cameraDistance = useDebugStore((state) => state.cameraDistance)
   const phase = useSessionStore((state) => state.phase)
@@ -42,6 +43,7 @@ export function GameCamera() {
     const session = useSessionStore.getState()
     const portalCinematic = session.phase === 'ending' && ['portal', 'falling', 'continued'].includes(session.bossPhase)
     const smoothingDelta = Math.min(delta, 0.1)
+    publishElapsed.current += smoothingDelta
     if (portalCinematic) {
       const portalX = session.endingPortalX
       camera.up.set(0, 0, -1)
@@ -55,7 +57,10 @@ export function GameCamera() {
       }
       lookTarget.current.set(portalX, 0, 0)
       camera.lookAt(lookTarget.current)
-      useGameStore.getState().setCameraX(portalX)
+      if (publishElapsed.current >= 1 / 30) {
+        publishElapsed.current %= 1 / 30
+        useGameStore.getState().setCameraX(portalX)
+      }
       return
     }
 
@@ -98,7 +103,10 @@ export function GameCamera() {
     }
     lookTarget.current.set(camera.position.x, 3.15 + highestPlayer * 0.11, 0)
     camera.lookAt(lookTarget.current)
-    useGameStore.getState().setCameraX(baseCameraX)
+    if (publishElapsed.current >= 1 / 30) {
+      publishElapsed.current %= 1 / 30
+      useGameStore.getState().setCameraX(baseCameraX)
+    }
   })
 
   return (

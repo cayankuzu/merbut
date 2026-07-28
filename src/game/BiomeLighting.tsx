@@ -34,6 +34,7 @@ export function BiomeLighting() {
   const accent = useRef<DirectionalLight>(null)
   const fog = useMemo(() => new Fog('#56342f', 18, 35), [])
   const tier = usePerformanceStore((state) => state.tier)
+  const qualityFactor = usePerformanceStore((state) => state.qualityFactor)
   const profile = PERFORMANCE_PROFILES[tier]
 
   useEffect(() => {
@@ -94,7 +95,7 @@ export function BiomeLighting() {
       <hemisphereLight ref={hemisphere} args={['#ffe0bb', '#3d242e', 1.02]} />
       <directionalLight
         ref={directional}
-        castShadow={profile.shadows}
+        castShadow={profile.shadows && qualityFactor >= 0.6}
         position={[-4, 9, 7]}
         intensity={2.15}
         color="#ffe0bb"
@@ -106,7 +107,7 @@ export function BiomeLighting() {
         shadow-bias={-0.00025}
       />
       <object3D ref={directionalTarget} position={[0, 1.2, 0]} />
-      {profile.dynamicLights ? <directionalLight ref={accent} position={[7, 5, 4]} intensity={0.62} color="#ff286f" /> : null}
+      {profile.dynamicLights && qualityFactor >= 0.65 ? <directionalLight ref={accent} position={[7, 5, 4]} intensity={0.62} color="#ff286f" /> : null}
     </group>
   )
 }

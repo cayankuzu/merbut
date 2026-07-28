@@ -17,7 +17,7 @@ import type {
   PortalAlertState,
   ProjectileState,
 } from '../types/session'
-import { currentPerformanceProfile } from './performanceStore'
+import { currentRuntimeImpactBudget } from './performanceStore'
 
 const FIREBALL_WINDOW_DURATION = 4_000
 const SHIELD_DURATION = 4_000
@@ -165,7 +165,7 @@ function recoverPlayer(player: PlayerStatus, amount: number): PlayerStatus {
 }
 
 function appendImpact(impacts: CombatImpactState[], impact: CombatImpactState) {
-  const budget = currentPerformanceProfile().impactBudget
+  const budget = currentRuntimeImpactBudget()
   return [...impacts.slice(-(budget - 1)), impact]
 }
 

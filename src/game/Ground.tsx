@@ -1,5 +1,16 @@
-import { useMemo } from 'react'
-import { Color, Float32BufferAttribute, PlaneGeometry } from 'three'
+import { useLayoutEffect, useMemo, useRef } from 'react'
+import {
+  BoxGeometry,
+  Color,
+  ConeGeometry,
+  DodecahedronGeometry,
+  Float32BufferAttribute,
+  InstancedMesh,
+  MeshBasicMaterial,
+  MeshStandardMaterial,
+  Object3D,
+  PlaneGeometry,
+} from 'three'
 import {
   BIOMES,
   BIOME_WORLD_WIDTH,
@@ -100,6 +111,70 @@ const WORLD_ENDS = [
   { id: 'world-end', x: WORLD_VISUAL_RIGHT - 0.8, rotation: 0.14 },
 ] as const
 
+interface StaticInstance {
+  color?: string
+  position: [number, number, number]
+  rotation?: [number, number, number]
+  scale: [number, number, number]
+}
+
+interface StaticInstancesProps {
+  castShadow?: boolean
+  instances: readonly StaticInstance[]
+  kind: 'box-basic' | 'box-standard' | 'cone-standard' | 'rock-standard'
+  metalness?: number
+  opacity?: number
+  receiveShadow?: boolean
+  roughness?: number
+}
+
+function StaticInstances({
+  castShadow = false,
+  instances,
+  kind,
+  metalness = 0,
+  opacity = 1,
+  receiveShadow = false,
+  roughness = 1,
+}: StaticInstancesProps) {
+  const mesh = useRef<InstancedMesh>(null)
+  const dummy = useMemo(() => new Object3D(), [])
+  const geometry = useMemo(() => {
+    if (kind === 'cone-standard') return new ConeGeometry(0.72, 1.7, 5)
+    if (kind === 'rock-standard') return new DodecahedronGeometry(0.72, 0)
+    return new BoxGeometry(1, 1, 1)
+  }, [kind])
+  const material = useMemo(() => kind === 'box-basic'
+    ? new MeshBasicMaterial({ color: '#38242c', opacity, transparent: opacity < 1, vertexColors: true })
+    : new MeshStandardMaterial({ color: '#ffffff', flatShading: true, metalness, roughness, vertexColors: true }),
+  [kind, metalness, opacity, roughness])
+
+  useLayoutEffect(() => {
+    const target = mesh.current
+    if (!target) return
+    instances.forEach((instance, index) => {
+      dummy.position.set(...instance.position)
+      dummy.rotation.set(...(instance.rotation ?? [0, 0, 0]))
+      dummy.scale.set(...instance.scale)
+      dummy.updateMatrix()
+      target.setMatrixAt(index, dummy.matrix)
+      if (instance.color) target.setColorAt(index, new Color(instance.color))
+    })
+    target.instanceMatrix.needsUpdate = true
+    if (target.instanceColor) target.instanceColor.needsUpdate = true
+    target.computeBoundingSphere()
+  }, [dummy, instances])
+
+  return (
+    <instancedMesh
+      ref={mesh}
+      args={[geometry, material, instances.length]}
+      castShadow={castShadow}
+      receiveShadow={receiveShadow}
+    />
+  )
+}
+
 function createGroundGeometry() {
   const geometry = new PlaneGeometry(GROUND_WIDTH, GROUND_DEPTH, 168, 28)
   const positions = geometry.attributes.position
@@ -145,6 +220,44 @@ function createGroundGeometry() {
 export function Ground() {
   const groundHeight = useDebugStore((state) => state.groundHeight)
   const groundGeometry = useMemo(createGroundGeometry, [])
+  const horizonBandInstances = useMemo<StaticInstance[]>(() => HORIZON_BANDS.map((band) => ({
+    color: band.color,
+    position: [band.x, groundHeight + 0.04, -12.2],
+    scale: [BIOME_WORLD_WIDTH + 0.25, 0.42, 1.65],
+  })), [groundHeight])
+  const pointedRidgeInstances = useMemo<StaticInstance[]>(() => HORIZON_RIDGES
+    .filter((ridge) => ridge.pointed)
+    .map((ridge) => ({
+      color: ridge.color,
+      position: [ridge.x, groundHeight + ridge.height * 0.4, -11.5],
+      rotation: [0, ridge.rotation, 0.05],
+      scale: [ridge.width * 0.58, ridge.height * 0.86, 1.05],
+    })), [groundHeight])
+  const roundedRidgeInstances = useMemo<StaticInstance[]>(() => HORIZON_RIDGES
+    .filter((ridge) => !ridge.pointed)
+    .map((ridge) => ({
+      color: ridge.color,
+      position: [ridge.x, groundHeight + ridge.height * 0.23, -11.5],
+      rotation: [0, ridge.rotation, 0.05],
+      scale: [ridge.width, ridge.height * 0.52, 1.35],
+    })), [groundHeight])
+  const pathInstances = useMemo<StaticInstance[]>(() => PATH_SLABS.map((slab) => ({
+    color: slab.color,
+    position: [slab.x, groundHeight - 0.012, slab.z],
+    rotation: [0, slab.rotation, 0],
+    scale: [slab.width, 0.075, 3.45],
+  })), [groundHeight])
+  const crackInstances = useMemo<StaticInstance[]>(() => CRACKS.map((crack) => ({
+    position: [crack.x, groundHeight + 0.012, crack.z],
+    rotation: [0, crack.rotation, 0],
+    scale: [crack.length, 0.012, 0.022],
+  })), [groundHeight])
+  const rockInstances = useMemo<StaticInstance[]>(() => ROCKS.map((rock) => ({
+    color: rock.color,
+    position: [rock.x, groundHeight + rock.y, rock.z],
+    rotation: [0.12, rock.rotation, -0.08],
+    scale: [rock.size, rock.size * 1.35, rock.size * 0.9],
+  })), [groundHeight])
 
   return (
     <group name="procedural-biome-world">
@@ -158,73 +271,12 @@ export function Ground() {
         <meshStandardMaterial vertexColors flatShading roughness={0.91} metalness={0.06} />
       </mesh>
 
-      {HORIZON_BANDS.map((band) => (
-        <mesh key={band.id} position={[band.x, groundHeight + 0.04, -12.2]} receiveShadow>
-          <boxGeometry args={[BIOME_WORLD_WIDTH + 0.25, 0.42, 1.65]} />
-          <meshStandardMaterial color={band.color} roughness={1} />
-        </mesh>
-      ))}
-
-      {HORIZON_RIDGES.map((ridge) => (
-        <mesh
-          key={ridge.id}
-          position={[
-            ridge.x,
-            groundHeight + ridge.height * (ridge.pointed ? 0.4 : 0.23),
-            -11.5,
-          ]}
-          rotation={[0, ridge.rotation, 0.05]}
-          scale={ridge.pointed
-            ? [ridge.width * 0.58, ridge.height * 0.86, 1.05]
-            : [ridge.width, ridge.height * 0.52, 1.35]}
-          castShadow
-          receiveShadow
-        >
-          {ridge.pointed ? (
-            <coneGeometry args={[0.72, 1.7, 5]} />
-          ) : (
-            <dodecahedronGeometry args={[0.72, 0]} />
-          )}
-          <meshStandardMaterial color={ridge.color} flatShading roughness={0.96} />
-        </mesh>
-      ))}
-
-      {PATH_SLABS.map((slab) => (
-        <mesh
-          key={slab.id}
-          position={[slab.x, groundHeight - 0.012, slab.z]}
-          rotation={[0, slab.rotation, 0]}
-          receiveShadow
-        >
-          <boxGeometry args={[slab.width, 0.075, 3.45]} />
-          <meshStandardMaterial color={slab.color} roughness={0.86} metalness={0.07} />
-        </mesh>
-      ))}
-
-      {CRACKS.map((crack) => (
-        <mesh
-          key={crack.id}
-          position={[crack.x, groundHeight + 0.012, crack.z]}
-          rotation={[0, crack.rotation, 0]}
-        >
-          <boxGeometry args={[crack.length, 0.012, 0.022]} />
-          <meshBasicMaterial color="#38242c" transparent opacity={0.68} />
-        </mesh>
-      ))}
-
-      {ROCKS.map((rock) => (
-        <mesh
-          key={rock.id}
-          position={[rock.x, groundHeight + rock.y, rock.z]}
-          rotation={[0.12, rock.rotation, -0.08]}
-          scale={[rock.size, rock.size * 1.35, rock.size * 0.9]}
-          castShadow
-          receiveShadow
-        >
-          <dodecahedronGeometry args={[0.72, 0]} />
-          <meshStandardMaterial color={rock.color} flatShading roughness={0.87} metalness={0.13} />
-        </mesh>
-      ))}
+      <StaticInstances instances={horizonBandInstances} kind="box-standard" receiveShadow roughness={1} />
+      <StaticInstances instances={pointedRidgeInstances} kind="cone-standard" castShadow receiveShadow roughness={0.96} />
+      <StaticInstances instances={roundedRidgeInstances} kind="rock-standard" castShadow receiveShadow roughness={0.96} />
+      <StaticInstances instances={pathInstances} kind="box-standard" receiveShadow roughness={0.86} metalness={0.07} />
+      <StaticInstances instances={crackInstances} kind="box-basic" opacity={0.68} />
+      <StaticInstances instances={rockInstances} kind="rock-standard" castShadow receiveShadow roughness={0.87} metalness={0.13} />
 
       {BIOME_GATES.map((gate) => (
         <group key={gate.id} position={[gate.x, groundHeight, -9.6]}>

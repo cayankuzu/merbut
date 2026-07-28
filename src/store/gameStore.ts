@@ -8,6 +8,7 @@ interface GameState {
   rotations: Record<CharacterId, number>
   cameraX: number
   animationStates: Record<CharacterId, AnimationState>
+  attackSequences: Record<CharacterId, number>
   togetherWarning: boolean
   resetToken: number
   teleports: Record<CharacterId, { token: number; x: number }>
@@ -16,6 +17,7 @@ interface GameState {
   setPlayerTransform: (id: CharacterId, position: Vec3Tuple, rotation: number) => void
   setCameraX: (position: number) => void
   setPlayerAnimation: (id: CharacterId, animation: AnimationState) => void
+  triggerPlayerAttack: (id: CharacterId) => void
   setTogetherWarning: (visible: boolean) => void
   teleportPlayer: (id: CharacterId, x: number) => void
   resetScene: () => void
@@ -31,6 +33,7 @@ export const useGameStore = create<GameState>((set) => ({
   rotations: { ali: 0, jack: 0 },
   cameraX: 0,
   animationStates: { ali: 'idle', jack: 'idle' },
+  attackSequences: { ali: 0, jack: 0 },
   togetherWarning: false,
   resetToken: 0,
   teleports: { ali: { token: 0, x: CHARACTERS.ali.startPosition[0] }, jack: { token: 0, x: CHARACTERS.jack.startPosition[0] } },
@@ -55,7 +58,15 @@ export const useGameStore = create<GameState>((set) => ({
   }),
   setCameraX: (position) => set((state) => Math.abs(state.cameraX - position) < 0.0001 ? state : { cameraX: position }),
   setPlayerAnimation: (id, animation) =>
-    set((state) => ({ animationStates: { ...state.animationStates, [id]: animation } })),
+    set((state) => state.animationStates[id] === animation
+      ? state
+      : { animationStates: { ...state.animationStates, [id]: animation } }),
+  triggerPlayerAttack: (id) => set((state) => ({
+    animationStates: state.animationStates[id] === 'attack'
+      ? state.animationStates
+      : { ...state.animationStates, [id]: 'attack' },
+    attackSequences: { ...state.attackSequences, [id]: state.attackSequences[id] + 1 },
+  })),
   setTogetherWarning: (visible) =>
     set((state) => (state.togetherWarning === visible ? state : { togetherWarning: visible })),
   teleportPlayer: (id, x) => set((state) => ({
@@ -68,6 +79,7 @@ export const useGameStore = create<GameState>((set) => ({
       rotations: { ali: 0, jack: 0 },
       cameraX: 0,
       animationStates: { ali: 'idle', jack: 'idle' },
+      attackSequences: { ali: 0, jack: 0 },
       togetherWarning: false,
       teleports: {
         ali: { token: state.teleports.ali.token + 1, x: CHARACTERS.ali.startPosition[0] },

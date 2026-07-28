@@ -8,7 +8,7 @@ import { prepareAnimationClip } from '../animation/animationLoader'
 import { validateClipTargets } from '../animation/animationRetargeting'
 import { ENEMIES } from '../config/enemies'
 import { useSessionStore } from '../store/sessionStore'
-import { PERFORMANCE_PROFILES, usePerformanceStore } from '../store/performanceStore'
+import { PERFORMANCE_PROFILES, runtimeAnimationFps, usePerformanceStore } from '../store/performanceStore'
 import { WorldHealthBar } from './WorldHealthBar'
 import { currentEnemyById, enemyById } from './enemyLookup'
 
@@ -42,7 +42,9 @@ export function EnemyActor({ id }: EnemyActorProps) {
   const modelRoot = useRef<Group>(null)
   const animationAccumulator = useRef(0)
   const tier = usePerformanceStore((state) => state.tier)
+  const qualityFactor = usePerformanceStore((state) => state.qualityFactor)
   const profile = PERFORMANCE_PROFILES[tier]
+  const animationFps = runtimeAnimationFps(tier, qualityFactor)
   const definition = ENEMIES[enemy?.kind ?? 1]
   const walkFile = useGLTF(definition.walk)
   const attackFile = useGLTF(definition.attack)
@@ -130,7 +132,7 @@ export function EnemyActor({ id }: EnemyActorProps) {
     }
     if (current.animation !== 'dead') {
       animationAccumulator.current += Math.min(delta, 0.1)
-      if (animationAccumulator.current >= 1 / profile.animationFps) {
+      if (animationAccumulator.current >= 1 / animationFps) {
         mixer.update(animationAccumulator.current)
         animationAccumulator.current = 0
       }

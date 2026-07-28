@@ -22,7 +22,7 @@ export const GAME_CONFIG = {
     airJumps: 1,
     coyoteTime: 0.11,
     jumpBuffer: 0.13,
-    fixedStep: 1 / 120,
+    fixedStep: 1 / 60,
     rotationSpeed: Math.PI * 0.92,
   },
   camera: {

@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { AdditiveBlending, Group, PointsMaterial } from 'three'
 import { BIOMES, BIOME_WORLD_WIDTH, WORLD_VISUAL_LEFT } from '../config/biomes'
-import { PERFORMANCE_PROFILES, usePerformanceStore } from '../store/performanceStore'
+import { runtimeParticleRatio, usePerformanceStore } from '../store/performanceStore'
 
 const centers = BIOMES.map((_, index) => WORLD_VISUAL_LEFT + index * BIOME_WORLD_WIDTH + BIOME_WORLD_WIDTH / 2)
 
@@ -20,7 +20,8 @@ export function BiomeScenery() {
   const weather = useRef<Group>(null)
   const weatherMaterials = useRef<PointsMaterial[]>([])
   const tier = usePerformanceStore((state) => state.tier)
-  const particleRatio = PERFORMANCE_PROFILES[tier].particleRatio
+  const qualityFactor = usePerformanceStore((state) => state.qualityFactor)
+  const particleRatio = runtimeParticleRatio(tier, qualityFactor)
   const particleSets = useMemo(() => BIOMES.map((_, index) => particles(Math.round((58 + index * 6) * particleRatio), index + 1)), [particleRatio])
 
   useFrame(({ clock }, delta) => {

@@ -22,7 +22,7 @@ export function RotatingCharacterPreview({ animationState = 'idle', id, initialR
   })
   return (
     <group ref={root} position={[0, -1.32, 0]} rotation={[0, initialRotation, 0]}>
-      <AnimatedCharacter definition={CHARACTERS[id]} animationState={animationState} />
+      <AnimatedCharacter continuousFaceLight={rotate} definition={CHARACTERS[id]} animationState={animationState} />
     </group>
   )
 }

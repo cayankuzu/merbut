@@ -68,4 +68,12 @@ describe('buildEnemyRenderPlan', () => {
     expect(plan.fullActorIds).toHaveLength(FULL_ENEMY_ACTOR_LIMITS.minimal)
     expect(plan.proxyIds).not.toContain('dying')
   })
+
+  it('keeps mounted actors stable while they remain inside the LOD range', () => {
+    const enemies = Array.from({ length: 12 }, (_, index) => enemy(`enemy-${index}`, index))
+    const first = buildEnemyRenderPlan(enemies, 4, 20, 'minimal')
+    const moved = buildEnemyRenderPlan(enemies, 5, 20, 'minimal', first.fullActorIds)
+
+    expect([...moved.fullActorIds].sort()).toEqual([...first.fullActorIds].sort())
+  })
 })

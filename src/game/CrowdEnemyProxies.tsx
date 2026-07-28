@@ -6,11 +6,12 @@ import {
   ConeGeometry,
   DynamicDrawUsage,
   InstancedMesh,
-  MeshBasicMaterial,
+  MeshLambertMaterial,
+  MeshStandardMaterial,
   Object3D,
   SphereGeometry,
 } from 'three'
-import { PERFORMANCE_PROFILES, usePerformanceStore } from '../store/performanceStore'
+import { runtimeAnimationFps, usePerformanceStore } from '../store/performanceStore'
 import { currentEnemyById } from './enemyLookup'
 
 interface CrowdEnemyProxiesProps {
@@ -36,11 +37,12 @@ export function CrowdEnemyProxies({ ids }: CrowdEnemyProxiesProps) {
   const bodyRef = useRef<InstancedMesh>(null)
   const headRef = useRef<InstancedMesh>(null)
   const weaponRef = useRef<InstancedMesh>(null)
-  const bodyGeometry = useMemo(() => new ConeGeometry(0.33, 1.28, 5), [])
-  const headGeometry = useMemo(() => new SphereGeometry(0.24, 8, 6), [])
+  const bodyGeometry = useMemo(() => new ConeGeometry(0.33, 1.28, 8), [])
+  const headGeometry = useMemo(() => new SphereGeometry(0.24, 12, 8), [])
   const weaponGeometry = useMemo(() => new BoxGeometry(0.12, 0.72, 0.12), [])
-  const material = useMemo(() => new MeshBasicMaterial({ color: '#ffffff', vertexColors: true, transparent: true, opacity: 0.88 }), [])
-  const accentMaterial = useMemo(() => new MeshBasicMaterial({ color: '#ffffff', vertexColors: true, transparent: true, opacity: 0.98 }), [])
+  const material = useMemo(() => new MeshLambertMaterial({ color: '#ffffff', vertexColors: true }), [])
+  const headMaterial = useMemo(() => new MeshLambertMaterial({ color: '#ffffff', vertexColors: true }), [])
+  const accentMaterial = useMemo(() => new MeshStandardMaterial({ color: '#ffffff', metalness: 0.64, roughness: 0.28, vertexColors: true }), [])
   const bodyDummy = useMemo(() => new Object3D(), [])
   const headDummy = useMemo(() => new Object3D(), [])
   const weaponDummy = useMemo(() => new Object3D(), [])
@@ -54,6 +56,8 @@ export function CrowdEnemyProxies({ ids }: CrowdEnemyProxiesProps) {
   }), [ids])
   const phases = useMemo(() => ids.map(seededPhase), [ids])
   const tier = usePerformanceStore((state) => state.tier)
+  const qualityFactor = usePerformanceStore((state) => state.qualityFactor)
+  const animationFps = runtimeAnimationFps(tier, qualityFactor)
   const transformAccumulator = useRef(0)
 
   useEffect(() => () => {
@@ -61,8 +65,9 @@ export function CrowdEnemyProxies({ ids }: CrowdEnemyProxiesProps) {
     headGeometry.dispose()
     weaponGeometry.dispose()
     material.dispose()
+    headMaterial.dispose()
     accentMaterial.dispose()
-  }, [accentMaterial, bodyGeometry, headGeometry, material, weaponGeometry])
+  }, [accentMaterial, bodyGeometry, headGeometry, headMaterial, material, weaponGeometry])
 
   useLayoutEffect(() => {
     const meshes = [bodyRef.current, headRef.current, weaponRef.current]
@@ -89,7 +94,7 @@ export function CrowdEnemyProxies({ ids }: CrowdEnemyProxiesProps) {
 
   useFrame((state, rawDelta) => {
     transformAccumulator.current += Math.min(rawDelta, 0.1)
-    const updateEvery = 1 / Math.max(12, PERFORMANCE_PROFILES[tier].animationFps)
+    const updateEvery = 1 / animationFps
     if (transformAccumulator.current < updateEvery) return
     transformAccumulator.current = 0
     const time = state.clock.elapsedTime
@@ -151,7 +156,7 @@ export function CrowdEnemyProxies({ ids }: CrowdEnemyProxiesProps) {
   return (
     <group name="crowd-enemy-proxies">
       <instancedMesh ref={bodyRef} args={[bodyGeometry, material, ids.length]} />
-      <instancedMesh ref={headRef} args={[headGeometry, accentMaterial, ids.length]} />
+      <instancedMesh ref={headRef} args={[headGeometry, headMaterial, ids.length]} />
       <instancedMesh ref={weaponRef} args={[weaponGeometry, accentMaterial, ids.length]} />
     </group>
   )

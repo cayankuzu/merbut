@@ -3,6 +3,7 @@ import { useAudioStore } from '../audio/audioStore'
 import { gameAudio } from '../audio/gameAudio'
 import { useDebugStore } from '../store/debugStore'
 import { useSessionStore } from '../store/sessionStore'
+import { GraphicsSettingsPanel } from './GraphicsSettingsPanel'
 import { MusicTransportControls, type MusicCommandDetail } from './MusicTransportControls'
 
 const MUSIC_URL = 'https://music.youtube.com/watch?v=Pp0xs_xpTYo&si=yebZejnX9bZByr_Z'
@@ -109,7 +110,8 @@ export function AudioSettingsPanel() {
   return (
     <aside className={`audio-settings${panelOpen ? ' is-open' : ''}${previewingCamera ? ' is-camera-preview' : ''}`} aria-label="Ayarlar" aria-hidden={!panelOpen} role="dialog" aria-modal={panelOpen}>
       <div className="audio-settings__panel pause-settings" hidden={!panelOpen}>
-        <header><div><small>MERBUT · AYARLAR</small><h2>Ses, müzik ve kamera</h2></div><button type="button" onClick={closePanel} aria-label="Ayarları kapat">KAPAT ×</button></header>
+        <header><div><small>MERBUT · AYARLAR</small><h2>Ses, grafik ve kamera</h2></div><button type="button" onClick={closePanel} aria-label="Ayarları kapat">KAPAT ×</button></header>
+        <GraphicsSettingsPanel />
         <div className="audio-settings__player pause-settings__music-preview">
           <iframe
             ref={iframe}

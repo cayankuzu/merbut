@@ -7,10 +7,10 @@ import type { PerformanceTier } from '../store/performanceStore'
  * remainder be drawn by CrowdEnemyProxies. Bosses never enter this budget.
  */
 export const FULL_ENEMY_ACTOR_LIMITS: Record<PerformanceTier, number> = {
-  minimal: 4,
-  performance: 7,
-  balanced: 10,
-  high: 14,
+  minimal: 3,
+  performance: 5,
+  balanced: 8,
+  high: 12,
 }
 
 export interface EnemyRenderPlan {
@@ -23,10 +23,13 @@ export function buildEnemyRenderPlan(
   cameraX: number,
   actorMountDistance: number,
   tier: PerformanceTier,
+  preferredFullActorIds: readonly string[] = [],
+  fullActorLimit = FULL_ENEMY_ACTOR_LIMITS[tier],
 ): EnemyRenderPlan {
   const fullActorIds: string[] = []
   const nearbyNormals: EnemyState[] = []
   const proxyIds: string[] = []
+  const preferred = new Set(preferredFullActorIds)
 
   for (const enemy of enemies) {
     // Bosses retain their bespoke mesh, animation and abilities at every
@@ -53,9 +56,12 @@ export function buildEnemyRenderPlan(
       const leftDying = left.animation === 'dead'
       const rightDying = right.animation === 'dead'
       if (leftDying !== rightDying) return leftDying ? -1 : 1
+      const leftPreferred = preferred.has(left.id)
+      const rightPreferred = preferred.has(right.id)
+      if (leftPreferred !== rightPreferred) return leftPreferred ? -1 : 1
       return Math.abs(left.x - cameraX) - Math.abs(right.x - cameraX)
     })
-    .slice(0, FULL_ENEMY_ACTOR_LIMITS[tier])
+    .slice(0, fullActorLimit)
     .forEach((enemy) => fullActorIds.push(enemy.id))
 
   const fullSet = new Set(fullActorIds)

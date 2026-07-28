@@ -59,7 +59,7 @@ function createFaceBlurTexture() {
 const FACE_BLUR_TEXTURE = createFaceBlurTexture()
 
 /** Camera-facing luminous blur that follows Ali's animated face anchor. */
-export function AliFaceLight({ scene }: { scene: Object3D }) {
+export function AliFaceLight({ continuous = true, scene }: { continuous?: boolean; scene: Object3D }) {
   const blurRoot = useRef<Group>(null)
   const sourceMaterial = useRef<SpriteMaterial>(null)
   const anchor = useMemo(() => findAliFaceAnchor(scene), [scene])
@@ -110,7 +110,7 @@ export function AliFaceLight({ scene }: { scene: Object3D }) {
     if (sourceMaterial.current) {
       sourceMaterial.current.opacity = 0.88 + Math.sin(time * 3.1) * 0.08
     }
-    invalidate()
+    if (continuous) invalidate()
   })
 
   if (!portalParent || !facePosition) return null

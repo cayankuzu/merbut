@@ -25,6 +25,7 @@ import {
 const ALI_PALM_REACH = 0.48
 
 interface AnimatedCharacterProps {
+  continuousFaceLight?: boolean
   definition: CharacterDefinition
   animationState: AnimationState
   /** Replays the current combat clip without changing gameplay animation state. */
@@ -43,7 +44,7 @@ function enableShadows(root: Object3D) {
   })
 }
 
-export function AnimatedCharacter({ definition, animationDurationSeconds, animationState, animationSignal = 0 }: AnimatedCharacterProps) {
+export function AnimatedCharacter({ continuousFaceLight = true, definition, animationDurationSeconds, animationState, animationSignal = 0 }: AnimatedCharacterProps) {
   const idleFile = useGLTF(definition.assets.idle)
   const walkFile = useGLTF(definition.assets.walk)
   const jumpFile = useGLTF(definition.assets.jump)
@@ -124,7 +125,7 @@ export function AnimatedCharacter({ definition, animationDurationSeconds, animat
       visible={animationState !== 'dead'}
     >
       <primitive object={characterScene} />
-      {definition.id === 'ali' ? <AliFaceLight scene={characterScene} /> : null}
+      {definition.id === 'ali' ? <AliFaceLight continuous={continuousFaceLight} scene={characterScene} /> : null}
     </group>
   )
 }
