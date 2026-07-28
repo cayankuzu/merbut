@@ -28,7 +28,7 @@ export function ControlsScreen() {
         <article className="hero-brief hero-brief--jack">
           {previewsReady ? <CharacterPreview3D id="jack" /> : <div className="character-preview" aria-hidden="true" />}
           <div className="hero-brief__copy"><h2>Samuray Jack</h2>
-            <dl><div><dt>← / →</dt><dd>Hareket</dd></div><div><dt>↑</dt><dd>Zıpla</dd></div><div><dt>↓</dt><dd>Beyaz kesiş</dd></div><div><dt>Ö / Ç</dt><dd>360° dön</dd></div><div><dt>L</dt><dd>Hareket ederken 6 sn koruyucu kalkan</dd></div></dl>
+            <dl><div><dt>← / →</dt><dd>Hareket</dd></div><div><dt>↑</dt><dd>Zıpla</dd></div><div><dt>↓</dt><dd>Beyaz kesiş</dd></div><div><dt>Ö / Ç</dt><dd>360° dön</dd></div><div><dt>L</dt><dd>Hareket ederken 4 sn koruyucu kalkan</dd></div></dl>
           </div>
         </article>
       </div>
