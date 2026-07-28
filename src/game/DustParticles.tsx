@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { AdditiveBlending, Color, Group, PointsMaterial } from 'three'
 import { getBiomeBlend } from '../config/biomes'
 import { useGameStore } from '../store/gameStore'
+import { PERFORMANCE_PROFILES, usePerformanceStore } from '../store/performanceStore'
 
 const DUST_COUNT = 150
 const EMBER_COUNT = 72
@@ -23,8 +24,10 @@ function createParticlePositions(count: number, verticalRange: number, depthRang
 export function DustParticles() {
   const group = useRef<Group>(null)
   const emberMaterial = useRef<PointsMaterial>(null)
-  const dustPositions = useMemo(() => createParticlePositions(DUST_COUNT, 6.8, 2.4), [])
-  const emberPositions = useMemo(() => createParticlePositions(EMBER_COUNT, 5.4, 1.8), [])
+  const tier = usePerformanceStore((state) => state.tier)
+  const particleRatio = PERFORMANCE_PROFILES[tier].particleRatio
+  const dustPositions = useMemo(() => createParticlePositions(Math.round(DUST_COUNT * particleRatio), 6.8, 2.4), [particleRatio])
+  const emberPositions = useMemo(() => createParticlePositions(Math.round(EMBER_COUNT * particleRatio), 5.4, 1.8), [particleRatio])
 
   useFrame(({ clock }, delta) => {
     if (!group.current) return

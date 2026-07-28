@@ -162,7 +162,10 @@ class GameAudioEngine {
 
   private getContext() {
     if (typeof window === 'undefined') return null
-    this.context ??= new AudioContext({ latencyHint: 'interactive' })
+    const AudioContextConstructor = window.AudioContext
+      ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!AudioContextConstructor) return null
+    this.context ??= new AudioContextConstructor({ latencyHint: 'interactive' })
     return this.context
   }
 

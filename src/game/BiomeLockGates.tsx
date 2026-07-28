@@ -38,7 +38,6 @@ export function BiomeLockGates() {
             <coneGeometry args={[.58, 4.4 + spike % 2 * .55, 5]} />
             <meshStandardMaterial color="#18090c" emissive={index % 2 ? '#52120e' : '#311020'} emissiveIntensity={.45} metalness={.38} roughness={.55} />
           </mesh>)}
-          <pointLight position={[0, 2.2, 1]} color={BIOMES[index + 1].accentColor} intensity={8} distance={7} />
         </group>
       ))}
     </group>

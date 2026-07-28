@@ -39,17 +39,22 @@ function MiniAkuModel({ bossId, index }: { bossId: string; index: number }) {
   const assets = ASSET_PATHS.bosses.aku.normal
   const runFile = useGLTF(assets.mini)
   const attackFile = useGLTF(assets.attack)
+  const heavyFile = useGLTF(assets.heavy)
+  const kickFile = useGLTF(assets.kick)
+  const tripleFile = useGLTF(assets.triple)
+  const rangedFile = useGLTF(assets.ranged)
   const scene = useMemo(() => SkeletonUtils.clone(runFile.scene), [runFile.scene])
   const clips = useMemo(() => [
     validateClipTargets(scene, prepareAnimationClip(runFile.animations[0], 'run')),
-    validateClipTargets(scene, prepareAnimationClip(attackFile.animations[0], 'attack')),
-  ], [attackFile.animations, runFile.animations, scene])
+    validateClipTargets(scene, prepareAnimationClip(attackFile.animations[0], 'attack-0')),
+    validateClipTargets(scene, prepareAnimationClip(heavyFile.animations[0], 'attack-1')),
+    validateClipTargets(scene, prepareAnimationClip(kickFile.animations[0], 'attack-2')),
+    validateClipTargets(scene, prepareAnimationClip(tripleFile.animations[0], 'attack-3')),
+    validateClipTargets(scene, prepareAnimationClip(rangedFile.animations[0], 'attack-4')),
+  ], [attackFile.animations, heavyFile.animations, kickFile.animations, rangedFile.animations, runFile.animations, scene, tripleFile.animations])
   const mixer = useMemo(() => new AnimationMixer(scene), [scene])
-  const actions = useMemo(() => ({
-    run: mixer.clipAction(clips[0]!),
-    attack: mixer.clipAction(clips[1]!),
-  }), [clips, mixer])
-  const active = useRef<'run' | 'attack'>('run')
+  const actions = useMemo(() => Object.fromEntries(clips.map((clip) => [clip.name, mixer.clipAction(clip)])), [clips, mixer])
+  const active = useRef('run')
   const animationAccumulator = useRef(0)
 
   useLayoutEffect(() => optimizeMiniAku(scene), [scene])
@@ -65,7 +70,13 @@ function MiniAkuModel({ bossId, index }: { bossId: string; index: number }) {
     mixer.update(animationAccumulator.current)
     animationAccumulator.current = 0
     const elapsed = performance.now() - enemy.specialStartedAt
-    const target: 'run' | 'attack' = getMiniAkuMotion(index, elapsed, enemy.x, enemy.x).attacking ? 'attack' : 'run'
+    const game = useGameStore.getState()
+    const players = useSessionStore.getState().players
+    const preferred = index % 2 === 0 ? 'ali' : 'jack'
+    const fallback = preferred === 'ali' ? 'jack' : 'ali'
+    const targetId = !players[preferred].dead ? preferred : fallback
+    const attacking = getMiniAkuMotion(index, elapsed, enemy.x, game.positions[targetId][0]).attacking
+    const target = attacking ? `attack-${index % 5}` : 'run'
     if (target === active.current) return
     active.current = target
     const action = actions[target]
@@ -75,7 +86,7 @@ function MiniAkuModel({ bossId, index }: { bossId: string; index: number }) {
     action.clampWhenFinished = !looping
     action.setLoop(looping ? LoopRepeat : LoopOnce, looping ? Infinity : 1)
     action.reset().fadeIn(0.08).play()
-    actions[target === 'run' ? 'attack' : 'run']?.fadeOut(0.08)
+    Object.entries(actions).forEach(([name, candidate]) => { if (name !== target) candidate?.fadeOut(0.08) })
   })
   return <primitive object={scene} />
 }
@@ -233,6 +244,7 @@ export function AkuBossActor({ id }: AkuBossActorProps) {
     monsterRoot.current.scale.setScalar(MathUtils.damp(monsterRoot.current.scale.x, monsterTarget, 8, delta))
     minisRoot.current.visible = split
     if (split) {
+      minisRoot.current.rotation.y = -root.current.rotation.y
       const elapsed = now - current.specialStartedAt
       const game = useGameStore.getState()
       const players = useSessionStore.getState().players
@@ -242,7 +254,7 @@ export function AkuBossActor({ id }: AkuBossActorProps) {
         const targetId = !players[preferred].dead ? preferred : fallback
         const motion = getMiniAkuMotion(index, elapsed, current.x, game.positions[targetId][0])
         mini.position.x = motion.x - current.x
-        mini.position.y = motion.y
+        mini.position.y = 0
         mini.rotation.y = motion.direction > 0 ? Math.PI / 2 : -Math.PI / 2
         mini.scale.setScalar(current.scale * 0.31 * (motion.attacking ? 1.08 : 1))
       })
@@ -261,7 +273,7 @@ export function AkuBossActor({ id }: AkuBossActorProps) {
       <group ref={normalRoot} scale={0}><primitive object={normalScene} /></group>
       <group ref={monsterRoot} scale={0}><primitive object={monsterScene} /></group>
       <group ref={minisRoot} visible={false}>
-        {MINI_AKU_OFFSETS.map((offset, index) => <group key={offset} ref={(group) => { if (group) miniGroups.current[index] = group }}><MiniAkuModel bossId={id} index={index} /></group>)}
+        {MINI_AKU_OFFSETS.map((offset, index) => <group key={offset} name={`mini-aku-${index + 1}`} ref={(group) => { if (group) miniGroups.current[index] = group }}><MiniAkuModel bossId={id} index={index} /></group>)}
       </group>
       {enemy.special === 'aku-shapeshift' && enemy.mimicKind ? <group scale={1.12}><MimicModel kind={enemy.mimicKind} /></group> : null}
       <group ref={morphRing} visible={false} position={[0, 1.35, 0]}>

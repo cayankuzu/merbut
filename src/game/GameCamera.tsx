@@ -41,8 +41,11 @@ export function GameCamera() {
       camera.position.x = MathUtils.damp(camera.position.x, portalX, 4.8, smoothingDelta)
       camera.position.y = MathUtils.damp(camera.position.y, 15.8, 4.2, smoothingDelta)
       camera.position.z = MathUtils.damp(camera.position.z, 0.01, 5.4, smoothingDelta)
-      camera.fov = MathUtils.damp(camera.fov, 46, 4.5, smoothingDelta)
-      camera.updateProjectionMatrix()
+      const nextFov = MathUtils.damp(camera.fov, 46, 4.5, smoothingDelta)
+      if (Math.abs(nextFov - camera.fov) > 0.001) {
+        camera.fov = nextFov
+        camera.updateProjectionMatrix()
+      }
       lookTarget.current.set(portalX, 0, 0)
       camera.lookAt(lookTarget.current)
       useGameStore.getState().setCameraX(portalX)
@@ -57,8 +60,11 @@ export function GameCamera() {
     const pullback = MathUtils.clamp((separation - 2.6) * 0.48, 0, GAME_CONFIG.camera.maxDistance - cameraDistance)
     const targetY = cameraHeight + highestPlayer * 0.13
     camera.up.set(0, 1, 0)
-    camera.fov = MathUtils.damp(camera.fov, 42, 4.5, smoothingDelta)
-    camera.updateProjectionMatrix()
+    const nextFov = MathUtils.damp(camera.fov, 42, 4.5, smoothingDelta)
+    if (Math.abs(nextFov - camera.fov) > 0.001) {
+      camera.fov = nextFov
+      camera.updateProjectionMatrix()
+    }
 
     camera.position.x = MathUtils.damp(camera.position.x, targetX, 4.8, smoothingDelta)
     camera.position.y = MathUtils.damp(camera.position.y, targetY, 5.2, smoothingDelta)

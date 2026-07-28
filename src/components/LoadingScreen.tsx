@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useGLTF, useProgress } from '@react-three/drei'
 import { BACKGROUND_ASSETS, MODEL_ASSETS } from '../config/assetManifest'
 import { MerbutMark } from './MerbutMark'
+import { MenuBattleStage } from './MenuBattleStage'
 
 const MINIMUM_SPLASH_MS = 1_400
 const MAXIMUM_PRELOAD_MS = 170_000
@@ -103,6 +104,7 @@ export function LoadingScreen({ onReady }: LoadingScreenProps) {
   const loadedCount = Math.min(ASSET_COUNT, loaded + backgroundsLoaded)
   return (
     <div className={`loading-screen${complete ? ' is-exiting' : ''}`} role="status" aria-live="polite" aria-label={`Merbut yüzde ${roundedProgress} hazır`}>
+      <MenuBattleStage variant="splash" />
       <div className="loading-screen__frame" aria-hidden="true" />
       <div className="loading-screen__core">
         <p className="loading-screen__eyebrow"><i /> YEDİ DİYAR · TEK KADER <i /></p>

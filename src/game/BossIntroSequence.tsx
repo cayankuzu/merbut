@@ -53,8 +53,8 @@ export function BossIntroSequence() {
 
   return (
     <>
-      <group ref={aliRoot} visible={false}><pointLight color="#c64cff" intensity={8} distance={4} /><primitive object={aliBottle} scale={0.42} /><mesh rotation={[Math.PI / 2, 0, 0]} position={[0, -0.48, 0]}><torusGeometry args={[0.5, 0.045, 8, 36]} /><meshBasicMaterial color="#d971ff" transparent opacity={0.8} /></mesh></group>
-      <group ref={jackRoot} visible={false}><pointLight color="#c64cff" intensity={8} distance={4} /><primitive object={jackBottle} scale={0.42} /><mesh rotation={[Math.PI / 2, 0, 0]} position={[0, -0.48, 0]}><torusGeometry args={[0.5, 0.045, 8, 36]} /><meshBasicMaterial color="#d971ff" transparent opacity={0.8} /></mesh></group>
+      <group ref={aliRoot} visible={false}><primitive object={aliBottle} scale={0.42} /><mesh rotation={[Math.PI / 2, 0, 0]} position={[0, -0.48, 0]}><torusGeometry args={[0.5, 0.045, 8, 36]} /><meshBasicMaterial color="#d971ff" transparent opacity={0.8} toneMapped={false} /></mesh></group>
+      <group ref={jackRoot} visible={false}><primitive object={jackBottle} scale={0.42} /><mesh rotation={[Math.PI / 2, 0, 0]} position={[0, -0.48, 0]}><torusGeometry args={[0.5, 0.045, 8, 36]} /><meshBasicMaterial color="#d971ff" transparent opacity={0.8} toneMapped={false} /></mesh></group>
     </>
   )
 }

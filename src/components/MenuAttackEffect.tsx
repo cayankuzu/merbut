@@ -11,6 +11,7 @@ import { EnemyProjectileVisual } from '../game/EnemyProjectileVisual'
 import type { EnemyProjectileState, ImpactKind } from '../types/session'
 
 export type MenuAttackEffectKind =
+  | 'none'
   | 'slash'
   | 'projectile'
   | 'shockwave'

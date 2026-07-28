@@ -97,7 +97,7 @@ export function EnemyActor({ id }: EnemyActorProps) {
         <primitive object={scene} />
       </group>
       {enemy.animation !== 'dead' && !enemy.boss ? (
-        <group position={[0, 2.55, 0]}>
+        <group position={[0, enemy.scale * 1.9, 0]}>
           <WorldHealthBar label={enemy.title} health={enemy.health} maxHealth={enemy.maxHealth} accent={enemy.accent} />
         </group>
       ) : null}

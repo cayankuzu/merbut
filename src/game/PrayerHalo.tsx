@@ -15,7 +15,6 @@ export function PrayerHalo({ active, id }: { active: boolean; id: CharacterId })
   })
   return (
     <group ref={root} visible={active} position={[0, 2.95, 0]} rotation={[Math.PI / 2, 0, 0]} name={`${id}-dua-halkasi`}>
-      <pointLight color="#fff3a5" intensity={5} distance={4} />
       <mesh><torusGeometry args={[0.48, 0.055, 8, 48]} /><meshBasicMaterial color="#fff6bd" transparent opacity={0.9} blending={AdditiveBlending} depthWrite={false} toneMapped={false} /></mesh>
       <mesh scale={1.24}><torusGeometry args={[0.48, 0.018, 6, 48]} /><meshBasicMaterial color={id === 'ali' ? '#ffbf60' : '#8ceeff'} transparent opacity={0.72} blending={AdditiveBlending} depthWrite={false} /></mesh>
     </group>

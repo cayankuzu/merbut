@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { AdditiveBlending, Group, PointsMaterial } from 'three'
 import { BIOMES, BIOME_WORLD_WIDTH, WORLD_VISUAL_LEFT } from '../config/biomes'
+import { PERFORMANCE_PROFILES, usePerformanceStore } from '../store/performanceStore'
 
 const centers = BIOMES.map((_, index) => WORLD_VISUAL_LEFT + index * BIOME_WORLD_WIDTH + BIOME_WORLD_WIDTH / 2)
 
@@ -18,7 +19,9 @@ function particles(count: number, seed: number) {
 export function BiomeScenery() {
   const weather = useRef<Group>(null)
   const weatherMaterials = useRef<PointsMaterial[]>([])
-  const particleSets = useMemo(() => BIOMES.map((_, index) => particles(58 + index * 6, index + 1)), [])
+  const tier = usePerformanceStore((state) => state.tier)
+  const particleRatio = PERFORMANCE_PROFILES[tier].particleRatio
+  const particleSets = useMemo(() => BIOMES.map((_, index) => particles(Math.round((58 + index * 6) * particleRatio), index + 1)), [particleRatio])
 
   useFrame(({ clock }, delta) => {
     if (weather.current) {
@@ -49,7 +52,6 @@ export function BiomeScenery() {
           <mesh position={[0, 2.4, 0]}><boxGeometry args={[0.34, 4.8, 0.42]} /><meshStandardMaterial color="#241e21" metalness={0.48} /></mesh>
           <mesh position={[index % 2 ? -1.3 : 1.3, 4.65, 0]} rotation={[0, 0, index % 2 ? 0.22 : -0.22]}><boxGeometry args={[3, 0.28, 0.34]} /><meshStandardMaterial color="#322529" /></mesh>
           <mesh position={[index % 2 ? -2.55 : 2.55, 3.5, 0]}><cylinderGeometry args={[0.025, 0.025, 2.2, 5]} /><meshStandardMaterial color="#171316" /></mesh>
-          <pointLight position={[0, 2.8, 1]} color="#ff8b43" intensity={3} distance={5} />
         </group>)}
       </group>
 
@@ -67,7 +69,6 @@ export function BiomeScenery() {
           <mesh position={[-1.25, 1.8, 0]} rotation={[0, 0, -0.15]}><coneGeometry args={[0.55, 3.8, 5]} /><meshStandardMaterial color="#1b2817" flatShading /></mesh>
           <mesh position={[1.25, 1.8, 0]} rotation={[0, 0, 0.15]}><coneGeometry args={[0.55, 3.8, 5]} /><meshStandardMaterial color="#1b2817" flatShading /></mesh>
           <mesh position={[0, 3.5, 0]} rotation={[0, 0, Math.PI / 2]}><torusGeometry args={[1.35, 0.34, 5, 12, Math.PI]} /><meshStandardMaterial color="#314329" roughness={.9} /></mesh>
-          <pointLight position={[0, 2.8, 1]} color="#78ff43" intensity={2.4} distance={5} />
         </group>)}
       </group>
 
@@ -89,10 +90,9 @@ export function BiomeScenery() {
       </group>
 
       <group position={[centers[6], 0, -7.8]} name="inferno-fortress">
-        {[-15, -10, 10, 15].map((x, index) => <group key={x} position={[x, 0, 0]}>
+        {[-15, -10, 10, 15].map((x) => <group key={x} position={[x, 0, 0]}>
           <mesh position={[0, 3, 0]}><cylinderGeometry args={[.72, 1.15, 6, 6]} /><meshStandardMaterial color="#180706" metalness={.52} roughness={.55} /></mesh>
           <mesh position={[0, 5.4, .2]}><octahedronGeometry args={[.7, 0]} /><meshStandardMaterial color="#ff4a12" emissive="#ff2700" emissiveIntensity={4} /></mesh>
-          <pointLight position={[0, 4.3, 1]} color="#ff3b0b" intensity={7 + index} distance={8} />
         </group>)}
         {[-12, -7, -2, 3, 8, 13].map((x) => <mesh key={x} position={[x, .035, -.5]} rotation={[Math.PI / 2, 0, 0]}><planeGeometry args={[.14, 4.8]} /><meshBasicMaterial color="#ff5b13" transparent opacity={.82} toneMapped={false} /></mesh>)}
       </group>

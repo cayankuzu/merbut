@@ -1,4 +1,4 @@
-export const MINI_AKU_OFFSETS = [-4.2, -2.7, -1.35, 1.35, 2.7, 4.2] as const
+export const MINI_AKU_OFFSETS = [-2.25, -1.35, -0.45, 0.45, 1.35, 2.25] as const
 export const MINI_AKU_ATTACK_TIMES = [700, 1_250, 1_800, 2_350, 2_900, 3_450] as const
 export const MINI_AKU_COUNT = MINI_AKU_OFFSETS.length
 
@@ -32,7 +32,5 @@ export function getMiniAkuMotion(index: number, elapsedMs: number, bossX: number
   if (elapsedMs > attackAt + 420) x = lerp(x, bossX + offset * 0.66, retreat)
 
   const direction: -1 | 1 = targetX >= x ? 1 : -1
-  const hop = Math.abs(Math.sin((elapsedMs / 1_000) * 7.2 + safeIndex * 0.9)) * 0.13
-  return { x, y: hop, direction, attacking: elapsedMs >= attackAt - 90 && elapsedMs <= attackAt + 430 }
+  return { x, y: 0, direction, attacking: elapsedMs >= attackAt - 90 && elapsedMs <= attackAt + 430 }
 }
-

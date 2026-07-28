@@ -42,7 +42,7 @@ function PlayerWorldHealth({ definition, visible }: { definition: CharacterDefin
   }, [dead, definition.id, visible])
   if (!visible || dead) return null
   return (
-    <group position={[0, 3.18, 0]}>
+    <group position={[0, 3.5, 0]}>
       <WorldHealthBar label={definition.displayName} health={vitals.health} maxHealth={vitals.maxHealth} accent={definition.accent} player />
     </group>
   )
@@ -79,6 +79,7 @@ export function CharacterController({ definition }: CharacterControllerProps) {
   const prayerActive = useSessionStore((state) => (state.phase === 'final-intro' || state.phase === 'playing') && state.enemies.some((enemy) => enemy.bossType === 'aku' && enemy.animation !== 'dead'))
   const setPlayerPosition = useGameStore((state) => state.setPlayerPosition)
   const setPlayerRotation = useGameStore((state) => state.setPlayerRotation)
+  const setPlayerTransform = useGameStore((state) => state.setPlayerTransform)
   const setPlayerAnimation = useGameStore((state) => state.setPlayerAnimation)
   const setTogetherWarning = useGameStore((state) => state.setTogetherWarning)
   const teleportRequest = useGameStore((state) => state.teleports[definition.id])
@@ -313,8 +314,7 @@ export function CharacterController({ definition }: CharacterControllerProps) {
       setPlayerAnimation(definition.id, nextAnimation)
     }
 
-    setPlayerPosition(definition.id, [value.x, value.y, 0])
-    setPlayerRotation(definition.id, targetRotation)
+    setPlayerTransform(definition.id, [value.x, value.y, 0], targetRotation)
     const positions = useGameStore.getState().positions
     const bothAlive = !useSessionStore.getState().players.ali.dead && !useSessionStore.getState().players.jack.dead
     setTogetherWarning(

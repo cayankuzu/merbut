@@ -108,7 +108,7 @@ test('özel yetenekler etkinleşir ve sahne sınırları korunur', async ({ page
       aliActivated,
       jackActivated,
       aliActive: current.players.ali.abilityActiveUntil === now + 6_000,
-      jackActive: current.players.jack.abilityActiveUntil === now + 6_000,
+      jackActive: current.players.jack.abilityActiveUntil === now + 4_000,
       aliCharge: current.players.ali.abilityCharge,
       jackCharge: current.players.jack.abilityCharge,
       shots: current.players.ali.abilityShots,
@@ -142,11 +142,13 @@ test('1920x1080 ekranda on dört paneli kırpmadan ve doğru sırayla gösterir'
   await waitForAssets(page)
   const canvasBounds = await page.locator('.game-canvas').boundingBox()
   const trackBounds = await page.locator('.scene-backdrop__track').boundingBox()
+  const footerBounds = await page.locator('.merbut-copyright').boundingBox()
   const panels = page.locator('.scene-backdrop__panel')
   await expect(panels).toHaveCount(14)
   await expect(page.locator('.scene-backdrop__transition')).toHaveCount(6)
-  expect(canvasBounds).toMatchObject({ width: 1920, height: 1080 })
-  expect(trackBounds).toMatchObject({ width: 26880, height: 1080 })
+  const gameHeight = 1080 - (footerBounds?.height ?? 0)
+  expect(canvasBounds).toMatchObject({ width: 1920, height: gameHeight })
+  expect(trackBounds).toMatchObject({ width: 26880, height: gameHeight })
   const biomeOrder = await panels.evaluateAll((elements) => elements.map((element) => element.getAttribute('data-biome')))
   expect(biomeOrder).toEqual([
     'aku-city', 'aku-city',

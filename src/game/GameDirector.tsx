@@ -64,7 +64,7 @@ function buildWave(wave: WaveDefinition, midpoint: number): EnemyState[] {
       attackRange: boss?.bossType === 'shadow' ? 3.7 : boss?.bossType === 'aku' ? 4.25 : base.attackRange,
       attackCooldown: boss ? base.attackCooldown * difficulty.bossCooldown * 0.86 : base.attackCooldown,
       score: boss?.score ?? base.score,
-      scale: boss?.bossType === 'shadow' ? 2.35 : boss?.bossType === 'aku' ? 3.05 : boss ? base.scale * 1.55 : base.scale,
+      scale: boss?.bossType === 'shadow' ? 2.55 : boss?.bossType === 'aku' ? 3.35 : boss ? base.scale * 1.55 : base.scale,
       accent: boss?.bossType === 'shadow' ? '#ff244f' : boss?.bossType === 'aku' ? '#74f05b' : base.accent,
       direction: spawn.side === 1 ? -1 : 1,
       animation: 'walk',

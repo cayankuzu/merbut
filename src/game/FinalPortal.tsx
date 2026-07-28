@@ -29,8 +29,6 @@ export function FinalPortal() {
 
   return (
     <group ref={root} visible={false} position={[0, 0.1, 0]} name="aku-hareketli-zaman-portali">
-      <pointLight position={[0, 2.2, 0]} color="#fff7d6" intensity={28} distance={14} />
-      <pointLight position={[0, 0.4, 0]} color="#61deff" intensity={16} distance={10} />
       <group ref={inner} rotation={[Math.PI / 2, 0, 0]}>
         <mesh position={[0, 0, -0.04]}><circleGeometry args={[2.92, 96]} /><meshBasicMaterial color="#010102" transparent opacity={0.96} /></mesh>
         <TimeSpiralDisc radius={2.72} opacity={1} speed={5.8} />

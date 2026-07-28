@@ -240,8 +240,6 @@ export function Ground() {
             <octahedronGeometry args={[1, 0]} />
             <meshStandardMaterial color="#211d27" flatShading roughness={0.7} metalness={0.28} />
           </mesh>
-          <pointLight position={[-1.25, 2.55, 1]} color={gate.fromColor} intensity={3.2} distance={5} />
-          <pointLight position={[1.25, 2.55, 1]} color={gate.toColor} intensity={3.2} distance={5} />
           <mesh position={[-1.25, 2.6, 0.45]}>
             <octahedronGeometry args={[0.18, 0]} />
             <meshStandardMaterial color={gate.fromColor} emissive={gate.fromColor} emissiveIntensity={3} />

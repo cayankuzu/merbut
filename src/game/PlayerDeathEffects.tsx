@@ -46,7 +46,6 @@ export function PlayerDeathEffects() {
 
   return <>{ids.map((id, index) => (
     <group key={id} ref={(group) => { if (group) groups.current[index] = group }} visible={false}>
-      <pointLight color={id === 'ali' ? '#ff6b16' : '#85eaff'} intensity={7} distance={5} />
       <mesh rotation={[Math.PI / 2, 0, 0]}>
         <torusGeometry args={[.7, .055, 8, 40]} />
         <meshBasicMaterial ref={(material) => { if (material) materials.current[index] = material }} color={id === 'ali' ? '#ff7b20' : '#b8f5ff'} transparent opacity={0} depthWrite={false} blending={AdditiveBlending} toneMapped={false} />

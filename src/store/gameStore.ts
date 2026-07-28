@@ -13,6 +13,7 @@ interface GameState {
   teleports: Record<CharacterId, { token: number; x: number }>
   setPlayerPosition: (id: CharacterId, position: Vec3Tuple) => void
   setPlayerRotation: (id: CharacterId, rotation: number) => void
+  setPlayerTransform: (id: CharacterId, position: Vec3Tuple, rotation: number) => void
   setCameraX: (position: number) => void
   setPlayerAnimation: (id: CharacterId, animation: AnimationState) => void
   setTogetherWarning: (visible: boolean) => void
@@ -34,10 +35,25 @@ export const useGameStore = create<GameState>((set) => ({
   resetToken: 0,
   teleports: { ali: { token: 0, x: CHARACTERS.ali.startPosition[0] }, jack: { token: 0, x: CHARACTERS.jack.startPosition[0] } },
   setPlayerPosition: (id, position) =>
-    set((state) => ({ positions: { ...state.positions, [id]: position } })),
+    set((state) => {
+      const previous = state.positions[id]
+      return Math.abs(previous[0] - position[0]) < 0.0001 && Math.abs(previous[1] - position[1]) < 0.0001 && Math.abs(previous[2] - position[2]) < 0.0001
+        ? state
+        : { positions: { ...state.positions, [id]: position } }
+    }),
   setPlayerRotation: (id, rotation) =>
-    set((state) => ({ rotations: { ...state.rotations, [id]: rotation } })),
-  setCameraX: (position) => set({ cameraX: position }),
+    set((state) => Math.abs(state.rotations[id] - rotation) < 0.0001 ? state : { rotations: { ...state.rotations, [id]: rotation } }),
+  setPlayerTransform: (id, position, rotation) => set((state) => {
+    const previous = state.positions[id]
+    const samePosition = Math.abs(previous[0] - position[0]) < 0.0001 && Math.abs(previous[1] - position[1]) < 0.0001 && Math.abs(previous[2] - position[2]) < 0.0001
+    const sameRotation = Math.abs(state.rotations[id] - rotation) < 0.0001
+    if (samePosition && sameRotation) return state
+    return {
+      ...(samePosition ? {} : { positions: { ...state.positions, [id]: position } }),
+      ...(sameRotation ? {} : { rotations: { ...state.rotations, [id]: rotation } }),
+    }
+  }),
+  setCameraX: (position) => set((state) => Math.abs(state.cameraX - position) < 0.0001 ? state : { cameraX: position }),
   setPlayerAnimation: (id, animation) =>
     set((state) => ({ animationStates: { ...state.animationStates, [id]: animation } })),
   setTogetherWarning: (visible) =>

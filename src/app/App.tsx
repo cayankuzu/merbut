@@ -8,6 +8,7 @@ import { useGameStore } from '../store/gameStore'
 import { useSessionStore } from '../store/sessionStore'
 import { AudioDirector } from '../audio/AudioDirector'
 import { useAudioStore } from '../audio/audioStore'
+import { usePerformanceStore } from '../store/performanceStore'
 import './app.css'
 
 const DebugCalibrationPanel = lazy(() =>
@@ -22,6 +23,7 @@ declare global {
       getState: typeof useGameStore.getState
       getSessionState: typeof useSessionStore.getState
       getAudioState: typeof useAudioStore.getState
+      getPerformanceState: typeof usePerformanceStore.getState
     }
   }
 }
@@ -37,6 +39,7 @@ export default function App() {
       getState: useGameStore.getState,
       getSessionState: useSessionStore.getState,
       getAudioState: useAudioStore.getState,
+      getPerformanceState: usePerformanceStore.getState,
     }
     return () => {
       delete window.__MERBUT__

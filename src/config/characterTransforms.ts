@@ -2,7 +2,7 @@ import type { CharacterId, CharacterTransform } from '../types/character'
 
 export const CHARACTER_TRANSFORMS: Record<CharacterId, CharacterTransform> = {
   ali: {
-    modelScale: 1.5,
+    modelScale: 1.65,
     modelPosition: [0, 0, 0],
     modelRotation: [0, Math.PI / 2, 0],
     weapon: {
@@ -15,7 +15,7 @@ export const CHARACTER_TRANSFORMS: Record<CharacterId, CharacterTransform> = {
     },
   },
   jack: {
-    modelScale: 1.5,
+    modelScale: 1.65,
     modelPosition: [0, 0, 0],
     modelRotation: [0, Math.PI / 2, 0],
     weapon: {

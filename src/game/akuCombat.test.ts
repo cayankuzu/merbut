@@ -21,8 +21,8 @@ describe('Aku encounter guards', () => {
     MINI_AKU_ATTACK_TIMES.forEach((attackAt, index) => {
       const motion = getMiniAkuMotion(index, attackAt + 100, 20, 25)
       expect(motion.attacking).toBe(true)
+      expect(motion.y).toBe(0)
       expect(Math.abs(motion.x - 25)).toBeLessThan(1.2)
     })
   })
 })
-

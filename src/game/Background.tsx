@@ -10,6 +10,8 @@ export function Background() {
 
   useEffect(() => {
     let frame = 0
+    let lastTransform = ''
+    let lastPanel = -1
     const [minimumX, maximumX] = GAME_CONFIG.camera.xBounds
 
     const updatePosition = () => {
@@ -18,7 +20,22 @@ export function Background() {
         const cameraX = useGameStore.getState().cameraX
         const progress = Math.min(1, Math.max(0, (cameraX - minimumX) / (maximumX - minimumX)))
         const maximumTrackTravel = ((BACKDROP_PANEL_COUNT - 1) / BACKDROP_PANEL_COUNT) * 100
-        track.style.transform = `translate3d(${-progress * maximumTrackTravel}%, 0, 0)`
+        const transform = `translate3d(${(-progress * maximumTrackTravel).toFixed(4)}%, 0, 0)`
+        if (transform !== lastTransform) {
+          track.style.transform = transform
+          lastTransform = transform
+        }
+        const activePanel = Math.round(progress * (BACKDROP_PANEL_COUNT - 1))
+        if (activePanel !== lastPanel) {
+          track.querySelectorAll<HTMLElement>('.scene-backdrop__panel').forEach((panel, index) => {
+            panel.style.visibility = Math.abs(index - activePanel) <= 1 ? 'visible' : 'hidden'
+          })
+          track.querySelectorAll<HTMLElement>('.scene-backdrop__transition').forEach((transition) => {
+            const boundary = Number(transition.dataset.boundary ?? -10)
+            transition.style.visibility = Math.abs(boundary - activePanel) <= 2 ? 'visible' : 'hidden'
+          })
+          lastPanel = activePanel
+        }
       }
       frame = window.requestAnimationFrame(updatePosition)
     }
@@ -60,7 +77,7 @@ export function Background() {
               alt=""
               decoding="async"
               draggable={false}
-              loading={index < 2 ? 'eager' : 'lazy'}
+              loading="eager"
             />
             <img
               className="scene-backdrop__image"
@@ -69,7 +86,7 @@ export function Background() {
               decoding="async"
               draggable={false}
               fetchPriority={index < 2 ? 'high' : 'low'}
-              loading={index < 2 ? 'eager' : 'lazy'}
+              loading="eager"
             />
           </div>
           )
@@ -80,6 +97,7 @@ export function Background() {
           return (
             <div
               className="scene-backdrop__transition"
+              data-boundary={boundaryPanel}
               key={`${biome.id}-${next.id}`}
               style={{
                 '--boundary': boundaryPanel,

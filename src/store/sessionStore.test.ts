@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DIFFICULTIES } from '../config/difficulty'
 import type { EnemyState } from '../types/session'
 import { useSessionStore } from './sessionStore'
+import { currentPerformanceProfile } from './performanceStore'
 
 const enemy = (): EnemyState => ({
   id: 'test-enemy', biome: 0, kind: 1, title: 'Myrkhan', x: 1, health: 70, maxHealth: 70,
@@ -109,8 +110,20 @@ describe('session store', () => {
     for (let index = 0; index < 60; index += 1) {
       session.addImpact({ kind: 'ember', x: index, y: 1, createdAt: 10_000, duration: 2_000, lethal: false })
     }
-    expect(useSessionStore.getState().impacts).toHaveLength(28)
+    expect(useSessionStore.getState().impacts).toHaveLength(currentPerformanceProfile().impactBudget)
     expect(useSessionStore.getState().impacts.at(-1)?.x).toBe(59)
+  })
+
+  it('keeps Jack shield at four seconds and Ali fireball window at six seconds', () => {
+    const session = useSessionStore.getState()
+    session.startCountdown()
+    session.tick(4, 10_000)
+    session.grantAbilityCharge('jack', 100)
+    session.grantAbilityCharge('ali', 100)
+    expect(useSessionStore.getState().activateShield(11_000)).toBe(true)
+    expect(useSessionStore.getState().players.jack.abilityActiveUntil).toBe(15_000)
+    expect(useSessionStore.getState().launchFireball(11_000, 0, 0, 0)).toBe(true)
+    expect(useSessionStore.getState().players.ali.abilityActiveUntil).toBe(17_000)
   })
 
   it('applies final prayer lifesteal and time-based regeneration to both sides', () => {

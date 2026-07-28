@@ -17,11 +17,12 @@ import type {
   PortalAlertState,
   ProjectileState,
 } from '../types/session'
+import { currentPerformanceProfile } from './performanceStore'
 
-const ABILITY_DURATION = 6_000
+const FIREBALL_WINDOW_DURATION = 6_000
+const SHIELD_DURATION = 4_000
 const ABILITY_MAX_CHARGE = 100
 const WORLD_START = -4.8
-const MAX_ACTIVE_IMPACTS = 28
 type PauseablePhase = 'countdown' | 'boss-intro' | 'final-intro' | 'playing' | 'ending'
 
 const createPlayer = (difficulty: Difficulty): PlayerStatus => {
@@ -164,7 +165,8 @@ function recoverPlayer(player: PlayerStatus, amount: number): PlayerStatus {
 }
 
 function appendImpact(impacts: CombatImpactState[], impact: CombatImpactState) {
-  return [...impacts.slice(-(MAX_ACTIVE_IMPACTS - 1)), impact]
+  const budget = currentPerformanceProfile().impactBudget
+  return [...impacts.slice(-(budget - 1)), impact]
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -433,7 +435,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const state = get()
     const jack = state.players.jack
     if (state.phase !== 'playing' || jack.dead || jack.abilityActiveUntil > now || jack.abilityCharge < ABILITY_MAX_CHARGE) return false
-    set((current) => ({ players: { ...current.players, jack: { ...current.players.jack, abilityActiveUntil: now + ABILITY_DURATION, abilityCharge: 0 } } }))
+    set((current) => ({ players: { ...current.players, jack: { ...current.players.jack, abilityActiveUntil: now + SHIELD_DURATION, abilityCharge: 0 } } }))
     return true
   },
   launchFireball: (now, x, y, rotation) => {
@@ -442,7 +444,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     if (state.phase !== 'playing' || ali.dead) return false
     const openingWindow = ali.abilityActiveUntil <= now
     if (openingWindow && ali.abilityCharge < ABILITY_MAX_CHARGE) return false
-    const activeUntil = openingWindow ? now + ABILITY_DURATION : ali.abilityActiveUntil
+    const activeUntil = openingWindow ? now + FIREBALL_WINDOW_DURATION : ali.abilityActiveUntil
     const shots = openingWindow ? 0 : ali.abilityShots
     if (activeUntil <= now || now - ali.lastAbilityShotAt < 270) return false
     const directionX = Math.cos(rotation)

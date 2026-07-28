@@ -12,6 +12,7 @@ import {
 } from 'three'
 import { getBiomeBlend } from '../config/biomes'
 import { useGameStore } from '../store/gameStore'
+import { PERFORMANCE_PROFILES, usePerformanceStore } from '../store/performanceStore'
 
 const targetFog = new Color()
 const targetSky = new Color()
@@ -31,6 +32,8 @@ export function BiomeLighting() {
   const directionalTarget = useRef<Object3D>(null)
   const accent = useRef<PointLight>(null)
   const fog = useMemo(() => new Fog('#56342f', 18, 35), [])
+  const tier = usePerformanceStore((state) => state.tier)
+  const profile = PERFORMANCE_PROFILES[tier]
 
   useEffect(() => {
     scene.fog = fog
@@ -69,11 +72,11 @@ export function BiomeLighting() {
       <hemisphereLight ref={hemisphere} args={['#ffe0bb', '#3d242e', 1.02]} />
       <directionalLight
         ref={directional}
-        castShadow
+        castShadow={profile.shadows}
         position={[-4, 9, 7]}
         intensity={2.15}
         color="#ffe0bb"
-        shadow-mapSize={[1024, 1024]}
+        shadow-mapSize={[profile.shadowMapSize, profile.shadowMapSize]}
         shadow-camera-left={-13}
         shadow-camera-right={13}
         shadow-camera-top={11}
