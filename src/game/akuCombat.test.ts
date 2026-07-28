@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { EnemyState } from '../types/session'
-import { isActiveAkuFight } from './akuCombat'
+import {
+  AKU_FIRE_SPIKE_DAMAGE_COOLDOWN_MS,
+  AKU_FIRE_SPIKE_DAMAGE_MULTIPLIER,
+  AKU_FIRE_SPIKE_RADIUS,
+  isActiveAkuFight,
+  isInsideAkuFireSpikeField,
+} from './akuCombat'
 import { getMiniAkuMotion, MINI_AKU_ATTACK_TIMES, MINI_AKU_COUNT, MINI_AKU_LANE_Y, MINI_AKU_LANE_Z } from './akuMiniSwarm'
 
 const aku = {
@@ -26,5 +32,14 @@ describe('Aku encounter guards', () => {
       expect(Math.abs(motion.x - 25)).toBeLessThan(1.2)
       expect(Math.abs(motion.x - 20)).toBeLessThan(6)
     })
+  })
+
+  it('covers Aku surroundings with a grounded fire-spike damage field', () => {
+    expect(isInsideAkuFireSpikeField(20, 20 + AKU_FIRE_SPIKE_RADIUS, 0)).toBe(true)
+    expect(isInsideAkuFireSpikeField(20, 20 - AKU_FIRE_SPIKE_RADIUS, 0.9)).toBe(true)
+    expect(isInsideAkuFireSpikeField(20, 20 + AKU_FIRE_SPIKE_RADIUS + 0.01, 0)).toBe(false)
+    expect(isInsideAkuFireSpikeField(20, 20, 0.91)).toBe(false)
+    expect(AKU_FIRE_SPIKE_DAMAGE_COOLDOWN_MS).toBe(650)
+    expect(AKU_FIRE_SPIKE_DAMAGE_MULTIPLIER).toBeGreaterThan(0)
   })
 })

@@ -1,4 +1,10 @@
 import { create } from 'zustand'
+import {
+  ALI_FIREBALL_COOLDOWN_MS,
+  ALI_FIREBALL_MAX_SHOTS,
+  ALI_FIREBALL_WINDOW_MS,
+  JACK_SHIELD_DURATION_MS,
+} from '../config/abilities'
 import { WORLD_VISUAL_RIGHT } from '../config/biomes'
 import { DIFFICULTIES, type Difficulty } from '../config/difficulty'
 import { getClosedBiomeLeftLimit, getClosedBiomeRightLimit } from '../game/biomeProgress'
@@ -19,8 +25,6 @@ import type {
 } from '../types/session'
 import { currentRuntimeImpactBudget } from './performanceStore'
 
-const FIREBALL_WINDOW_DURATION = 4_000
-const SHIELD_DURATION = 4_000
 const ABILITY_MAX_CHARGE = 100
 const WORLD_START = -4.8
 type PauseablePhase = 'countdown' | 'boss-intro' | 'final-intro' | 'playing' | 'ending'
@@ -426,7 +430,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     const state = get()
     const jack = state.players.jack
     if (state.phase !== 'playing' || jack.dead || jack.abilityActiveUntil > now || jack.abilityCharge < ABILITY_MAX_CHARGE) return false
-    set((current) => ({ players: { ...current.players, jack: { ...current.players.jack, abilityActiveUntil: now + SHIELD_DURATION, abilityCharge: 0 } } }))
+    set((current) => ({ players: { ...current.players, jack: { ...current.players.jack, abilityActiveUntil: now + JACK_SHIELD_DURATION_MS, abilityCharge: 0 } } }))
     return true
   },
   launchFireball: (now, x, y, rotation) => {
@@ -435,9 +439,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     if (state.phase !== 'playing' || ali.dead) return false
     const openingWindow = ali.abilityActiveUntil <= now
     if (openingWindow && ali.abilityCharge < ABILITY_MAX_CHARGE) return false
-    const activeUntil = openingWindow ? now + FIREBALL_WINDOW_DURATION : ali.abilityActiveUntil
+    const activeUntil = openingWindow ? now + ALI_FIREBALL_WINDOW_MS : ali.abilityActiveUntil
     const shots = openingWindow ? 0 : ali.abilityShots
-    if (activeUntil <= now || now - ali.lastAbilityShotAt < 270) return false
+    if (activeUntil <= now || shots >= ALI_FIREBALL_MAX_SHOTS || now - ali.lastAbilityShotAt < ALI_FIREBALL_COOLDOWN_MS) return false
     const directionX = Math.cos(rotation)
     const directionZ = -Math.sin(rotation)
     const projectile: ProjectileState = { id: nextId('fireball'), owner: 'ali', x: x + directionX * 1.15, y: y + 1.35, z: directionZ * 1.15, directionX, directionZ, travelled: 0 }

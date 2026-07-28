@@ -43,7 +43,7 @@ test('karakter brifingi ve arşiv metinleri okunabilir, modeller doğru yönden 
   await page.locator('.character-gallery > header button').click()
   await page.getByRole('button', { name: 'OYUNA BAŞLA' }).click()
   await expect(page.locator('.controls-screen')).toBeVisible()
-  await expect(page.getByText(/sınırsız alev topu/i)).toBeVisible()
+  await expect(page.getByText(/4 sn boyunca en fazla 9 alev topu/i)).toBeVisible()
   const difficultyFontSize = await page.locator('.controls-screen .difficulty-select button span').first().evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize))
   expect(difficultyFontSize).toBeGreaterThanOrEqual(10)
   await page.waitForTimeout(700)
@@ -64,13 +64,14 @@ test('savaş HUD yalnızca isim-can barını ve kalan canı gösterir', async ({
   await expect(page.locator('.player-hud__lives')).toHaveCount(2)
   await expect(page.locator('.player-hud footer', { hasText: 'SKOR' })).toHaveCount(0)
 
-  const unlimitedShots = await page.evaluate(() => {
+  const fireballLimit = await page.evaluate(() => {
     const session = window.__MERBUT__!.getSessionState()
     session.grantAbilityCharge('ali', 100)
     const start = performance.now()
-    return Array.from({ length: 14 }, (_, index) => session.launchFireball(start + index * 280, 0, 0, 0)).every(Boolean)
+    const attempts = Array.from({ length: 14 }, (_, index) => session.launchFireball(start + index * 280, 0, 0, 0))
+    return { accepted: attempts.filter(Boolean).length, rejected: attempts.filter((accepted) => !accepted).length }
   })
-  expect(unlimitedShots).toBe(true)
+  expect(fireballLimit).toEqual({ accepted: 9, rejected: 5 })
   await page.keyboard.press('s')
   await page.waitForTimeout(260)
   await page.screenshot({ path: 'e2e-artifacts/gameplay-weapons-live-hud-v7.png' })

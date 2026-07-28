@@ -1,0 +1,4 @@
+export const ALI_FIREBALL_WINDOW_MS = 4_000
+export const ALI_FIREBALL_MAX_SHOTS = 9
+export const ALI_FIREBALL_COOLDOWN_MS = 270
+export const JACK_SHIELD_DURATION_MS = 4_000

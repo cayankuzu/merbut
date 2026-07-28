@@ -11,7 +11,13 @@ import { useGameStore } from '../store/gameStore'
 import { useSessionStore } from '../store/sessionStore'
 import type { CharacterId } from '../types/character'
 import type { EnemyProjectileState, EnemySpecial, EnemyState, ImpactKind, MeteorState, ProjectileState } from '../types/session'
-import { isActiveAkuFight } from './akuCombat'
+import {
+  AKU_FIRE_SPIKE_DAMAGE_COOLDOWN_MS,
+  AKU_FIRE_SPIKE_DAMAGE_MULTIPLIER,
+  isActiveAkuFight,
+  isInsideAkuFireSpikeField,
+} from './akuCombat'
+import { buildAkuPortalAmbush } from './akuPortalAmbush'
 import { getMiniAkuMotion, MINI_AKU_ATTACK_TIMES } from './akuMiniSwarm'
 import { chooseShadowAttack, getShadowStrikeThresholds } from './shadowCombat'
 
@@ -256,9 +262,18 @@ function teleportPlayersThroughAkuPortal(now: number) {
   const destinations = BIOMES.map((_, index) => index).filter((index) => index !== currentWorldBiome)
   const destination = destinations[Math.floor(Math.random() * destinations.length)] ?? 0
   const destinationX = WORLD_VISUAL_LEFT + destination * BIOME_WORLD_WIDTH + BIOME_WORLD_WIDTH * 0.5
+  const ambush = buildAkuPortalAmbush({
+    destinationBiome: destination,
+    destinationX,
+    difficulty: session.difficulty,
+    now,
+    nextId: () => `portal-enemy-${++enemySequence}`,
+  })
+  session.spawnEnemies(ambush)
   game.teleportPlayer('ali', destinationX - 1.05)
   game.teleportPlayer('jack', destinationX + 1.05)
-  session.showPortalAlert('ZAMAN YARILDI', `${BIOMES[destination].title} biyomuna savruldunuz`, now)
+  session.showPortalAlert('ZAMAN PUSUSU', `${BIOMES[destination].title} biyomunda ${ambush.length} düşman sizi bekliyor`, now)
+  session.addFeed(`Zaman portalı ${ambush.length} rastgele düşman çağırdı`, 'system', now)
 }
 
 function chooseAkuSpecial(form: EnemyState['bossForm']): EnemySpecial {
@@ -318,13 +333,14 @@ function runAkuBoss(enemy: EnemyState, now: number, positions: ReturnType<typeof
       specialStartedAt: now,
       specialUntil: now + duration,
       specialHitMask: 0,
+      nextAuraAt: special === 'aku-fire-rain' ? now : enemy.nextAuraAt,
       mimicKind: special === 'aku-shapeshift' ? (Math.floor(Math.random() * 5) + 1) as EnemyKind : null,
       animation: 'attack' as const,
     }
   }
   if (now >= enemy.specialUntil) {
     const [minimum, maximum] = rules.akuSpecialCooldown
-    return { ...enemy, special: 'none' as const, mimicKind: null, specialHitMask: 0, animation: 'walk' as const, nextSpecialAt: now + randomBetween(minimum, maximum) * 1_000 }
+    return { ...enemy, special: 'none' as const, mimicKind: null, specialHitMask: 0, nextAuraAt: 0, animation: 'walk' as const, nextSpecialAt: now + randomBetween(minimum, maximum) * 1_000 }
   }
 
   const elapsed = now - enemy.specialStartedAt
@@ -346,6 +362,24 @@ function runAkuBoss(enemy: EnemyState, now: number, positions: ReturnType<typeof
   } else if (enemy.special === 'aku-ranged') {
     trigger(0, 760, () => addAkuProjectile(enemy, 'aku-fire', targetX))
     if (enemy.bossForm === 'monster') trigger(1, 1_520, () => addAkuProjectile(enemy, 'aku-fire', targetX + randomBetween(-1.6, 1.6)))
+  } else if (enemy.special === 'aku-fire-rain') {
+    let nextAuraAt = enemy.nextAuraAt
+    if (now >= nextAuraAt) {
+      const shieldActive = session.players.jack.abilityActiveUntil > now && !session.players.jack.dead
+      let playerInside = false
+      for (const id of livingPlayers()) {
+        if (!isInsideAkuFireSpikeField(enemy.x, positions[id][0], positions[id][1])) continue
+        playerInside = true
+        if (!isShielded(id, positions, shieldActive)) {
+          session.damagePlayer(id, Math.round(enemy.damage * AKU_FIRE_SPIKE_DAMAGE_MULTIPLIER), now)
+        }
+      }
+      if (playerInside) {
+        nextAuraAt = now + AKU_FIRE_SPIKE_DAMAGE_COOLDOWN_MS
+        session.addImpact({ kind: 'ember', x: enemy.x, y: 0.08, createdAt: now, duration: 520, lethal: false })
+      }
+    }
+    return { ...enemy, animation: 'attack' as const, specialHitMask: mask, nextAuraAt }
   } else if (enemy.special === 'aku-time-portal') {
     trigger(0, 1_020, () => {
       session.showPortalAlert('ZAMAN PORTALI AÇILDI', 'Temastan kaçın — Aku sizi başka bir biyoma savurabilir', now)

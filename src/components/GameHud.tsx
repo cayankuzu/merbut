@@ -1,4 +1,5 @@
 import { memo, useEffect, useReducer } from 'react'
+import { ALI_FIREBALL_MAX_SHOTS } from '../config/abilities'
 import { BIOMES } from '../config/biomes'
 import { DIFFICULTIES } from '../config/difficulty'
 import type { CharacterId } from '../types/character'
@@ -23,13 +24,16 @@ function PlayerHud({ id, player, prayerActive, now }: { id: CharacterId; player:
   const ability = abilityActive ? 100 : Math.max(0, Math.min(100, player.abilityCharge))
   const frozen = player.frozenUntil > now
   const skill = isAli ? 'ALEV PENCERESİ' : 'KORUYUCU KALKAN'
+  const activeSkillStatus = isAli
+    ? ` · ${Math.max(0, ALI_FIREBALL_MAX_SHOTS - player.abilityShots)} ATIŞ`
+    : ' · AKTİF'
   return (
     <article className={`player-hud player-hud--${id}${player.dead ? ' is-dead' : ''}${prayerActive ? ' is-prayer-active' : ''}${frozen ? ' is-time-frozen' : ''}`} aria-label={`${isAli ? 'Hz. Ali' : 'Samuray Jack'} savaş bilgisi`}>
       <HudCharacterPreview id={id} compact />
       <div className="player-hud__data">
         <header><div><small>{player.dead ? 'DÜŞTÜ' : frozen ? 'ZAMAN DONMASI' : 'KAHRAMAN'}</small><h2>{isAli ? 'Hz. Ali' : 'Samuray Jack'}</h2></div><b>{Math.ceil(player.health)}<em>/{player.maxHealth}</em></b></header>
         <div className="player-hud__health" aria-label={`Can yüzde ${Math.round(health)}`}><i style={{ width: `${health}%` }} /></div>
-        <div className="player-hud__ability" aria-label={`${skill} yüzde ${Math.round(ability)}`}><i style={{ width: `${ability}%` }} /><span>{skill}{abilityActive ? ' · AKTİF' : ''}</span></div>
+        <div className="player-hud__ability" aria-label={`${skill} yüzde ${Math.round(ability)}`}><i style={{ width: `${ability}%` }} /><span>{skill}{abilityActive ? activeSkillStatus : ''}</span></div>
         <footer><span className="player-hud__lives" aria-label={`${player.lives} can`}>♥ <b>{player.lives}</b> CAN</span><strong>ÖLDÜRME {player.kills}</strong></footer>
       </div>
     </article>

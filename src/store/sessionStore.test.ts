@@ -26,17 +26,18 @@ describe('session store', () => {
     useSessionStore.getState().setDifficulty('normal')
   })
 
-  it('charges abilities through combat and allows unlimited Ali shots during the active window', () => {
+  it('limits Ali to nine fireballs in each four-second ability window', () => {
     const session = useSessionStore.getState()
     session.startCountdown()
     session.tick(4, 10_000)
     expect(useSessionStore.getState().launchFireball(10_000, 0, 0, 0)).toBe(false)
     session.grantAbilityCharge('ali', 100)
-    for (let shot = 0; shot < 14; shot += 1) {
+    for (let shot = 0; shot < 9; shot += 1) {
       expect(useSessionStore.getState().launchFireball(10_000 + shot * 280, 0, 0, 0)).toBe(true)
     }
-    expect(useSessionStore.getState().launchFireball(13_920, 0, 0, 0)).toBe(true)
-    expect(useSessionStore.getState().players.ali.abilityShots).toBe(15)
+    expect(useSessionStore.getState().launchFireball(12_520, 0, 0, 0)).toBe(false)
+    expect(useSessionStore.getState().launchFireball(13_920, 0, 0, 0)).toBe(false)
+    expect(useSessionStore.getState().players.ali.abilityShots).toBe(9)
     expect(useSessionStore.getState().players.ali.abilityActiveUntil).toBe(14_000)
     expect(useSessionStore.getState().players.ali.abilityCharge).toBe(0)
     expect(useSessionStore.getState().launchFireball(14_001, 0, 0, 0)).toBe(false)
