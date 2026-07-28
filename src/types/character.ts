@@ -5,6 +5,8 @@ export type CharacterId = 'ali' | 'jack'
 export type Vec3Tuple = [number, number, number]
 
 export interface WeaponTransform {
+  /** False keeps the authored local rotation instead of counter-aligning the blade. */
+  alignBlade?: boolean
   bladeDirection: Vec3Tuple
   gripPoint: Vec3Tuple
   palmLerp?: number

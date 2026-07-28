@@ -116,6 +116,15 @@ export function alignWeaponAttachment(
   attachment.palmLerp = transform.palmLerp ?? 0.48
   applyWeaponTransform(attachment.weapon, transform)
 
+  // Hz. Ali'nin kılıcı gibi, sanat yönetimi tarafından verilen eksen dönüşü
+  // doğrudan kullanılacak silahlar otomatik yön telafisine girmemelidir.
+  if (transform.alignBlade === false) {
+    attachment.stableRotation.copy(attachment.rawStableRotation)
+    attachment.rotationOffset.identity()
+    attachment.socket.quaternion.copy(attachment.stableRotation)
+    return
+  }
+
   currentBladeDirection
     .set(...transform.bladeDirection)
     .normalize()

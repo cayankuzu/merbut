@@ -24,7 +24,7 @@ body,
 
 #root {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) 40px;
+  grid-template-rows: minmax(0, 1fr) 42px;
 }
 
 body {
@@ -63,12 +63,12 @@ button {
   gap: 9px;
   width: 100%;
   min-width: 0;
-  height: 40px;
+  height: 42px;
   margin: 0;
   padding: 0 14px;
   overflow: hidden;
   color: rgba(255, 239, 216, 0.72);
-  font: 750 9px/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+  font: 750 10px/1 ui-monospace, SFMono-Regular, Consolas, monospace;
   letter-spacing: 0.12em;
   text-align: center;
   white-space: nowrap;
@@ -95,6 +95,10 @@ button {
 .merbut-copyright strong {
   color: rgba(255, 224, 168, 0.88);
   font-weight: 900;
+}
+
+.merbut-copyright__version {
+  color: rgba(255, 255, 255, 0.86);
 }
 
 .scene-backdrop {

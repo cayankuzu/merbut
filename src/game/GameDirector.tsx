@@ -64,7 +64,7 @@ function buildWave(wave: WaveDefinition, midpoint: number): EnemyState[] {
       attackRange: boss?.bossType === 'shadow' ? 3.7 : boss?.bossType === 'aku' ? 4.25 : base.attackRange,
       attackCooldown: boss ? base.attackCooldown * difficulty.bossCooldown * 0.86 : base.attackCooldown,
       score: boss?.score ?? base.score,
-      scale: boss?.bossType === 'shadow' ? 2.55 : boss?.bossType === 'aku' ? 3.35 : boss ? base.scale * 1.55 : base.scale,
+      scale: boss?.bossType === 'shadow' ? 2.94 : boss?.bossType === 'aku' ? 3.83 : boss ? base.scale * 1.55 : base.scale,
       accent: boss?.bossType === 'shadow' ? '#ff244f' : boss?.bossType === 'aku' ? '#74f05b' : base.accent,
       direction: spawn.side === 1 ? -1 : 1,
       animation: 'walk',
@@ -266,7 +266,7 @@ function hitMiniAku(enemy: EnemyState, index: number, positions: ReturnType<type
   const preferred: CharacterId = index % 2 === 0 ? 'ali' : 'jack'
   const targetId = session.players[preferred].dead ? nearestLivingPlayer(enemy.x) : preferred
   if (!targetId) return
-  const motion = getMiniAkuMotion(index, MINI_AKU_ATTACK_TIMES[index]!, enemy.x, positions[targetId][0])
+  const motion = getMiniAkuMotion(index, now - enemy.specialStartedAt, enemy.x, positions[targetId][0])
   const shieldActive = session.players.jack.abilityActiveUntil > now && !session.players.jack.dead
   for (const id of livingPlayers()) {
     if (Math.abs(positions[id][0] - motion.x) <= 1.65 && positions[id][1] <= 1.05 && !isShielded(id, positions, shieldActive)) {

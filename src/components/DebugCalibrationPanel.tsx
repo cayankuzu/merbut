@@ -35,13 +35,14 @@ function useCharacterControls(name: string, defaults: CharacterTransform) {
   })
 }
 
-function toTransform(values: ReturnType<typeof useCharacterControls>): CharacterTransform {
+function toTransform(values: ReturnType<typeof useCharacterControls>, defaults: CharacterTransform): CharacterTransform {
   const scale: Vec3Tuple = [values.weaponScale, values.weaponScale, values.weaponScale]
   return {
     modelScale: values.modelScale,
     modelPosition: [values.modelX, values.modelY, values.modelZ],
     modelRotation: [radians(values.modelRotX), radians(values.modelRotY), radians(values.modelRotZ)],
     weapon: {
+      alignBlade: defaults.weapon.alignBlade,
       palmLerp: values.palmLerp,
       bladeDirection: [values.bladeDirectionX, values.bladeDirectionY, values.bladeDirectionZ],
       gripPoint: [values.gripX, values.gripY, values.gripZ],
@@ -68,8 +69,8 @@ export function DebugCalibrationPanel() {
   const jackSnapshot = JSON.stringify(jack)
   const sceneSnapshot = JSON.stringify(scene)
 
-  useEffect(() => setTransform('ali', toTransform(ali)), [ali, aliSnapshot, setTransform])
-  useEffect(() => setTransform('jack', toTransform(jack)), [jack, jackSnapshot, setTransform])
+  useEffect(() => setTransform('ali', toTransform(ali, CHARACTER_TRANSFORMS.ali)), [ali, aliSnapshot, setTransform])
+  useEffect(() => setTransform('jack', toTransform(jack, CHARACTER_TRANSFORMS.jack)), [jack, jackSnapshot, setTransform])
   useEffect(() => setSceneValues(scene), [scene, sceneSnapshot, setSceneValues])
 
   return <Leva hidden={!debugEnabled} collapsed oneLineLabels titleBar={{ title: 'Merbut · Kalibrasyon' }} />

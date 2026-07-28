@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { AdditiveBlending, Group, MathUtils, Mesh, MeshBasicMaterial } from 'three'
+import { AdditiveBlending, DoubleSide, Group, MathUtils, Mesh, MeshBasicMaterial } from 'three'
 import { AliFlameTrailVisual } from '../game/AliFlameTrailVisual'
 import { FireballVisual } from '../game/FireballVisual'
 import { ALI_FLAME_ARCS, JACK_SLASHES } from '../game/heroCombatGeometry'
@@ -145,15 +145,15 @@ export function MenuAttackEffect({ accent, direction, kind, originY, presentatio
     <>
       <mesh rotation={[0, 0, direction * 0.48]}>
         <planeGeometry args={[1.55, 0.085]} />
-        <meshBasicMaterial color="#fff4d2" transparent opacity={0} blending={AdditiveBlending} depthWrite={false} />
+        <meshBasicMaterial color="#fff4d2" transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} />
       </mesh>
       <mesh rotation={[0, 0, direction * -0.38]}>
         <planeGeometry args={[1.1, 0.055]} />
-        <meshBasicMaterial color={accent} transparent opacity={0} blending={AdditiveBlending} depthWrite={false} />
+        <meshBasicMaterial color={accent} transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} />
       </mesh>
       <mesh scale={[1.2, 0.72, 1]}>
         <ringGeometry args={[0.72, 0.82, 40, 1, 0.2, Math.PI * 1.22]} />
-        <meshBasicMaterial color={accent} transparent opacity={0} blending={AdditiveBlending} depthWrite={false} side={2} />
+        <meshBasicMaterial color={accent} transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} />
       </mesh>
     </>
   )
@@ -162,16 +162,16 @@ export function MenuAttackEffect({ accent, direction, kind, originY, presentatio
     <>
       <mesh>
         <sphereGeometry args={[0.18, 16, 12]} />
-        <meshBasicMaterial color="#fff8de" transparent opacity={0} blending={AdditiveBlending} depthWrite={false} />
+        <meshBasicMaterial color="#fff8de" transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} />
       </mesh>
       <mesh scale={[1.5, 1.5, 1]}>
         <ringGeometry args={[0.2, 0.27, 28]} />
-        <meshBasicMaterial color={accent} transparent opacity={0} blending={AdditiveBlending} depthWrite={false} side={2} />
+        <meshBasicMaterial color={accent} transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} />
       </mesh>
       {[-0.48, -0.3, -0.14].map((offset, index) => (
         <mesh key={offset} position={[direction * offset, (index - 1) * 0.09, -0.02]} scale={1 - index * 0.2}>
           <sphereGeometry args={[0.1, 10, 8]} />
-          <meshBasicMaterial color={accent} transparent opacity={0} blending={AdditiveBlending} depthWrite={false} />
+          <meshBasicMaterial color={accent} transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} />
         </mesh>
       ))}
     </>
@@ -181,15 +181,15 @@ export function MenuAttackEffect({ accent, direction, kind, originY, presentatio
     <>
       <mesh>
         <ringGeometry args={[0.58, 0.68, 48]} />
-        <meshBasicMaterial color={accent} transparent opacity={0} blending={AdditiveBlending} depthWrite={false} side={2} />
+        <meshBasicMaterial color={accent} transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} />
       </mesh>
       <mesh rotation={[0, 0, Math.PI / 4]}>
         <planeGeometry args={[1.25, 0.05]} />
-        <meshBasicMaterial color="#fff1c4" transparent opacity={0} blending={AdditiveBlending} depthWrite={false} />
+        <meshBasicMaterial color="#fff1c4" transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} />
       </mesh>
       <mesh rotation={[0, 0, -Math.PI / 4]}>
         <planeGeometry args={[1.25, 0.05]} />
-        <meshBasicMaterial color={accent} transparent opacity={0} blending={AdditiveBlending} depthWrite={false} />
+        <meshBasicMaterial color={accent} transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} />
       </mesh>
     </>
   )
@@ -199,12 +199,12 @@ export function MenuAttackEffect({ accent, direction, kind, originY, presentatio
       {[0, 1, 2, 3, 4].map((index) => (
         <mesh key={index} position={[direction * (index * 0.16), Math.sin(index * 2.1) * 0.16, index * -0.035]} scale={1 - index * 0.1}>
           <octahedronGeometry args={[0.22, 0]} />
-          <meshBasicMaterial color={index % 2 === 0 ? '#fff1a8' : accent} transparent opacity={0} blending={AdditiveBlending} depthWrite={false} />
+          <meshBasicMaterial color={index % 2 === 0 ? '#fff1a8' : accent} transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} />
         </mesh>
       ))}
       <mesh scale={[1.7, 0.75, 1]}>
         <ringGeometry args={[0.35, 0.46, 32]} />
-        <meshBasicMaterial color={accent} transparent opacity={0} blending={AdditiveBlending} depthWrite={false} side={2} />
+        <meshBasicMaterial color={accent} transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} />
       </mesh>
     </>
   )

@@ -6,10 +6,10 @@ import { useSessionStore } from '../store/sessionStore'
 import { PERFORMANCE_PROFILES, type PerformanceTier, usePerformanceStore } from '../store/performanceStore'
 
 const LOWER_TIER: Record<PerformanceTier, PerformanceTier> = {
-  high: 'balanced', balanced: 'performance', performance: 'performance',
+  high: 'balanced', balanced: 'performance', performance: 'minimal', minimal: 'minimal',
 }
 const HIGHER_TIER: Record<PerformanceTier, PerformanceTier> = {
-  high: 'high', balanced: 'high', performance: 'balanced',
+  high: 'high', balanced: 'high', performance: 'balanced', minimal: 'performance',
 }
 
 function ShadowRenderBudget() {
@@ -55,7 +55,7 @@ function RuntimePerformanceGovernor({ active }: { active: boolean }) {
     if (!supported.includes('long-animation-frame')) return
     const observer = new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
-        if (entry.duration >= 120) usePerformanceStore.getState().noteLongFrame()
+        if (entry.duration >= 50) usePerformanceStore.getState().noteLongFrame()
       }
     })
     observer.observe({ type: 'long-animation-frame', buffered: true })
@@ -71,27 +71,28 @@ function RuntimePerformanceGovernor({ active }: { active: boolean }) {
     }
     const delta = Math.min(rawDelta, 0.25)
     activeElapsed.current += delta
-    if (activeElapsed.current < 7) return
+    if (activeElapsed.current < 2.5) return
     samples.current.push(delta * 1_000)
     elapsed.current += delta
-    if (elapsed.current < 2.4 || samples.current.length < 20) return
+    if (elapsed.current < 1.5 || samples.current.length < 18) return
 
     const ordered = [...samples.current].sort((a, b) => a - b)
     const average = samples.current.reduce((sum, value) => sum + value, 0) / samples.current.length
-    const fps = Math.min(120, 1_000 / Math.max(1, average))
+    const fps = Math.min(240, 1_000 / Math.max(1, average))
     const p95 = ordered[Math.min(ordered.length - 1, Math.floor(ordered.length * 0.95))] ?? average
     const store = usePerformanceStore.getState()
     store.reportWindow(fps, p95)
 
-    const underBudget = fps < 43 || p95 > 52
+    const critical = fps < 28 || p95 > 90
+    const underBudget = fps < 46 || p95 > 48
     const comfortablyFast = fps > 57 && p95 < 24
     slowWindows.current = underBudget ? slowWindows.current + 1 : 0
     fastWindows.current = comfortablyFast ? fastWindows.current + 1 : 0
-    if (slowWindows.current >= 2) {
+    if (critical || slowWindows.current >= 2) {
       store.setTier(LOWER_TIER[store.tier])
       slowWindows.current = 0
       fastWindows.current = 0
-    } else if (fastWindows.current >= 4) {
+    } else if (fastWindows.current >= 3) {
       store.setTier(HIGHER_TIER[store.tier])
       slowWindows.current = 0
       fastWindows.current = 0
@@ -114,7 +115,7 @@ export function GameScene() {
       shadows={profile.shadows}
       dpr={profile.dpr}
       frameloop={active ? 'always' : 'demand'}
-      gl={{ antialias: tier !== 'performance', alpha: true, powerPreference: 'high-performance' }}
+      gl={{ antialias: profile.antialias, alpha: true, powerPreference: 'high-performance' }}
       onCreated={({ gl }) => {
         gl.shadowMap.type = PCFShadowMap
         gl.toneMapping = ACESFilmicToneMapping

@@ -9,15 +9,13 @@ export function Background() {
   const trackRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    let frame = 0
     let lastTransform = ''
     let lastPanel = -1
     const [minimumX, maximumX] = GAME_CONFIG.camera.xBounds
 
-    const updatePosition = () => {
+    const updatePosition = (cameraX: number) => {
       const track = trackRef.current
       if (track) {
-        const cameraX = useGameStore.getState().cameraX
         const progress = Math.min(1, Math.max(0, (cameraX - minimumX) / (maximumX - minimumX)))
         const maximumTrackTravel = ((BACKDROP_PANEL_COUNT - 1) / BACKDROP_PANEL_COUNT) * 100
         const transform = `translate3d(${(-progress * maximumTrackTravel).toFixed(4)}%, 0, 0)`
@@ -37,11 +35,12 @@ export function Background() {
           lastPanel = activePanel
         }
       }
-      frame = window.requestAnimationFrame(updatePosition)
     }
 
-    frame = window.requestAnimationFrame(updatePosition)
-    return () => window.cancelAnimationFrame(frame)
+    updatePosition(useGameStore.getState().cameraX)
+    return useGameStore.subscribe((state, previous) => {
+      if (state.cameraX !== previous.cameraX) updatePosition(state.cameraX)
+    })
   }, [])
 
   return (

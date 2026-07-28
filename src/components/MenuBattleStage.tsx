@@ -51,31 +51,31 @@ interface EnemyShowcaseDefinition {
   rowCount: number
 }
 
-const repeatMotion = (motion: string, walk: string): MotionSet => [motion, motion, walk, motion, motion]
+const repeatMotion = (motion: string): MotionSet => [motion, motion, motion, motion, motion]
 
 const ENEMY_SHOWCASE: readonly EnemyShowcaseDefinition[] = [
-  { id: 'myrkhan', name: 'Myrkhan', row: 0, column: 0, rowCount: 3, base: ENEMIES[1].walk, motions: repeatMotion(ENEMIES[1].attack, ENEMIES[1].walk), modelScale: ENEMIES[1].scale, displayScale: 1, accent: ENEMIES[1].accent, effects: ['impact-ember', 'slash', 'none', 'shockwave', 'flame'] },
-  { id: 'zorvex', name: 'Zorvex', row: 0, column: 1, rowCount: 3, base: ENEMIES[2].walk, motions: repeatMotion(ENEMIES[2].attack, ENEMIES[2].walk), modelScale: ENEMIES[2].scale, displayScale: 1, accent: ENEMIES[2].accent, effects: ['impact-void', 'slash', 'none', 'projectile', 'shockwave'] },
-  { id: 'kharzul', name: 'Kharzul', row: 0, column: 2, rowCount: 3, base: ENEMIES[3].walk, motions: repeatMotion(ENEMIES[3].attack, ENEMIES[3].walk), modelScale: ENEMIES[3].scale, displayScale: 1, accent: ENEMIES[3].accent, effects: ['impact-quake', 'shockwave', 'none', 'impact-boss', 'slash'] },
-  { id: 'vhalgor', name: 'Vhalgor', row: 2, column: 0, rowCount: 2, base: ENEMIES[4].walk, motions: repeatMotion(ENEMIES[4].attack, ENEMIES[4].walk), modelScale: ENEMIES[4].scale, displayScale: 1, accent: ENEMIES[4].accent, effects: ['projectile-stone', 'impact-quake', 'none', 'projectile-stone', 'shockwave'] },
-  { id: 'nexrath', name: 'Nexrath', row: 2, column: 1, rowCount: 2, base: ENEMIES[5].walk, motions: repeatMotion(ENEMIES[5].attack, ENEMIES[5].walk), modelScale: ENEMIES[5].scale, displayScale: 1, accent: ENEMIES[5].accent, effects: ['projectile-dark-orb', 'impact-void', 'none', 'projectile-dark-orb', 'flame'] },
+  { id: 'myrkhan', name: 'Myrkhan', row: 0, column: 0, rowCount: 3, base: ENEMIES[1].walk, motions: repeatMotion(ENEMIES[1].attack), modelScale: ENEMIES[1].scale, displayScale: 1, accent: ENEMIES[1].accent, effects: ['impact-ember', 'slash', 'impact-quake', 'shockwave', 'flame'] },
+  { id: 'zorvex', name: 'Zorvex', row: 0, column: 1, rowCount: 3, base: ENEMIES[2].walk, motions: repeatMotion(ENEMIES[2].attack), modelScale: ENEMIES[2].scale, displayScale: 1, accent: ENEMIES[2].accent, effects: ['impact-void', 'slash', 'projectile', 'impact-void', 'shockwave'] },
+  { id: 'kharzul', name: 'Kharzul', row: 0, column: 2, rowCount: 3, base: ENEMIES[3].walk, motions: repeatMotion(ENEMIES[3].attack), modelScale: ENEMIES[3].scale, displayScale: 1, accent: ENEMIES[3].accent, effects: ['impact-quake', 'shockwave', 'slash', 'impact-boss', 'slash'] },
+  { id: 'vhalgor', name: 'Vhalgor', row: 2, column: 0, rowCount: 2, base: ENEMIES[4].walk, motions: repeatMotion(ENEMIES[4].attack), modelScale: ENEMIES[4].scale, displayScale: 1, accent: ENEMIES[4].accent, effects: ['projectile-stone', 'impact-quake', 'projectile-stone', 'shockwave', 'projectile-stone'] },
+  { id: 'nexrath', name: 'Nexrath', row: 2, column: 1, rowCount: 2, base: ENEMIES[5].walk, motions: repeatMotion(ENEMIES[5].attack), modelScale: ENEMIES[5].scale, displayScale: 1, accent: ENEMIES[5].accent, effects: ['projectile-dark-orb', 'impact-void', 'projectile-dark-orb', 'flame', 'projectile-dark-orb'] },
   {
     id: 'aku-shadow', name: 'Aku’nun Gölgesi', row: 1, column: 0, rowCount: 3,
     base: ASSET_PATHS.bosses.evilJack.walk,
-    motions: [ASSET_PATHS.bosses.evilJack.slash, ASSET_PATHS.bosses.evilJack.doubleCombo, ASSET_PATHS.bosses.evilJack.run, ASSET_PATHS.bosses.evilJack.tripleCombo, ASSET_PATHS.bosses.evilJack.cast],
-    modelScale: 2.55, displayScale: 1, accent: '#ff315f', effects: ['slash', 'impact-boss', 'none', 'shockwave', 'projectile-dark-orb'],
+    motions: [ASSET_PATHS.bosses.evilJack.slash, ASSET_PATHS.bosses.evilJack.doubleCombo, ASSET_PATHS.bosses.evilJack.tripleCombo, ASSET_PATHS.bosses.evilJack.cast, ASSET_PATHS.bosses.evilJack.slash],
+    modelScale: 2.94, displayScale: 1, accent: '#ff315f', effects: ['slash', 'impact-boss', 'shockwave', 'projectile-dark-orb', 'slash'],
   },
   {
     id: 'aku', name: 'Aku', row: 1, column: 1, rowCount: 3,
     base: ASSET_PATHS.bosses.aku.normal.walk,
-    motions: [ASSET_PATHS.bosses.aku.normal.attack, ASSET_PATHS.bosses.aku.normal.heavy, ASSET_PATHS.bosses.aku.normal.run, ASSET_PATHS.bosses.aku.normal.triple, ASSET_PATHS.bosses.aku.normal.ranged],
-    modelScale: 3.35, displayScale: 1, accent: '#75ff70', effects: ['impact-boss', 'shockwave', 'none', 'flame', 'projectile-aku-fire'],
+    motions: [ASSET_PATHS.bosses.aku.normal.attack, ASSET_PATHS.bosses.aku.normal.heavy, ASSET_PATHS.bosses.aku.normal.kick, ASSET_PATHS.bosses.aku.normal.triple, ASSET_PATHS.bosses.aku.normal.ranged],
+    modelScale: 3.83, displayScale: 1, accent: '#75ff70', effects: ['impact-boss', 'shockwave', 'slash', 'flame', 'projectile-aku-fire'],
   },
   {
     id: 'aku-monster', name: 'Aku · Canavar', row: 1, column: 2, rowCount: 3,
     base: ASSET_PATHS.bosses.aku.monster.idle,
-    motions: [ASSET_PATHS.bosses.aku.monster.slash, ASSET_PATHS.bosses.aku.monster.double, ASSET_PATHS.bosses.aku.monster.run, ASSET_PATHS.bosses.aku.monster.spin, ASSET_PATHS.bosses.aku.monster.ranged],
-    modelScale: 3.35, displayScale: 1, accent: '#ff244f', effects: ['slash', 'impact-boss', 'none', 'shockwave', 'projectile-aku-fire'],
+    motions: [ASSET_PATHS.bosses.aku.monster.slash, ASSET_PATHS.bosses.aku.monster.double, ASSET_PATHS.bosses.aku.monster.triple, ASSET_PATHS.bosses.aku.monster.spin, ASSET_PATHS.bosses.aku.monster.ranged],
+    modelScale: 3.83, displayScale: 1, accent: '#ff244f', effects: ['slash', 'impact-boss', 'shockwave', 'shockwave', 'projectile-aku-fire'],
   },
 ] as const
 
@@ -204,22 +204,61 @@ function ActionModel({ attacking, base, motions, scale, variant }: { attacking: 
     ]
   }, [baseFile.animations, motionFile0.animations, motionFile1.animations, motionFile2.animations, motionFile3.animations, motionFile4.animations, scene])
   const { actions } = useAnimations(clips, scene)
+  const activeAction = useRef<string | null>(null)
+  const actionsPrimed = useRef(false)
+
+  // Keep showcase actions registered with their mixer for the lifetime of the
+  // card. Replaying a faded-out action during the six-second carousel used to
+  // allocate work at the exact time a new model was mounted.
+  useEffect(() => {
+    Object.values(actions).forEach((action) => {
+      if (!action) return
+      action.enabled = true
+      action.paused = false
+      action.clampWhenFinished = false
+      action.setLoop(LoopRepeat, Infinity)
+      action.reset().play()
+      action.setEffectiveWeight(0)
+    })
+    actions.stance?.setEffectiveWeight(1)
+    if (actions.stance) {
+      actions.stance.time = 0
+      actions.stance.paused = true
+    }
+    activeAction.current = 'stance'
+    actionsPrimed.current = true
+    return () => {
+      actionsPrimed.current = false
+      activeAction.current = null
+      Object.values(actions).forEach((action) => action?.stop())
+    }
+  }, [actions])
 
   useEffect(() => {
+    if (!actionsPrimed.current) return
     const actionName = attacking ? `attack-${variant}` : 'stance'
     const selected = actions[actionName]
     if (!selected) return
 
     const clipDuration = clips.find((clip) => clip.name === actionName)?.duration ?? 1
+    const changed = activeAction.current !== actionName
     selected.enabled = true
     selected.paused = false
     selected.clampWhenFinished = attacking
     selected.setLoop(attacking ? LoopOnce : LoopRepeat, attacking ? 1 : Infinity)
     selected.timeScale = attacking ? Math.max(0.8, clipDuration / 0.86) : 0.32
-    selected.reset().fadeIn(0.12).play()
+    if (changed) selected.reset()
+    if (!attacking) {
+      selected.time = 0
+      selected.paused = true
+    }
     Object.entries(actions).forEach(([name, candidate]) => {
-      if (name !== actionName) candidate?.fadeOut(0.12)
+      if (!candidate) return
+      candidate.enabled = true
+      candidate.setEffectiveWeight(name === actionName ? 1 : 0)
+      if (name !== actionName) candidate.paused = true
     })
+    activeAction.current = actionName
   }, [actions, attacking, clips, variant])
 
   return <primitive object={scene} scale={scale} />
@@ -228,13 +267,9 @@ function ActionModel({ attacking, base, motions, scale, variant }: { attacking: 
 function Hero({ attacking, id, variant }: { attacking: boolean; id: 'ali' | 'jack'; variant: number }) {
   const animation: AnimationState = !attacking
     ? 'idle'
-    : variant === 2
-      ? 'jump'
-      : variant === 3
-        ? 'walk'
-        : id === 'ali' && variant === 1
+    : id === 'ali' && (variant === 1 || variant === 3)
       ? 'fireball'
-      : id === 'jack' && variant === 1
+      : id === 'jack' && (variant === 1 || variant === 3)
         ? 'shield'
         : 'attack'
   return <AnimatedCharacter definition={CHARACTERS[id]} animationState={animation} />
@@ -321,8 +356,8 @@ function Fighter({ accent, children, displayScale, effects, forced, id, index, o
 function StageCast({ action, activeEnemyIndex, activeHeroIndex }: { action: MenuStageAction; activeEnemyIndex: number; activeHeroIndex: number }) {
   const heroId = HERO_SHOWCASE[activeHeroIndex] ?? 'ali'
   const hero = heroId === 'ali'
-    ? { id: 'hz-ali', originY: 1.15, accent: '#f7c65f', effects: ['ali-slash', 'ali-fireball', 'impact-ember', 'none', 'ali-slash'] as const }
-    : { id: 'samuray-jack', originY: 1.15, accent: '#ff4c87', effects: ['jack-slash', 'jack-shield', 'impact-quake', 'none', 'jack-slash'] as const }
+    ? { id: 'hz-ali', originY: 1.15, accent: '#f7c65f', effects: ['ali-slash', 'ali-fireball', 'impact-ember', 'ali-fireball', 'ali-slash'] as const }
+    : { id: 'samuray-jack', originY: 1.15, accent: '#ff4c87', effects: ['jack-slash', 'jack-shield', 'impact-quake', 'jack-shield', 'jack-slash'] as const }
   const enemy = ENEMY_SHOWCASE[activeEnemyIndex] ?? ENEMY_SHOWCASE[0]
   return (
     <>
@@ -350,13 +385,13 @@ function StageCast({ action, activeEnemyIndex, activeHeroIndex }: { action: Menu
   )
 }
 
-function BudgetedMenuFrames({ enabled }: { enabled: boolean }) {
+function BudgetedMenuFrames({ enabled, fps }: { enabled: boolean; fps: number }) {
   const invalidate = useThree((state) => state.invalidate)
   useEffect(() => {
     if (!enabled) return
-    const timer = window.setInterval(invalidate, 1_000 / 30)
+    const timer = window.setInterval(invalidate, 1_000 / fps)
     return () => window.clearInterval(timer)
-  }, [enabled, invalidate])
+  }, [enabled, fps, invalidate])
   return null
 }
 
@@ -370,7 +405,7 @@ export function MenuBattleStage({ action = 'idle', variant = 'menu' }: { action?
   const activeEnemyName = (ENEMY_SHOWCASE[activeEnemyIndex] ?? ENEMY_SHOWCASE[0]).name
   const tier = usePerformanceStore((state) => state.tier)
   const profile = PERFORMANCE_PROFILES[tier]
-  const budgetWebkitFrames = isSafariWebkitEngine()
+  const budgetMenuFrames = isSafariWebkitEngine() || tier === 'minimal' || tier === 'performance'
 
   useEffect(() => {
     if (splash || total === 0 || loading || loaded < total) return
@@ -391,11 +426,11 @@ export function MenuBattleStage({ action = 'idle', variant = 'menu' }: { action?
 
   return (
     <div className={`menu-battle-stage menu-battle-stage--${variant} is-${action}`} aria-label="Hz. Ali, Samuray Jack ve Aku lejyonu dikey sütunlarda savaş pozunda">
-      <Canvas orthographic frameloop={budgetWebkitFrames ? 'demand' : 'always'} dpr={profile.dpr} camera={{ position: [0, CAMERA_CENTER_Y, 14], rotation: [0, 0, 0], zoom: splash ? 75 : 94 }} gl={{ alpha: true, antialias: tier !== 'performance', powerPreference: 'high-performance' }}>
-        <BudgetedMenuFrames enabled={budgetWebkitFrames} />
+      <Canvas orthographic frameloop={budgetMenuFrames ? 'demand' : 'always'} dpr={profile.dpr} camera={{ position: [0, CAMERA_CENTER_Y, 14], rotation: [0, 0, 0], zoom: splash ? 75 : 94 }} gl={{ alpha: true, antialias: profile.antialias, powerPreference: 'high-performance' }}>
+        <BudgetedMenuFrames enabled={budgetMenuFrames} fps={profile.menuFps} />
         <ambientLight intensity={splash ? 2.28 : 1.72} />
         <directionalLight position={[-4, 8, 8]} intensity={splash ? 5.4 : 4.2} color="#ffe0b0" />
-        {tier !== 'performance' ? <>
+        {profile.dynamicLights ? <>
           <pointLight position={[-5, 1, 4]} intensity={splash ? 10 : 7.5} color="#ffb541" distance={13} />
           <pointLight position={[6, 1.8, 4]} intensity={splash ? 18 : 13} color="#ff3e62" distance={16} />
           <pointLight position={[4.6, -1, 3]} intensity={splash ? 12 : 8.5} color="#ffd0a0" distance={11} />

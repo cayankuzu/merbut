@@ -22,11 +22,11 @@ export interface EnemyDefinition {
 const enemyAsset = (kind: EnemyKind) => ASSET_PATHS.enemies[kind - 1]!
 
 export const ENEMIES: Record<EnemyKind, EnemyDefinition> = {
-  1: { kind: 1, title: 'Myrkhan', ...enemyAsset(1), health: 70, damage: 13, speed: 1.65, attackRange: 1.55, attackCooldown: 1.55, score: 120, scale: 1.72, accent: '#ff6a42', ability: 'spin' },
-  2: { kind: 2, title: 'Zorvex', ...enemyAsset(2), health: 90, damage: 16, speed: 1.3, attackRange: 1.75, attackCooldown: 1.8, score: 160, scale: 1.78, accent: '#c655ff', ability: 'dash' },
-  3: { kind: 3, title: 'Kharzul', ...enemyAsset(3), health: 120, damage: 20, speed: 1.05, attackRange: 3.15, attackCooldown: 2.1, score: 210, scale: 2.02, accent: '#dcdf4c', ability: 'quake' },
-  4: { kind: 4, title: 'Vhalgor', ...enemyAsset(4), health: 155, damage: 24, speed: 1.18, attackRange: 6.4, attackCooldown: 2.25, score: 280, scale: 1.95, accent: '#53e89c', ability: 'stone' },
-  5: { kind: 5, title: 'Nexrath', ...enemyAsset(5), health: 190, damage: 28, speed: 1.28, attackRange: 7.2, attackCooldown: 2.05, score: 360, scale: 2.05, accent: '#58cbff', ability: 'dark-orb' },
+  1: { kind: 1, title: 'Myrkhan', ...enemyAsset(1), health: 70, damage: 13, speed: 1.65, attackRange: 1.55, attackCooldown: 1.55, score: 120, scale: 1.98, accent: '#ff6a42', ability: 'spin' },
+  2: { kind: 2, title: 'Zorvex', ...enemyAsset(2), health: 90, damage: 16, speed: 1.3, attackRange: 1.75, attackCooldown: 1.8, score: 160, scale: 2.07, accent: '#c655ff', ability: 'dash' },
+  3: { kind: 3, title: 'Kharzul', ...enemyAsset(3), health: 120, damage: 20, speed: 1.05, attackRange: 3.15, attackCooldown: 2.1, score: 210, scale: 2.35, accent: '#dcdf4c', ability: 'quake' },
+  4: { kind: 4, title: 'Vhalgor', ...enemyAsset(4), health: 155, damage: 24, speed: 1.18, attackRange: 6.4, attackCooldown: 2.25, score: 280, scale: 2.27, accent: '#53e89c', ability: 'stone' },
+  5: { kind: 5, title: 'Nexrath', ...enemyAsset(5), health: 190, damage: 28, speed: 1.28, attackRange: 7.2, attackCooldown: 2.05, score: 360, scale: 2.38, accent: '#58cbff', ability: 'dark-orb' },
 }
 
 export const ENEMY_NAMES = [

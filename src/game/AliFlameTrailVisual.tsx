@@ -1,5 +1,5 @@
 import { useMemo, type MutableRefObject } from 'react'
-import { AdditiveBlending, type Mesh, type MeshBasicMaterial } from 'three'
+import { AdditiveBlending, DoubleSide, type Mesh, type MeshBasicMaterial } from 'three'
 import { ALI_FLAME_ARCS, createAliFlameArcGeometry } from './heroCombatGeometry'
 
 interface AliFlameTrailVisualProps {
@@ -13,7 +13,7 @@ export function AliFlameTrailVisual({ arcs, materials }: AliFlameTrailVisualProp
     <>
       {ALI_FLAME_ARCS.map((arc, index) => (
         <mesh key={arc.color} ref={(mesh) => { if (mesh && arcs) arcs.current[index] = mesh }} geometry={geometry} position={arc.position} rotation={[0, 0, arc.rotation]}>
-          <meshBasicMaterial ref={(material) => { if (material && materials) materials.current[index] = material }} color={arc.color} transparent opacity={0} depthWrite={false} blending={AdditiveBlending} toneMapped={false} />
+          <meshBasicMaterial ref={(material) => { if (material && materials) materials.current[index] = material }} color={arc.color} transparent opacity={0} side={DoubleSide} depthWrite={false} blending={AdditiveBlending} toneMapped={false} />
         </mesh>
       ))}
     </>

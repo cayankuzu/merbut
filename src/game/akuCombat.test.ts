@@ -23,6 +23,7 @@ describe('Aku encounter guards', () => {
       expect(motion.attacking).toBe(true)
       expect(motion.y).toBe(0)
       expect(Math.abs(motion.x - 25)).toBeLessThan(1.2)
+      expect(Math.abs(motion.x - 20)).toBeLessThan(6)
     })
   })
 })

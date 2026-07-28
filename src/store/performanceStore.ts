@@ -1,10 +1,15 @@
 import { create } from 'zustand'
 
-export type PerformanceTier = 'performance' | 'balanced' | 'high'
+export type PerformanceTier = 'minimal' | 'performance' | 'balanced' | 'high'
 
 export interface PerformanceProfile {
+  actorMountDistance: number
+  animationFps: number
+  antialias: boolean
   dpr: number
+  dynamicLights: boolean
   impactBudget: number
+  menuFps: number
   particleRatio: number
   shadowFps: number
   shadowMapSize: 256 | 512 | 1024
@@ -28,15 +33,17 @@ export function detectInitialPerformanceTier(): PerformanceTier {
   const userAgent = navigator.userAgent
   const conservativeEngine = /Firefox/i.test(userAgent) || isSafariWebkitEngine()
   if (conservativeEngine) return 'performance'
+  if (cores <= 1 || memory <= 1) return 'minimal'
   if (cores <= 2 || memory <= 2) return 'performance'
   if (cores >= 8 && memory >= 8) return 'high'
   return 'balanced'
 }
 
 export const PERFORMANCE_PROFILES: Record<PerformanceTier, PerformanceProfile> = {
-  performance: { dpr: 0.62, impactBudget: 10, particleRatio: 0.38, shadowFps: 0, shadowMapSize: 256, shadows: false },
-  balanced: { dpr: 0.82, impactBudget: 15, particleRatio: 0.68, shadowFps: 12, shadowMapSize: 512, shadows: true },
-  high: { dpr: 1, impactBudget: 22, particleRatio: 1, shadowFps: 24, shadowMapSize: 1024, shadows: true },
+  minimal: { actorMountDistance: 22, animationFps: 12, antialias: false, dpr: 0.44, dynamicLights: false, impactBudget: 6, menuFps: 18, particleRatio: 0.14, shadowFps: 0, shadowMapSize: 256, shadows: false },
+  performance: { actorMountDistance: 26, animationFps: 18, antialias: false, dpr: 0.6, dynamicLights: false, impactBudget: 10, menuFps: 24, particleRatio: 0.36, shadowFps: 0, shadowMapSize: 256, shadows: false },
+  balanced: { actorMountDistance: 31, animationFps: 24, antialias: true, dpr: 0.82, dynamicLights: true, impactBudget: 15, menuFps: 60, particleRatio: 0.68, shadowFps: 12, shadowMapSize: 512, shadows: true },
+  high: { actorMountDistance: 38, animationFps: 30, antialias: true, dpr: 1, dynamicLights: true, impactBudget: 22, menuFps: 60, particleRatio: 1, shadowFps: 24, shadowMapSize: 1024, shadows: true },
 }
 
 interface PerformanceState {

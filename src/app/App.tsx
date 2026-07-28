@@ -9,6 +9,7 @@ import { useSessionStore } from '../store/sessionStore'
 import { AudioDirector } from '../audio/AudioDirector'
 import { useAudioStore } from '../audio/audioStore'
 import { usePerformanceStore } from '../store/performanceStore'
+import { APP_VERSION } from '../config/version'
 import './app.css'
 
 const DebugCalibrationPanel = lazy(() =>
@@ -22,6 +23,7 @@ declare global {
     __MERBUT__?: {
       getState: typeof useGameStore.getState
       getSessionState: typeof useSessionStore.getState
+      setSessionState: typeof useSessionStore.setState
       getAudioState: typeof useAudioStore.getState
       getPerformanceState: typeof usePerformanceStore.getState
     }
@@ -38,11 +40,9 @@ export default function App() {
     window.__MERBUT__ = {
       getState: useGameStore.getState,
       getSessionState: useSessionStore.getState,
+      setSessionState: useSessionStore.setState,
       getAudioState: useAudioStore.getState,
       getPerformanceState: usePerformanceStore.getState,
-    }
-    return () => {
-      delete window.__MERBUT__
     }
   }, [])
 
@@ -70,6 +70,8 @@ export default function App() {
         <span>TÜM HAKLARI SAKLIDIR</span>
         <i aria-hidden="true" />
         <span><strong>MeMoDe</strong> tarafından</span>
+        <i aria-hidden="true" />
+        <span className="merbut-copyright__version">SÜRÜM <strong>v{APP_VERSION}</strong></span>
       </footer>
     </>
   )

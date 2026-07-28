@@ -10,6 +10,7 @@ import { ASSET_PATHS } from '../config/assetPaths'
 import { CHARACTER_TRANSFORMS } from '../config/characterTransforms'
 import { useSessionStore } from '../store/sessionStore'
 import { attachWeapon, updateWeaponSocket, type WeaponAttachment } from '../characters/WeaponSocket'
+import { currentEnemyById, enemyById } from './enemyLookup'
 
 interface EvilJackBossActorProps { id: string }
 
@@ -25,10 +26,10 @@ function enableShadows(root: Object3D) {
 
 export function EvilJackBossActor({ id }: EvilJackBossActorProps) {
   const enemy = useSessionStore(useShallow((state) => {
-    const current = state.enemies.find((candidate) => candidate.id === id)
+    const current = enemyById(state.enemies, id)
     return current ? { animation: current.animation, special: current.special, title: current.title } : null
   }))
-  const initialX = useMemo(() => useSessionStore.getState().enemies.find((candidate) => candidate.id === id)?.x ?? 0, [id])
+  const initialX = useMemo(() => currentEnemyById(id)?.x ?? 0, [id])
   const bossPhase = useSessionStore((state) => state.bossPhase)
   const assets = ASSET_PATHS.bosses.evilJack
   const walkFile = useGLTF(assets.walk)
@@ -94,7 +95,7 @@ export function EvilJackBossActor({ id }: EvilJackBossActorProps) {
   }, [actionName, actions])
 
   useFrame((_, delta) => {
-    const current = useSessionStore.getState().enemies.find((candidate) => candidate.id === id)
+    const current = currentEnemyById(id)
     if (!root.current || !modelRoot.current || !current) return
     root.current.position.x = MathUtils.damp(root.current.position.x, current.x, 16, Math.min(delta, 0.1))
     root.current.rotation.y = MathUtils.damp(root.current.rotation.y, current.direction > 0 ? Math.PI / 2 : -Math.PI / 2, 14, Math.min(delta, 0.1))

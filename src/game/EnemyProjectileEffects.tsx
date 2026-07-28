@@ -4,12 +4,13 @@ import { Group } from 'three'
 import { useShallow } from 'zustand/react/shallow'
 import { useSessionStore } from '../store/sessionStore'
 import { EnemyProjectileVisual } from './EnemyProjectileVisual'
+import { currentEnemyProjectileById } from './projectileLookup'
 
 function EnemyProjectileActor({ id }: { id: string }) {
   const root = useRef<Group>(null)
-  const initial = useSessionStore.getState().enemyProjectiles.find((projectile) => projectile.id === id)
+  const initial = currentEnemyProjectileById(id)
   useFrame(() => {
-    const projectile = useSessionStore.getState().enemyProjectiles.find((candidate) => candidate.id === id)
+    const projectile = currentEnemyProjectileById(id)
     if (!root.current || !projectile) return
     root.current.position.set(projectile.x, projectile.y, 0)
     root.current.rotation.z = projectile.travelled * (projectile.kind === 'time-portal' ? 1.8 : 0.7)

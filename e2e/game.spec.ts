@@ -18,6 +18,7 @@ test('ana menü, kontrol brifingi ve duraklatma akışı çalışır', async ({ 
   await page.goto('/')
   await waitForAssets(page)
   await expect(page.getByRole('heading', { name: 'MERBUT' })).toBeVisible()
+  await expect(page.locator('.merbut-copyright')).toContainText('SÜRÜM v1.0.0')
   await page.getByRole('button', { name: 'OYUNA BAŞLA' }).click()
   await expect(page.getByText('R', { exact: true })).toBeVisible()
   await expect(page.getByText('L', { exact: true })).toBeVisible()
@@ -81,10 +82,13 @@ test('iki oyuncu bağımsız hareket eder, zıplar, saldırır ve doğru yöne b
 
   await page.keyboard.press('KeyW')
   await page.keyboard.press('ArrowUp')
-  await page.waitForTimeout(140)
-  const afterJump = await page.evaluate(() => window.__MERBUT__!.getState().positions)
-  expect(afterJump.ali[1]).toBeGreaterThan(0)
-  expect(afterJump.jack[1]).toBeGreaterThan(0)
+  // Firefox may dispatch the two synthetic key presses across adjacent render
+  // frames. Assert the observable airborne state instead of sampling a fixed
+  // wall-clock instant between the two jump buffers.
+  await expect.poll(() => page.evaluate(() => {
+    const positions = window.__MERBUT__!.getState().positions
+    return positions.ali[1] > 0 && positions.jack[1] > 0
+  }), { timeout: 1_000 }).toBe(true)
 
   await page.keyboard.press('KeyS')
   await page.keyboard.press('ArrowDown')

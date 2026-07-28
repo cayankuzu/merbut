@@ -48,6 +48,19 @@ export function AudioSettingsPanel() {
   }, [command])
 
   useEffect(() => {
+    // The embedded YouTube player posts internal telemetry to its parent. In
+    // Firefox, letting that cross-origin MessageEvent reach React's global
+    // listener can throw while React reads its timestamp. We only command the
+    // player and never consume these replies, so stop them in capture phase.
+    const isolateYoutubePlayerMessage = (event: MessageEvent) => {
+      if (event.origin !== 'https://www.youtube.com' && event.origin !== 'https://www.youtube-nocookie.com') return
+      event.stopImmediatePropagation()
+    }
+    window.addEventListener('message', isolateYoutubePlayerMessage, true)
+    return () => window.removeEventListener('message', isolateYoutubePlayerMessage, true)
+  }, [])
+
+  useEffect(() => {
     if (panelOpen) setPlayerMounted(true)
   }, [panelOpen])
 

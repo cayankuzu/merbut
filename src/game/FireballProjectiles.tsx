@@ -4,12 +4,13 @@ import { Group } from 'three'
 import { useShallow } from 'zustand/react/shallow'
 import { useSessionStore } from '../store/sessionStore'
 import { FireballVisual } from './FireballVisual'
+import { currentFireballById } from './projectileLookup'
 
 function FireballActor({ id }: { id: string }) {
   const root = useRef<Group>(null)
-  const initial = useSessionStore.getState().projectiles.find((projectile) => projectile.id === id)
+  const initial = currentFireballById(id)
   useFrame(() => {
-    const projectile = useSessionStore.getState().projectiles.find((candidate) => candidate.id === id)
+    const projectile = currentFireballById(id)
     if (!root.current || !projectile) return
     root.current.position.set(projectile.x, projectile.y, projectile.z)
   })

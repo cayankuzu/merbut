@@ -84,7 +84,7 @@ export function BiomeLighting() {
         shadow-bias={-0.00025}
       />
       <object3D ref={directionalTarget} position={[0, 1.2, 0]} />
-      <pointLight ref={accent} position={[5, 4, 3]} intensity={7} distance={13} color="#ff286f" />
+      {profile.dynamicLights ? <pointLight ref={accent} position={[5, 4, 3]} intensity={7} distance={13} color="#ff286f" /> : null}
     </group>
   )
 }
