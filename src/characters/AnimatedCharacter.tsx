@@ -12,6 +12,8 @@ import type { CharacterDefinition } from '../types/character'
 import {
   alignWeaponAttachment,
   attachWeapon,
+  findTorsoBone,
+  keepWeaponOutsideTorso,
   updateWeaponSocket,
   type WeaponAttachment,
 } from './WeaponSocket'
@@ -47,6 +49,7 @@ export function AnimatedCharacter({ definition, animationDurationSeconds, animat
 
   const characterScene = useMemo(() => SkeletonUtils.clone(idleFile.scene), [idleFile.scene])
   const swordScene = useMemo(() => swordFile.scene.clone(true), [swordFile.scene])
+  const torso = useMemo(() => findTorsoBone(characterScene), [characterScene])
 
   const clips = useMemo(() => {
     const prepared: AnimationClip[] = [
@@ -78,7 +81,17 @@ export function AnimatedCharacter({ definition, animationDurationSeconds, animat
 
   useFrame((_, delta) => {
     if (attachmentRef.current) {
-      updateWeaponSocket(attachmentRef.current, animationState === 'attack' || animationState === 'shield', delta)
+      // The grip must remain part of the animated hand in every state. Keeping a
+      // world-stable blade during idle/walk made it slide through the palm and
+      // body as soon as the wrist moved (most visible in the roster preview).
+      updateWeaponSocket(attachmentRef.current, true, delta)
+      keepWeaponOutsideTorso(
+        attachmentRef.current,
+        torso,
+        transform.weapon,
+        definition.id === 'ali' ? 136 : 122,
+        definition.id === 'ali' ? 15 : 13,
+      )
     }
   })
 

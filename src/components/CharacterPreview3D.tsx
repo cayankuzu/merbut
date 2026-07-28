@@ -53,12 +53,14 @@ function LiveCharacterPreview({ id }: { id: CharacterId }) {
 
 export function CharacterPreview3D({ id, compact = false }: CharacterPreview3DProps) {
   const paused = useSessionStore((state) => state.phase === 'paused')
+  const briefingDistance = id === 'ali' ? 6.5 : 5.55
+  const briefingPanX = id === 'ali' ? -0.14 : 0
   return (
     <div className={`character-preview${compact ? ' character-preview--compact' : ''}`} aria-label={`${id === 'ali' ? 'Hz. Ali' : 'Samuray Jack'} dönen 3B figürü`}>
       <Canvas
         frameloop={paused ? 'never' : 'demand'}
         dpr={[0.75, 1]}
-        camera={{ position: [0, compact ? 1.18 : 1.25, compact ? 5 : 5.25], fov: compact ? 32 : 34 }}
+        camera={{ position: [compact ? 0 : briefingPanX, compact ? 1.18 : 1.25, compact ? 5 : briefingDistance], fov: compact ? 32 : 34 }}
         gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}
       >
         <PreviewFrameScheduler active={!paused} fps={compact ? 15 : 30} />

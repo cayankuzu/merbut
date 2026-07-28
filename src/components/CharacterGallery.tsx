@@ -17,7 +17,9 @@ type GalleryDrag = {
 }
 
 function galleryFrontRotation(preview: RosterPreview) {
-  return preview.type === 'hero' ? -Math.PI / 2 : 0
+  // A slight three-quarter pose keeps the face readable while showing the
+  // complete blade outside the silhouette instead of foreshortening it.
+  return preview.type === 'hero' ? -Math.PI / 2 + 0.5 : 0
 }
 
 const clampPan = (value: number) => Math.max(-2.8, Math.min(2.8, value))

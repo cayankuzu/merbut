@@ -18,7 +18,7 @@ test('ana menü, kontrol brifingi ve duraklatma akışı çalışır', async ({ 
   await page.goto('/')
   await waitForAssets(page)
   await expect(page.getByRole('heading', { name: 'MERBUT' })).toBeVisible()
-  await expect(page.locator('.merbut-copyright')).toContainText('SÜRÜM v1.1.1')
+  await expect(page.locator('.merbut-copyright')).toContainText('SÜRÜM v1.1.2')
   await page.getByRole('button', { name: 'OYUNA BAŞLA' }).click()
   await expect(page.getByText('R', { exact: true })).toBeVisible()
   await expect(page.getByText('L', { exact: true })).toBeVisible()

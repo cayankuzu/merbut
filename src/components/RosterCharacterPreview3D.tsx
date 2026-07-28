@@ -24,7 +24,7 @@ function AnimatedAsset({ source, scale = 1.5 }: { source: string; scale?: number
 }
 
 function PreviewModel({ preview }: { preview: RosterPreview }) {
-  if (preview.type === 'hero') return <group position={[0, -1.32, 0]}><AnimatedCharacter definition={CHARACTERS[preview.id]} animationState="walk" /></group>
+  if (preview.type === 'hero') return <group position={[0, -1.32, 0]}><AnimatedCharacter definition={CHARACTERS[preview.id]} animationState="idle" /></group>
   if (preview.type === 'enemy') return <group position={[0, -1.28, 0]}><AnimatedAsset source={ENEMIES[preview.kind].walk} scale={ENEMIES[preview.kind].scale} /></group>
   if (preview.type === 'shadow') return <group position={[0, -1.3, 0]} scale={BOSS_MODEL_SCALES.shadow}><EvilJackCharacter action="slash" loopCombat shadows={false} /></group>
   const source = preview.form === 'normal' ? ASSET_PATHS.bosses.aku.normal.walk : ASSET_PATHS.bosses.aku.monster.idle

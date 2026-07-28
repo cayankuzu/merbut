@@ -13,6 +13,22 @@ const palmBoneWorldPosition = new Vector3()
 const desiredBladeDirection = new Vector3(0, -1.08, 0.72).normalize()
 const localBladeAxis = new Vector3()
 const bladeRollRotation = new Quaternion()
+const torsoWorldPosition = new Vector3()
+const torsoOffset = new Vector3()
+const guardedBladeDirection = new Vector3()
+const safeBladeDirection = new Vector3()
+const guardTangent = new Vector3()
+const guardCorrection = new Quaternion()
+const guardLocalCorrection = new Quaternion()
+const guardRootWorldRotation = new Quaternion()
+const guardRootWorldScale = new Vector3()
+const socketWorldPosition = new Vector3()
+const TORSO_BONE_NAMES = [
+  'Spine2', 'Spine02', 'mixamorigSpine2',
+  'Spine1', 'Spine01', 'mixamorigSpine1',
+  'UpperChest', 'Chest', 'Spine', 'mixamorigSpine',
+] as const
+const TORSO_BONE_PATTERN = /(spine1|spine|chest)/i
 
 export interface WeaponAttachment {
   root: Object3D
@@ -37,6 +53,105 @@ function findPalmBones(hand: Bone) {
   const directBones = hand.children.filter((child): child is Bone => child instanceof Bone)
   const fingerBones = directBones.filter((bone) => /(thumb|index|middle|ring|pinky|little)/i.test(bone.name))
   return fingerBones.length > 0 ? fingerBones : directBones
+}
+
+export function findTorsoBone(root: Object3D) {
+  for (const name of TORSO_BONE_NAMES) {
+    const candidate = root.getObjectByName(name)
+    if (candidate instanceof Bone) return candidate
+  }
+  let match: Bone | null = null
+  root.traverse((node) => {
+    if (!match && node instanceof Bone && TORSO_BONE_PATTERN.test(node.name)) match = node
+  })
+  return match
+}
+
+/** Returns the nearest blade direction that clears a torso capsule. */
+export function constrainWeaponBladeDirection(
+  currentDirection: Vector3,
+  torsoFromGrip: Vector3,
+  bladeReach: number,
+  clearance: number,
+  target = new Vector3(),
+) {
+  target.copy(currentDirection).normalize()
+  const torsoDistance = torsoFromGrip.length()
+  if (torsoDistance <= 0.0001) return target
+
+  const inward = torsoOffset.copy(torsoFromGrip).multiplyScalar(1 / torsoDistance)
+  const inwardDot = target.dot(inward)
+  if (torsoDistance <= clearance) {
+    if (inwardDot <= -0.12) return target
+    // The grip can legitimately be close to the robe/chest. In that case a
+    // tangent (with a slight outward bias) is the nearest safe blade path.
+    target.addScaledVector(inward, -(inwardDot + 0.18))
+    if (target.lengthSq() < 0.0001) target.set(-inward.y, inward.x, 0)
+    return target.normalize()
+  }
+  if (inwardDot <= 0) return target
+  const projection = torsoDistance * inwardDot
+  if (projection >= bladeReach) return target
+  const closestDistance = torsoDistance * Math.sqrt(Math.max(0, 1 - inwardDot * inwardDot))
+  if (closestDistance >= clearance) return target
+
+  const safeInwardDot = Math.sqrt(Math.max(0, 1 - (clearance / torsoDistance) ** 2))
+  guardTangent.copy(target).addScaledVector(inward, -inwardDot)
+  if (guardTangent.lengthSq() < 0.0001) guardTangent.set(-inward.y, inward.x, 0)
+  guardTangent.normalize()
+  return target
+    .copy(guardTangent)
+    .multiplyScalar(Math.sqrt(Math.max(0, 1 - safeInwardDot * safeInwardDot)))
+    .addScaledVector(inward, safeInwardDot)
+    .normalize()
+}
+
+/** Rotates around the fixed grip only when an animated blade would cut the torso. */
+export function keepWeaponOutsideTorso(
+  attachment: WeaponAttachment,
+  torso: Bone | null,
+  transform: WeaponTransform,
+  bladeReach: number,
+  clearance: number,
+) {
+  if (!torso) return
+  attachment.root.updateWorldMatrix(true, false)
+  attachment.root.getWorldQuaternion(guardRootWorldRotation)
+  attachment.root.getWorldScale(guardRootWorldScale)
+  torso.updateWorldMatrix(true, false)
+  torso.getWorldPosition(torsoWorldPosition)
+  attachment.socket.updateWorldMatrix(true, false)
+  attachment.socket.getWorldPosition(socketWorldPosition)
+  // The game and roster are read from a frontal camera. Guard the projected
+  // silhouette as well as the 3D pose so a blade cannot look as if it exits
+  // through the robe merely because it passed just in front of it in Z.
+  torsoOffset.copy(torsoWorldPosition).sub(socketWorldPosition).setZ(0)
+
+  guardedBladeDirection
+    .set(...transform.bladeDirection)
+    .normalize()
+    .applyQuaternion(attachment.weapon.quaternion)
+    .applyQuaternion(attachment.socket.quaternion)
+    .applyQuaternion(guardRootWorldRotation)
+    .setZ(0)
+    .normalize()
+  if (guardedBladeDirection.lengthSq() < 0.0001 || torsoOffset.lengthSq() < 0.0001) return
+  const rootScale = Math.max(guardRootWorldScale.x, guardRootWorldScale.y, guardRootWorldScale.z)
+  constrainWeaponBladeDirection(
+    guardedBladeDirection,
+    torsoOffset,
+    bladeReach * rootScale,
+    clearance * rootScale,
+    safeBladeDirection,
+  )
+  if (safeBladeDirection.dot(guardedBladeDirection) > 0.99999) return
+  guardCorrection.setFromUnitVectors(guardedBladeDirection, safeBladeDirection)
+  guardLocalCorrection
+    .copy(guardRootWorldRotation)
+    .invert()
+    .multiply(guardCorrection)
+    .multiply(guardRootWorldRotation)
+  attachment.socket.quaternion.premultiply(guardLocalCorrection)
 }
 
 function getHandRotationInRootSpace(attachment: WeaponAttachment, target: Quaternion) {
