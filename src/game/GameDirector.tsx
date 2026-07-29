@@ -4,7 +4,7 @@ import { BIOMES, BIOME_WORLD_WIDTH, WORLD_VISUAL_LEFT, WORLD_VISUAL_RIGHT } from
 import { DIFFICULTIES } from '../config/difficulty'
 import { BOSS_MODEL_SCALES } from '../config/characterTransforms'
 import { BOSS_DEFINITIONS, ENEMIES, ENEMY_NAMES, type EnemyKind } from '../config/enemies'
-import { expandWaveSpawns, shouldTriggerWave, WAVES, type WaveDefinition } from '../config/waves'
+import { expandWaveSpawns, getWaveSpawnX, shouldTriggerWave, WAVES, type WaveDefinition } from '../config/waves'
 import { areBiomeEnemiesCleared, arePriorBiomeWavesCleared, BIOME_GATE_PADDING, getBiomeGateX, getClosedBiomeRightLimit } from './biomeProgress'
 import { enemyCatchUpMultiplier, shouldEnemyApproach } from './enemyAI'
 import { useGameStore } from '../store/gameStore'
@@ -55,8 +55,7 @@ function buildWave(wave: WaveDefinition, midpoint: number): EnemyState[] {
   return expandWaveSpawns(wave, difficulty.extraEnemies).map((spawn, index) => {
     const base = ENEMIES[spawn.kind]
     const boss = spawn.boss ? BOSS_DEFINITIONS[spawn.boss] : null
-    const offset = 6.4 + index * 1.15
-    const x = Math.min(WORLD_VISUAL_RIGHT - 2, Math.max(WORLD_VISUAL_LEFT + 2, midpoint + spawn.side * offset))
+    const x = getWaveSpawnX(midpoint, spawn.side, index, session.lockedLeft, session.lockedRight)
     const maxHealth = Math.round(boss ? boss.health * difficulty.bossHealth : base.health)
     const bossSpeed = boss?.bossType === 'shadow' ? 4.8 : boss?.bossType === 'aku' ? 3.1 : base.speed
     return {

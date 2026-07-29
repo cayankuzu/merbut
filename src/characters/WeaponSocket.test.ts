@@ -281,8 +281,8 @@ describe('weapon transforms', () => {
     expect(hilt.distanceTo(attachment.socket.getWorldPosition(new Vector3()))).toBeLessThan(0.00001)
   })
 
-  it('uses a dedicated hand-pose correction and shared boss presentation scales for Aku\'s Shadow', () => {
-    expect(SHADOW_WEAPON_TRANSFORM.alignBlade).toBe(false)
+  it('uses blade alignment, a dedicated hand-pose correction, and shared boss presentation scales for Aku\'s Shadow', () => {
+    expect(SHADOW_WEAPON_TRANSFORM.alignBlade).toBe(true)
     expect(SHADOW_WEAPON_TRANSFORM.rotation).not.toEqual(CHARACTER_TRANSFORMS.jack.weapon.rotation)
     expect(BOSS_MODEL_SCALES).toEqual({ shadow: 2.94, aku: 3.83 })
   })

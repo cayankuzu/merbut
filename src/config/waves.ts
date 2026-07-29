@@ -1,4 +1,4 @@
-import { BIOMES, BIOME_WORLD_WIDTH, WORLD_VISUAL_LEFT } from './biomes'
+import { BIOMES, BIOME_WORLD_WIDTH, WORLD_VISUAL_LEFT, WORLD_VISUAL_RIGHT } from './biomes'
 import type { EnemyKind } from './enemies'
 
 export interface WaveSpawn {
@@ -12,6 +12,21 @@ export interface WaveDefinition {
   biome: number
   triggerX: number
   spawns: WaveSpawn[]
+}
+
+const WAVE_SPAWN_PADDING = 2
+
+export function getWaveSpawnX(
+  midpoint: number,
+  side: -1 | 1,
+  index: number,
+  lockedLeft: number,
+  lockedRight: number,
+) {
+  const offset = 6.4 + index * 1.15
+  const left = Math.max(WORLD_VISUAL_LEFT + WAVE_SPAWN_PADDING, lockedLeft + WAVE_SPAWN_PADDING)
+  const right = Math.min(WORLD_VISUAL_RIGHT - WAVE_SPAWN_PADDING, lockedRight - WAVE_SPAWN_PADDING)
+  return Math.min(right, Math.max(left, midpoint + side * offset))
 }
 
 export function expandWaveSpawns(wave: WaveDefinition, extraEnemies: number): WaveSpawn[] {

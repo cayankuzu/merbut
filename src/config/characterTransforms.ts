@@ -46,6 +46,6 @@ export const CHARACTER_TRANSFORMS: Record<CharacterId, CharacterTransform> = {
  */
 export const SHADOW_WEAPON_TRANSFORM: WeaponTransform = {
   ...CHARACTER_TRANSFORMS.jack.weapon,
-  alignBlade: false,
+  alignBlade: true,
   rotation: [-1.9213176356064228, 0.17992370132894234, -3.0545531270324],
 }

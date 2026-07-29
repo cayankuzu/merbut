@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { APP_VERSION } from '../src/config/version'
 
 async function waitForAssets(page: Page) {
   await expect(page.locator('.loading-screen')).toHaveCount(0, { timeout: 60_000 })
@@ -18,7 +19,7 @@ test('ana menü, kontrol brifingi ve duraklatma akışı çalışır', async ({ 
   await page.goto('/')
   await waitForAssets(page)
   await expect(page.getByRole('heading', { name: 'MERBUT' })).toBeVisible()
-  await expect(page.locator('.merbut-copyright')).toContainText('SÜRÜM v1.2.5')
+  await expect(page.locator('.merbut-copyright')).toContainText(`SÜRÜM v${APP_VERSION}`)
   await expect(page.locator('iframe[title="Merbut fon müziği · YouTube"]')).toHaveAttribute('src', /autoplay=1.*loop=1/)
   const audioDefaults = await page.evaluate(() => window.__MERBUT__!.getAudioState())
   expect(audioDefaults).toMatchObject({ musicPlaying: true, musicLooping: true })

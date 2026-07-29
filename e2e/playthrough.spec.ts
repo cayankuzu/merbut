@@ -202,12 +202,15 @@ test.describe.configure({ mode: 'serial' })
 for (const mode of MODES) {
   test(`${mode.label} modu dış klavye girdileriyle tamamlanabilir`, async ({ page }) => {
     test.setTimeout(35 * 60_000)
+    const pageErrors: string[] = []
+    page.on('pageerror', (error) => pageErrors.push(error.message))
     await startMode(page, mode)
     const attemptOffset = Number(process.env.PLAYTHROUGH_ATTEMPT_OFFSET ?? 0)
     for (let attempt = attemptOffset + 1; attempt <= 25; attempt += 1) {
       const result = await playAttempt(page, mode, attempt)
       if (result.victory) {
         expect(result.state.biome).toBe(6)
+        expect(pageErrors).toEqual([])
         return
       }
       await page.getByRole('button', { name: 'TEKRAR OYNA' }).click()

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { BIOMES, BIOME_WORLD_WIDTH, WORLD_VISUAL_LEFT } from './biomes'
-import { expandWaveSpawns, shouldTriggerWave, WAVES } from './waves'
+import { expandWaveSpawns, getWaveSpawnX, shouldTriggerWave, WAVES } from './waves'
 import { DIFFICULTIES } from './difficulty'
+import { getClosedBiomeLeftLimit, getClosedBiomeRightLimit } from '../game/biomeProgress'
 
 describe('boss wave placement', () => {
   it('places both bosses in the second panel of their requested biome', () => {
@@ -41,5 +42,19 @@ describe('wave biome gate', () => {
     expect(shouldTriggerWave(wave, 4, [], 10, wave.triggerX)).toBe(false)
     expect(shouldTriggerWave(wave, 3, [], 10, wave.triggerX)).toBe(true)
     expect(shouldTriggerWave(wave, 3, [wave.id], 10, wave.triggerX)).toBe(false)
+  })
+
+  it('keeps every entry spawn inside the active biome gates', () => {
+    for (let biome = 0; biome < BIOMES.length; biome += 1) {
+      const lockedLeft = getClosedBiomeLeftLimit(biome)
+      const lockedRight = getClosedBiomeRightLimit(biome)
+      const entryMidpoint = lockedLeft + 0.05
+
+      for (const side of [-1, 1] as const) {
+        const spawnX = getWaveSpawnX(entryMidpoint, side, 0, lockedLeft, lockedRight)
+        expect(spawnX).toBeGreaterThanOrEqual(lockedLeft + 2)
+        expect(spawnX).toBeLessThanOrEqual(lockedRight - 2)
+      }
+    }
   })
 })
