@@ -202,7 +202,7 @@ h1, h2, .title-card h1, .main-menu h1, .title-screen h1 { font-family: var(--fon
 @keyframes countdown-in { from { opacity: 0; transform: scale(1.8); filter: blur(8px); } to { opacity: 1; transform: none; } }
 
 /* ───────────────────────── Prologue ───────────────────────── */
-.prologue { position: absolute; inset: 0; z-index: 70; overflow: hidden; background: #000; cursor: pointer; }
+.prologue { position: absolute; inset: 0; z-index: 70; overflow: hidden; background: #000; cursor: pointer; pointer-events: auto; }
 .prologue__image { position: absolute; inset: -6%; background-size: cover; background-position: center; filter: saturate(0.85) contrast(1.05); animation: ken-burns 7s ease-out both; }
 @keyframes ken-burns { from { opacity: 0; transform: scale(1.12) translateX(2%); } 12% { opacity: 1; } to { opacity: 1; transform: scale(1) translateX(-1%); } }
 .prologue::after { content: ''; position: absolute; inset: auto 0 0 0; height: 46vh; background: linear-gradient(0deg, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0)); pointer-events: none; }
@@ -241,7 +241,7 @@ h1, h2, .title-card h1, .main-menu h1, .title-screen h1 { font-family: var(--fon
 .menu-corner button:hover, .menu-corner button:focus-visible { color: var(--paper); border-color: var(--gold); outline: none; }
 .menu-screen--battle .menu-screen__core { display: none; }
 
-.menu-page { position: absolute; inset: 0; z-index: 30; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 18px; padding: 42px clamp(28px, 6vw, 96px) 54px; background: radial-gradient(ellipse at 30% 20%, rgba(60, 12, 26, 0.9), rgba(8, 2, 4, 0.97)); overflow: hidden; }
+.menu-page { position: absolute; inset: 0; z-index: 30; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 18px; padding: 42px clamp(28px, 6vw, 96px) 54px; background: radial-gradient(ellipse at 30% 20%, rgba(60, 12, 26, 0.9), rgba(8, 2, 4, 0.97)); overflow: hidden; pointer-events: auto; }
 .menu-page > header { display: flex; align-items: baseline; gap: 18px; }
 .menu-page > header small { color: var(--gold); font: 800 11px / 1 var(--font-body); letter-spacing: 0.4em; }
 .menu-page > header h1 { margin: 0; font: 800 44px / 1 var(--font-display); color: var(--paper); }
@@ -363,7 +363,7 @@ h1, h2, .title-card h1, .main-menu h1, .title-screen h1 { font-family: var(--fon
 @keyframes rank-in { from { transform: scale(2.4); opacity: 0; filter: blur(10px); } }
 .ending-overlay--continued h1 { font-family: var(--font-display) !important; }
 .ending-overlay--continued p b { color: var(--gold); letter-spacing: 0.1em; }
-.ending-overlay--credits { position: absolute; inset: 0; z-index: 80; overflow: hidden; background: #000; }
+.ending-overlay--credits { position: absolute; inset: 0; z-index: 80; overflow: hidden; background: #000; pointer-events: auto; }
 .credits-scroll { position: absolute; left: 50%; top: 100%; display: grid; gap: 34px; justify-items: center; width: min(640px, 90vw); transform: translateX(-50%); text-align: center; animation: credits-roll 38s linear forwards; }
 .credits-scroll h1 { margin: 0; font: 800 64px / 1 var(--font-display); }
 .credits-scroll h2 { margin-top: 30vh; font: 800 30px / 1.2 var(--font-display); color: var(--gold); }

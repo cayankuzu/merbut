@@ -1,5 +1,14 @@
 # Değişiklik günlüğü
 
+## 3.1.1 · Buton düzeltmeleri (26 Eylül 2026)
+
+- Arayüz katmanı fareyi varsayılan olarak yok sayar; alt ekranların ortak çerçevesi (`.menu-page`) bunu geri açmadığı için Bölüm Seç, Başarımlar, Yapımcılar ve Yama Notları'nda **GERİ** ve bölüm parçaları tıklanmıyor, tıklama 3B tuvale düşüyordu. Düzeltildi.
+- Prologdaki **ATLA** butonu ve tıklayarak sonraki panele geçme fareyle çalışmıyordu. Düzeltildi.
+- Finaldeki yapımcılar kaydırmasının **GEÇ** butonu tıklanmıyordu. Düzeltildi.
+- Duraklatma menüsünden açılan Ayarlarda ok tuşları ve gamepad, arkadaki duraklatma butonlarında geziniyordu; artık en üstteki pencerede kalıyor.
+- Duraklatma → Kontroller'de Esc / gamepad B artık oyunu devam ettirmek yerine duraklatma menüsüne döner.
+- Yeni E2E testi tüm bu butonları gerçek fare tıklamasıyla dener (eski testler Esc kullandığı için hatayı görmüyordu). Tüm ekranlarda 195 kontrol isabet testi ve 56 gerçek tıklamayla denetlendi.
+
 ## 3.1.0 · Kayıt ve vitrin güncellemesi (26 Eylül 2026)
 
 ### Kayıt

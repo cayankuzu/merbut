@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAudioStore } from '../audio/audioStore'
 import { BIOMES } from '../config/biomes'
 import { BIOME_CONTENT } from '../content/biomeContent'
@@ -34,6 +34,18 @@ export function PauseMenu() {
   const openSettings = useAudioStore((state) => state.openPanel)
   const content = BIOME_CONTENT[biome]!
 
+  // Inside a sub-panel, Esc / gamepad B mean "back", like the GERİ button, not "resume".
+  useEffect(() => {
+    if (panel === 'menu') return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.code !== 'Escape' || useAudioStore.getState().panelOpen) return
+      event.stopImmediatePropagation()
+      setPanel('menu')
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [panel])
+
   return (
     <section className="pause-screen" aria-label="Oyun duraklatıldı" role="dialog" aria-modal="true">
       <small>MERBUT · DURAKLATILDI · {content.chapter}</small>
@@ -54,7 +66,7 @@ export function PauseMenu() {
           </>
         )}
       </div>
-      <em>Esc · Start · devam</em>
+      <em>{panel === 'menu' ? 'Esc · Start · devam' : 'Esc · B · geri'}</em>
     </section>
   )
 }

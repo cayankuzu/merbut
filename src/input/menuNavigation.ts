@@ -17,9 +17,18 @@ function visibleControls() {
   })
 }
 
-/** Menus that open on top (dialogs) own navigation while they are open. */
+/**
+ * Menus that open on top (dialogs) own navigation while they are open. Dialogs
+ * can stack (settings over the pause menu); the last one in the document is
+ * the one on top, so it wins.
+ */
+function topDialog() {
+  const dialogs = document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]:not([aria-hidden="true"])')
+  return dialogs.length > 0 ? dialogs[dialogs.length - 1]! : null
+}
+
 function navigationScope(controls: HTMLElement[]) {
-  const dialog = document.querySelector<HTMLElement>('[role="dialog"][aria-modal="true"]:not([aria-hidden="true"])')
+  const dialog = topDialog()
   return dialog ? controls.filter((control) => dialog.contains(control)) : controls
 }
 

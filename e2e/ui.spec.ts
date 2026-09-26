@@ -137,4 +137,42 @@ test.describe('Merbut arayüz doğrulaması', () => {
     await expect(page.getByRole('heading', { name: 'HZ. ALİ’NİN ZAMANI' })).toBeVisible()
     await page.screenshot({ path: 'e2e-artifacts/continued-summary.png' })
   })
+
+  // Real mouse clicks, never Esc: the interface layer ignores the pointer by
+  // default, and screens that forgot to opt back in let clicks fall through to
+  // the 3D canvas (back buttons, chapter tracks, prologue skip, credits skip).
+  test('alt ekranlardaki GERİ, parça, ATLA ve GEÇ butonları fareyle çalışır', async ({ page }) => {
+    await page.goto('/')
+    await page.evaluate(() => localStorage.setItem('merbut-progress', JSON.stringify({ state: { furthestBiome: 2, checkpoint: null, bestTimes: {}, bestRanks: {}, achievements: {}, stats: { runs: 0, victories: 0, kills: 0, falls: 0, perfectDodges: 0, bestCombo: 0, playSeconds: 0 }, prologueSeen: false }, version: 2 })))
+    await openMainMenu(page)
+    for (const [open, screen] of [['BÖLÜM SEÇ', '.chapter-select'], ['BAŞARIMLAR', '.achievements-screen'], ['YAPIMCILAR', '.credits-screen'], ['YAMA NOTLARI', '.patch-notes']] as const) {
+      await page.getByRole('button', { name: open }).click()
+      await expect(page.locator(screen)).toBeVisible()
+      await page.locator(`${screen} > header button`).click()
+      await expect(page.getByRole('button', { name: 'YENİ OYUN' })).toBeVisible()
+    }
+
+    await page.getByRole('button', { name: 'BÖLÜM SEÇ' }).click()
+    await page.locator('.album__tracks button:not([disabled])').nth(1).click()
+    await expect.poll(() => page.evaluate(() => window.__MERBUT__!.getSessionState().phase)).toBe('controls')
+    await page.getByRole('button', { name: 'GERİ', exact: true }).click()
+    await page.locator('.chapter-select > header button').click()
+
+    await page.getByRole('button', { name: 'YENİ OYUN' }).click()
+    await page.getByRole('button', { name: 'SAVAŞA BAŞLA' }).click()
+    await page.getByRole('button', { name: /ATLA/ }).click()
+    await expect.poll(() => page.evaluate(() => window.__MERBUT__!.getSessionState().phase), { timeout: 10_000 }).toMatch(/countdown|playing/)
+
+    await expect.poll(() => page.evaluate(() => window.__MERBUT__!.getSessionState().phase), { timeout: 10_000 }).toBe('playing')
+    await page.keyboard.press('Escape')
+    await page.getByRole('button', { name: 'KONTROLLER' }).click()
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('button', { name: 'DEVAM ET' })).toBeVisible()
+    expect(await page.evaluate(() => window.__MERBUT__!.getSessionState().phase)).toBe('paused')
+
+    await page.evaluate(() => window.__MERBUT__!.setSessionState({ phase: 'ending', bossPhase: 'continued' }))
+    await page.getByRole('button', { name: 'YAPIMCILAR' }).click()
+    await page.getByRole('button', { name: 'GEÇ' }).click()
+    await expect(page.locator('.ending-overlay--continued')).toBeVisible()
+  })
 })

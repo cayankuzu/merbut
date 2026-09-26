@@ -1,5 +1,16 @@
 export const PATCH_NOTES: readonly { version: string; title: string; notes: readonly string[] }[] = [
   {
+    version: '3.1.1',
+    title: 'Buton düzeltmeleri',
+    notes: [
+      'Bölüm Seç, Başarımlar, Yapımcılar ve Yama Notları ekranlarında GERİ butonu fareyle çalışmıyordu; bölüm seçimindeki parçalar da tıklanmıyordu. Düzeltildi.',
+      'Prologdaki ATLA butonu ve tıklayarak sonraki panele geçme fareyle çalışmıyordu. Düzeltildi.',
+      'Finaldeki yapımcılar kaydırmasının GEÇ butonu düzeltildi.',
+      'Duraklatma menüsünden açılan Ayarlarda ok tuşları ve gamepad artık ayarların içinde geziniyor.',
+      'Duraklatma → Kontroller ekranında Esc / gamepad B artık oyuna değil duraklatma menüsüne döner.',
+    ],
+  },
+  {
     version: '3.1.0',
     title: 'Kayıt ve vitrin güncellemesi',
     notes: [
