@@ -1,16 +1,82 @@
 import { useEffect } from 'react'
+import { gameEvents, type GameEvent } from '../sim/events'
 import { useGameStore } from '../store/gameStore'
-import { useSessionStore } from '../store/sessionStore'
 import { useAudioStore } from './audioStore'
 import { gameAudio, type SoundEffect } from './gameAudio'
 
-const ACTIVE_PHASES = ['playing', 'boss-intro', 'final-intro', 'ending'] as const
-
-function playEffect(effect: SoundEffect, worldX?: number) {
+function panFor(worldX?: number) {
+  if (worldX === undefined) return 0
   const cameraX = useGameStore.getState().cameraX
-  const pan = worldX === undefined ? 0 : Math.max(-0.9, Math.min(0.9, (worldX - cameraX) / 12))
-  gameAudio.play(effect, pan)
+  return Math.max(-0.9, Math.min(0.9, (worldX - cameraX) / 12))
+}
+
+function play(effect: SoundEffect, worldX?: number) {
+  gameAudio.play(effect, panFor(worldX))
   useAudioStore.getState().noteEffect(effect)
+}
+
+const heroX = (id: 'ali' | 'jack') => useGameStore.getState().positions[id][0]
+
+const HAZARD_SOUNDS: Record<string, Record<'warn' | 'strike', SoundEffect>> = {
+  tide: { warn: 'tide-warn', strike: 'hazard-strike' },
+  lava: { warn: 'lava-warn', strike: 'hazard-strike' },
+  vent: { warn: 'lava-warn', strike: 'hazard-strike' },
+  gust: { warn: 'gust-warn', strike: 'hazard-strike' },
+  press: { warn: 'press-warn', strike: 'press-slam' },
+  bolt: { warn: 'bolt-warn', strike: 'thunder' },
+}
+
+/** Maps gameplay events to sounds. No store diffing: every cue has a cause. */
+function onEvent(event: GameEvent) {
+  switch (event.type) {
+    case 'player-attack':
+      play(event.id === 'ali' ? 'ali-slash' : 'jack-slash', event.x)
+      if (event.step === 3) play('finisher', event.x)
+      break
+    case 'enemy-hit': {
+      if (event.boss === 'aku') play(event.killed ? 'aku-death' : 'aku-hurt', event.x)
+      else if (event.boss === 'shadow') play(event.killed ? 'shadow-death' : 'shadow-hurt', event.x)
+      else play(`enemy-${event.kind}-${event.killed ? 'death' : 'hurt'}`, event.x)
+      if (event.killed && event.variant === 'mirage') play('sand-burst', event.x)
+      if (event.killed && (event.variant === 'drone' || event.variant === 'queen')) play('machine-break', event.x)
+      if (event.source !== 'hazard') play(event.killed ? 'kill-impact' : 'hit-impact', event.x)
+      break
+    }
+    case 'player-hit': play(`${event.id}-${event.down ? 'down' : 'hurt'}`, heroX(event.id)); break
+    case 'player-dash': play(event.perfect ? 'perfect-dodge' : 'dash', heroX(event.id)); break
+    case 'ability': play(event.ability === 'shield' ? 'shield' : 'fireball', heroX(event.id)); break
+    case 'pickup': play('heal', heroX(event.id)); break
+    case 'wave': play('wave'); break
+    case 'enemy-shot': play(event.kind === 'stone' ? 'stone-throw' : event.kind === 'dark-orb' ? 'dark-orb' : event.kind === 'time-portal' ? 'time-portal' : 'aku-fire', event.x); break
+    case 'meteor-warning': play('meteor-warning', event.x); break
+    case 'enemy-windup': play('telegraph', event.x); break
+    case 'biome-enter': play('biome-shift'); break
+    case 'gate-open': play('gate-open', event.x); break
+    case 'hazard': play(HAZARD_SOUNDS[event.name]?.[event.stage] ?? (event.stage === 'warn' ? 'lava-warn' : 'hazard-strike'), event.x); break
+    case 'mechanic':
+      if (event.name === 'neon') play('neon-break', event.x)
+      else if (event.name === 'bell') play('bell', event.x)
+      else if (event.name === 'resonance') play('resonance', event.x)
+      else if (event.name === 'firefly') play('firefly', event.x)
+      else if (event.name === 'hourglass') play('hourglass', event.x)
+      else if (event.name === 'rod') play('rod-charge', event.x)
+      else if (event.name === 'chain') play('chain-zap', event.x2 ?? event.x)
+      else if (event.name === 'parry') play('parry', event.x)
+      else if (event.name === 'team') play('team-strike', event.x)
+      break
+    case 'achievement': play('achievement'); break
+    case 'phase':
+      if (event.phase === 'boss-intro') play('shadow-roar')
+      if (event.phase === 'final-intro') play('aku-roar')
+      if (event.phase === 'defeat') play('defeat')
+      break
+    case 'boss-phase':
+      if (event.phase === 'portal') play('portal')
+      if (event.phase === 'continued') play('victory')
+      break
+    case 'boss-form': play(event.form === 'fracture' ? 'time-portal' : 'aku-roar'); break
+    default: break
+  }
 }
 
 export function AudioDirector() {
@@ -19,7 +85,6 @@ export function AudioDirector() {
     const unsubscribeAudio = useAudioStore.subscribe((state, previous) => {
       if (state.sfxVolume !== previous.sfxVolume) gameAudio.setVolume(state.sfxVolume)
     })
-
     const unlock = () => {
       gameAudio.unlock()
       window.dispatchEvent(new CustomEvent('merbut-audio-unlocked'))
@@ -31,60 +96,10 @@ export function AudioDirector() {
     window.addEventListener('pointerdown', unlock)
     window.addEventListener('keydown', unlock)
     document.addEventListener('visibilitychange', visibility)
-
-    const unsubscribeGame = useGameStore.subscribe((state, previous) => {
-      if (useSessionStore.getState().phase !== 'playing') return
-      if (state.animationStates.ali === 'attack' && previous.animationStates.ali !== 'attack') playEffect('ali-slash', state.positions.ali[0])
-      if (state.animationStates.jack === 'attack' && previous.animationStates.jack !== 'attack') playEffect('jack-slash', state.positions.jack[0])
-    })
-
-    const unsubscribeSession = useSessionStore.subscribe((state, previous) => {
-      const active = ACTIVE_PHASES.includes(state.phase as typeof ACTIVE_PHASES[number])
-      if (state.spawnedWaves.length > previous.spawnedWaves.length) playEffect('wave')
-      if (state.projectiles.length > previous.projectiles.length) playEffect('fireball')
-      if (state.enemyProjectiles.length > previous.enemyProjectiles.length) {
-        const projectile = state.enemyProjectiles.at(-1)
-        if (projectile) playEffect(projectile.kind === 'stone' ? 'stone-throw' : projectile.kind === 'dark-orb' ? 'dark-orb' : projectile.kind === 'time-portal' ? 'time-portal' : 'aku-fire', projectile.x)
-      }
-      if (state.meteors.length > previous.meteors.length) playEffect('meteor-warning')
-      if (state.pickups.length < previous.pickups.length) playEffect('heal')
-      if (state.players.jack.abilityActiveUntil > previous.players.jack.abilityActiveUntil) playEffect('shield')
-      if (state.players.ali.kills > previous.players.ali.kills || state.players.jack.kills > previous.players.jack.kills) playEffect('xp')
-
-      if (active) {
-        if (state.currentBiome !== previous.currentBiome) playEffect('biome-shift')
-        for (const id of ['ali', 'jack'] as const) {
-          const player = state.players[id]
-          const oldPlayer = previous.players[id]
-          if (player.health < oldPlayer.health) playEffect(`${id}-${player.dead && !oldPlayer.dead ? 'down' : 'hurt'}`, useGameStore.getState().positions[id][0])
-        }
-
-        const previousEnemies = new Map(previous.enemies.map((enemy) => [enemy.id, enemy]))
-        for (const enemy of state.enemies) {
-          const oldEnemy = previousEnemies.get(enemy.id)
-          if (!oldEnemy || enemy.health >= oldEnemy.health) continue
-          const defeated = enemy.animation === 'dead' && oldEnemy.animation !== 'dead'
-          if (enemy.bossType === 'aku') playEffect(defeated ? 'aku-death' : 'aku-hurt', enemy.x)
-          else if (enemy.bossType === 'shadow') playEffect(defeated ? 'shadow-death' : 'shadow-hurt', enemy.x)
-          else playEffect(`enemy-${enemy.kind}-${defeated ? 'death' : 'hurt'}`, enemy.x)
-        }
-      }
-
-      if (state.phase !== previous.phase) {
-        if (state.phase === 'boss-intro') playEffect('shadow-roar')
-        if (state.phase === 'final-intro') playEffect('aku-roar')
-        if (state.phase === 'defeat') playEffect('defeat')
-      }
-      if (state.bossPhase !== previous.bossPhase) {
-        if (state.bossPhase === 'portal') playEffect('portal')
-        if (state.bossPhase === 'continued') playEffect('victory')
-      }
-    })
-
+    const unsubscribeEvents = gameEvents.on(onEvent)
     return () => {
       unsubscribeAudio()
-      unsubscribeGame()
-      unsubscribeSession()
+      unsubscribeEvents()
       window.removeEventListener('pointerdown', unlock)
       window.removeEventListener('keydown', unlock)
       document.removeEventListener('visibilitychange', visibility)

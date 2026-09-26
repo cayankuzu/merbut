@@ -5,6 +5,7 @@ import { Group, Mesh, MeshStandardMaterial, Object3D } from 'three'
 import { ASSET_PATHS } from '../config/assetPaths'
 import { useGameStore } from '../store/gameStore'
 import { useSessionStore } from '../store/sessionStore'
+import { simClock } from '../sim/clock'
 
 function createPurpleBottle(source: Object3D) {
   const clone = source.clone(true)
@@ -34,7 +35,7 @@ export function BossIntroSequence() {
   useFrame((_, delta) => {
     if (!aliRoot.current || !jackRoot.current) return
     const game = useGameStore.getState()
-    const now = performance.now()
+    const now = simClock.now()
     const drinkingProgress = bossPhase === 'drinking' ? Math.min(1, Math.max(0, (now - phaseStartedAt - 1_350) / 1_250)) : 0
     const midpoint = (game.positions.ali[0] + game.positions.jack[0]) / 2
     const targets = [

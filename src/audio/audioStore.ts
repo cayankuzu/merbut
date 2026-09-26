@@ -1,19 +1,25 @@
 import { create } from 'zustand'
-import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware'
+import { createJSONStorage, persist } from 'zustand/middleware'
+import { safeStorage } from '../utils/safeStorage'
 import type { SoundEffect } from './gameAudio'
 
+export type VolumeChannel = 'masterVolume' | 'musicVolume' | 'sfxVolume' | 'ambienceVolume' | 'voiceVolume'
+
 interface AudioState {
-  sfxVolume: number
+  masterVolume: number
   musicVolume: number
+  sfxVolume: number
+  ambienceVolume: number
+  voiceVolume: number
   musicPlaying: boolean
-  musicLooping: boolean
+  /** The settings panel is shared by the menu and pause screen. */
   panelOpen: boolean
   lastEffect: SoundEffect | null
   effectCount: number
+  setVolume: (channel: VolumeChannel, volume: number) => void
   setSfxVolume: (volume: number) => void
   setMusicVolume: (volume: number) => void
   setMusicPlaying: (playing: boolean) => void
-  setMusicLooping: (looping: boolean) => void
   openPanel: () => void
   togglePanel: () => void
   closePanel: () => void
@@ -22,60 +28,31 @@ interface AudioState {
 
 const clampVolume = (volume: number) => Math.max(0, Math.min(1, volume))
 
-const memoryValues = new Map<string, string>()
-const memoryStorage: StateStorage = {
-  getItem: (name) => memoryValues.get(name) ?? null,
-  setItem: (name, value) => memoryValues.set(name, value),
-  removeItem: (name) => memoryValues.delete(name),
-}
-
-const getAudioStorage = (): StateStorage => {
-  try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      return window.localStorage
-    }
-  } catch {
-    // Sandboxed browsers and the test runner can reject localStorage access.
-  }
-
-  return memoryStorage
-}
-
 export const useAudioStore = create<AudioState>()(persist((set) => ({
-  sfxVolume: 0.78,
-  musicVolume: 0.48,
+  masterVolume: 0.9,
+  musicVolume: 0.55,
+  sfxVolume: 0.8,
+  ambienceVolume: 0.6,
+  voiceVolume: 0.7,
   musicPlaying: true,
-  musicLooping: true,
   panelOpen: false,
   lastEffect: null,
   effectCount: 0,
+  setVolume: (channel, volume) => set({ [channel]: clampVolume(volume) } as Pick<AudioState, VolumeChannel>),
   setSfxVolume: (sfxVolume) => set({ sfxVolume: clampVolume(sfxVolume) }),
   setMusicVolume: (musicVolume) => set({ musicVolume: clampVolume(musicVolume) }),
   setMusicPlaying: (musicPlaying) => set({ musicPlaying }),
-  setMusicLooping: (musicLooping) => set({ musicLooping }),
   openPanel: () => set({ panelOpen: true }),
   togglePanel: () => set((state) => ({ panelOpen: !state.panelOpen })),
   closePanel: () => set({ panelOpen: false }),
   noteEffect: (lastEffect) => set((state) => ({ lastEffect, effectCount: state.effectCount + 1 })),
 }), {
   name: 'merbut-audio-settings',
-  version: 2,
-  storage: createJSONStorage(getAudioStorage),
-  migrate: (persistedState, version) => {
-    const state = (persistedState ?? {}) as Partial<AudioState>
-    if (version < 2) {
-      return {
-        ...state,
-        musicPlaying: true,
-        musicLooping: true,
-      } as AudioState
-    }
-    return state as AudioState
+  version: 3,
+  storage: createJSONStorage(safeStorage),
+  migrate: (persisted) => {
+    const state = (persisted ?? {}) as Partial<AudioState>
+    return { ...state, musicPlaying: state.musicPlaying ?? true } as AudioState
   },
-  partialize: (state) => ({
-    sfxVolume: state.sfxVolume,
-    musicVolume: state.musicVolume,
-    musicPlaying: state.musicPlaying,
-    musicLooping: state.musicLooping,
-  }),
+  partialize: ({ masterVolume, musicVolume, sfxVolume, ambienceVolume, voiceVolume, musicPlaying }) => ({ masterVolume, musicVolume, sfxVolume, ambienceVolume, voiceVolume, musicPlaying }),
 }))

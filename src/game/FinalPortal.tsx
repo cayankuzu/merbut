@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { AdditiveBlending, Group, MathUtils } from 'three'
 import { useSessionStore } from '../store/sessionStore'
 import { TimeSpiralDisc } from './TimeSpiralDisc'
+import { simClock } from '../sim/clock'
 
 const RIFT_POINTS = Array.from({ length: 30 }, (_, index) => index / 30 * Math.PI * 2)
 const VORTEX_RINGS = [0.52, 0.88, 1.24, 1.62, 2.02, 2.42] as const
@@ -18,7 +19,7 @@ export function FinalPortal() {
     const visible = state.phase === 'ending' && ['portal', 'falling', 'continued'].includes(state.bossPhase)
     root.current.visible = visible
     if (!visible) return
-    const elapsed = performance.now() - state.bossPhaseStartedAt
+    const elapsed = simClock.now() - state.bossPhaseStartedAt
     const opening = MathUtils.clamp((elapsed - 1_700) / 1_050, 0, 1)
     const pulse = 1 + Math.sin(elapsed * 0.012) * 0.045
     root.current.position.x = state.endingPortalX

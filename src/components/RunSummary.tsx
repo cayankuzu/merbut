@@ -1,5 +1,8 @@
 import { BIOMES } from '../config/biomes'
 import { DIFFICULTIES } from '../config/difficulty'
+import { achievementById } from '../meta/achievements'
+import { useRunStore } from '../meta/runTracker'
+import { HERO_NAMES } from '../sim/players'
 import { useSessionStore } from '../store/sessionStore'
 
 interface RunSummaryProps {
@@ -7,9 +10,7 @@ interface RunSummaryProps {
 }
 
 function formatTime(totalSeconds: number) {
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = Math.floor(totalSeconds % 60)
-  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+  return `${String(Math.floor(totalSeconds / 60)).padStart(2, '0')}:${String(Math.floor(totalSeconds % 60)).padStart(2, '0')}`
 }
 
 export function RunSummary({ compact = false }: RunSummaryProps) {
@@ -17,12 +18,14 @@ export function RunSummary({ compact = false }: RunSummaryProps) {
   const elapsed = useSessionStore((state) => state.elapsedSeconds)
   const difficulty = useSessionStore((state) => state.difficulty)
   const currentBiome = useSessionStore((state) => state.currentBiome)
-  const startingLives = DIFFICULTIES[difficulty].playerLives
+  const result = useRunStore((state) => state.result)
+  const falls = useRunStore((state) => state.falls)
+  const unlocked = useRunStore((state) => state.unlockedThisRun)
   const totalScore = players.ali.score + players.jack.score
-  const totalKills = players.ali.kills + players.jack.kills
 
   return (
     <div className={`run-summary${compact ? ' run-summary--compact' : ''}`} aria-label="Oyun özeti">
+      {result ? <div className={`run-summary__rank rank-${result.rank}`} aria-label={`Rütbe ${result.rank}`}><b>{result.rank}</b><small>{result.points} PUAN</small></div> : null}
       <div className="run-summary__totals">
         <div><span>TOPLAM SKOR</span><b>{totalScore.toLocaleString('tr-TR')}</b></div>
         <div><span>SÜRE</span><b>{formatTime(elapsed)}</b></div>
@@ -30,10 +33,15 @@ export function RunSummary({ compact = false }: RunSummaryProps) {
         <div><span>İLERLEME</span><b>{Math.min(BIOMES.length, currentBiome + 1)}/{BIOMES.length}</b></div>
       </div>
       <div className="run-summary__heroes">
-        <article><strong>Hz. Ali</strong><span>{players.ali.score.toLocaleString('tr-TR')} puan</span><small>{players.ali.kills} öldürme · {startingLives - players.ali.lives} düşüş</small></article>
-        <article><strong>Samuray Jack</strong><span>{players.jack.score.toLocaleString('tr-TR')} puan</span><small>{players.jack.kills} öldürme · {startingLives - players.jack.lives} düşüş</small></article>
+        {(['ali', 'jack'] as const).map((id) => (
+          <article key={id}>
+            <strong>{HERO_NAMES[id]}</strong>
+            <span>{players[id].score.toLocaleString('tr-TR')} puan</span>
+            <small>{players[id].kills} yenilgi · en uzun kombo {players[id].bestCombo}</small>
+          </article>
+        ))}
       </div>
-      <footer>{totalKills} TOPLAM ÖLDÜRME</footer>
+      <footer>{falls} düşüş{unlocked.length > 0 ? ` · Açılan başarımlar: ${unlocked.map((id) => achievementById(id)?.title).join(', ')}` : ''}</footer>
     </div>
   )
 }

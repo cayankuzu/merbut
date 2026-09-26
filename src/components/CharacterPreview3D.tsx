@@ -1,4 +1,5 @@
 import { Suspense, useEffect } from 'react'
+import { ASSET_PATHS } from '../config/assetPaths'
 import { Canvas, useThree } from '@react-three/fiber'
 import type { CharacterId } from '../types/character'
 import { RotatingCharacterPreview } from './RotatingCharacterPreview'
@@ -11,8 +12,8 @@ interface CharacterPreview3DProps {
 }
 
 const HUD_PORTRAITS: Record<CharacterId, string> = {
-  ali: '/assets/ui/ali-hud.webp',
-  jack: '/assets/ui/jack-hud.webp',
+  ali: ASSET_PATHS.ui.aliHud,
+  jack: ASSET_PATHS.ui.jackHud,
 }
 
 function PreviewFrameScheduler({ active, fps }: { active: boolean; fps: number }) {

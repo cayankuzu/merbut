@@ -1,14 +1,12 @@
-export function FireballVisual({ directionX = 1, directionZ = 0 }: { directionX?: number; directionZ?: number }) {
+import { EnergyShell } from './vfx/EnergyShell'
+
+/** Ali's fireball: a white-hot core inside a rolling shell of flame; embers come from the particle system. */
+export function FireballVisual() {
   return (
     <>
-      <mesh><icosahedronGeometry args={[0.28, 2]} /><meshBasicMaterial color="#fff0a2" toneMapped={false} /></mesh>
-      <mesh scale={1.75}><icosahedronGeometry args={[0.27, 1]} /><meshBasicMaterial color="#ff3b0b" transparent opacity={0.42} toneMapped={false} /></mesh>
-      {[0.45, 0.85, 1.2].map((distance, index) => (
-        <mesh key={distance} position={[-directionX * distance, 0, -directionZ * distance]} scale={1 - index * 0.2}>
-          <octahedronGeometry args={[0.19, 0]} />
-          <meshBasicMaterial color={index === 0 ? '#ff9a24' : '#d92b08'} transparent opacity={0.72 - index * 0.16} toneMapped={false} />
-        </mesh>
-      ))}
+      <mesh><icosahedronGeometry args={[0.17, 2]} /><meshBasicMaterial color="#fff6d0" toneMapped={false} /></mesh>
+      <EnergyShell color="#ff4a0e" core="#ffd27a" radius={0.34} fill={0.9} bands={16} speed={2.4} />
+      <EnergyShell color="#ff2a06" core="#ff9a24" radius={0.56} opacity={0.45} bands={6} speed={1.6} />
     </>
   )
 }

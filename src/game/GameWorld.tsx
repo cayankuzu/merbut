@@ -2,15 +2,17 @@ import { AliCharacter } from '../characters/AliCharacter'
 import { JackCharacter } from '../characters/JackCharacter'
 import { BiomeLighting } from './BiomeLighting'
 import { BiomeAtmosphere } from './BiomeAtmosphere'
-import { CombatEffects } from './CombatEffects'
+import { VfxLayer } from './vfx/VfxLayer'
 import { DustParticles } from './DustParticles'
 import { GameCamera } from './GameCamera'
 import { Ground } from './Ground'
-import { BiomeScenery } from './BiomeScenery'
+import { WeatherSystem } from '../world/WeatherSystem'
+import { MechanicsVisuals } from '../world/MechanicsVisuals'
+import { BiomeDressing } from '../world/BiomeDressing'
 import { BiomeLockGates } from './BiomeLockGates'
 import { EnemySystem } from './EnemySystem'
 import { FireballProjectiles } from './FireballProjectiles'
-import { GameDirector } from './GameDirector'
+import { SimulationLoop } from '../sim/SimulationLoop'
 import { JackShield } from './JackShield'
 import { ZemzemPickups } from './ZemzemPickups'
 import { PlayerDeathEffects } from './PlayerDeathEffects'
@@ -20,7 +22,9 @@ import { BossIntroSequence } from './BossIntroSequence'
 import { BossBattleEffects } from './BossBattleEffects'
 import { FinalPortal } from './FinalPortal'
 import { useSessionStore } from '../store/sessionStore'
+import { labOff } from '../utils/labFlags'
 import { ActorContactShadows } from './ActorContactShadows'
+import { DamageNumbers } from './feedback/DamageNumbers'
 
 export function GameWorld() {
   const phase = useSessionStore((state) => state.phase)
@@ -28,7 +32,7 @@ export function GameWorld() {
   return (
     <>
       <GameCamera />
-      <GameDirector />
+      <SimulationLoop />
       <BiomeLighting />
       <BiomeAtmosphere />
 
@@ -38,7 +42,7 @@ export function GameWorld() {
         <ActorContactShadows />
         <EnemySystem />
         <ZemzemPickups />
-        <CombatEffects />
+        {labOff('vfx') ? null : <VfxLayer />}
         <FireballProjectiles />
         <EnemyProjectileEffects />
         <CombatImpactEffects />
@@ -47,10 +51,13 @@ export function GameWorld() {
         <BossBattleEffects />
         <FinalPortal />
         <PlayerDeathEffects />
+        {labOff('numbers') ? null : <DamageNumbers />}
       </> : null}
       <Ground />
-      <BiomeScenery />
-      <BiomeLockGates />
+      {labOff('dressing') ? null : <BiomeDressing />}
+      {labOff('mechanics') ? null : <MechanicsVisuals />}
+      {labOff('weather') ? null : <WeatherSystem />}
+      {labOff('gates') ? null : <BiomeLockGates />}
       <DustParticles />
     </>
   )

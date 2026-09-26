@@ -15,9 +15,10 @@ import {
 } from 'three'
 import { useShallow } from 'zustand/react/shallow'
 import { useSessionStore } from '../store/sessionStore'
-import { AKU_FIRE_SPIKE_RADIUS } from './akuCombat'
+import { AKU_FIRE_SPIKE_RADIUS } from '../sim/akuCombat'
 import { currentMeteorById } from './projectileLookup'
 import type { MeteorState } from '../types/session'
+import { simClock } from '../sim/clock'
 
 const SHADOW_THORNS = Array.from({ length: 18 }, (_, index) => index / 18 * Math.PI * 2)
 const AKU_SPIKES = Array.from({ length: 28 }, (_, index) => ({
@@ -154,7 +155,7 @@ function InstancedMeteorField({ ids, kind }: { ids: readonly string[]; kind: Met
     const borderMesh = border.current
     const orbMesh = orb.current
     if (!warningMesh || !borderMesh || !orbMesh) return
-    const now = performance.now()
+    const now = simClock.now()
     ids.forEach((id, index) => {
       const meteor = currentMeteorById(id)
       const active = meteor && now >= meteor.createdAt

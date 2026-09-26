@@ -1,0 +1,11 @@
+{
+  "items/zemzem.glb": {
+    "simplifiedTo": 0.05
+  },
+  "ali/ali-sword.glb": {
+    "simplifiedTo": 0.2
+  },
+  "jack/jack-sword.glb": {
+    "simplifiedTo": 0.25
+  }
+}

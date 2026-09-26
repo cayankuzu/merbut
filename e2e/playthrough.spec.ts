@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { startQuick } from './helpers'
 
 type Difficulty = 'easy' | 'normal' | 'hard' | 'soulslike'
 
@@ -6,7 +7,7 @@ const MODES: Array<{ id: Difficulty; index: number; label: string }> = [
   { id: 'easy', index: 0, label: 'KOLAY' },
   { id: 'normal', index: 1, label: 'ORTA' },
   { id: 'hard', index: 2, label: 'ZOR' },
-  { id: 'soulslike', index: 3, label: 'SOULS LIKE' },
+  { id: 'soulslike', index: 3, label: 'ACIMASIZ' },
 ]
 
 interface Snapshot {
@@ -41,18 +42,13 @@ async function readSnapshot(page: Page): Promise<Snapshot> {
       meteors: session.meteors.map((meteor) => ({ x: meteor.x, impactAt: meteor.impactAt, landedAt: meteor.landedAt })),
       enemyProjectiles: session.enemyProjectiles.map((projectile) => ({ x: projectile.x, targetX: projectile.targetX })),
       pickups: session.pickups.map((pickup) => ({ x: pickup.x })),
-      now: performance.now(),
+      now: window.__MERBUT__!.now(),
     }
   })
 }
 
 async function startMode(page: Page, mode: typeof MODES[number]) {
-  await page.goto('/')
-  await expect(page.locator('.loading-screen')).toHaveCount(0, { timeout: 60_000 })
-  await page.getByRole('button', { name: 'OYUNA BAŞLA' }).click()
-  await page.locator('.difficulty-select button').nth(mode.index).click()
-  await page.getByRole('button', { name: 'SAVAŞA BAŞLA' }).click()
-  await expect.poll(() => page.evaluate(() => window.__MERBUT__!.getSessionState().phase), { timeout: 10_000 }).toBe('playing')
+  await startQuick(page, mode.id)
 }
 
 async function playAttempt(page: Page, mode: typeof MODES[number], attempt: number) {
@@ -83,11 +79,11 @@ async function playAttempt(page: Page, mode: typeof MODES[number], attempt: numb
   }
 
   const startedAt = Date.now()
-  while (Date.now() - startedAt < 12 * 60_000) {
+  while (Date.now() - startedAt < 18 * 60_000) {
     const state = await readSnapshot(page)
     if (state.phase === 'defeat') {
       await releaseMovement()
-      console.log(`[OYUN] ${mode.label} · ${attempt}. deneme YENİLGİ · biyom ${state.biome + 1}/7 · ${Math.round(state.elapsed)} sn`)
+      console.log(`[OYUN] ${mode.label} · ${attempt}. deneme YENİLGİ · biyom ${state.biome + 1}/10 · ${Math.round(state.elapsed)} sn`)
       return { victory: false, state }
     }
     if (state.phase === 'ending' && state.bossPhase === 'continued') {
@@ -101,7 +97,7 @@ async function playAttempt(page: Page, mode: typeof MODES[number], attempt: numb
 
     if (state.biome !== lastBiome) {
       lastBiome = state.biome
-      console.log(`[OYUN] ${mode.label} · ${attempt}. deneme · biyom ${state.biome + 1}/7 başladı`)
+      console.log(`[OYUN] ${mode.label} · ${attempt}. deneme · biyom ${state.biome + 1}/10 başladı`)
     }
 
     if (state.phase !== 'playing') {
@@ -188,20 +184,20 @@ async function playAttempt(page: Page, mode: typeof MODES[number], attempt: numb
     if (now - lastReport > 20_000) {
       lastReport = now
       const targetReport = groupTarget ? ` · hedef K${groupTarget.kind} ${Math.ceil(groupTarget.health)}/${groupTarget.maxHealth} x${groupTarget.x.toFixed(1)} ${groupTarget.animation}` : ''
-      console.log(`[OYUN] ${mode.label} · biyom ${state.biome + 1}/7 · düşman ${livingEnemies.length} · Hz. Ali ${Math.ceil(state.players.ali.health)}/${state.players.ali.maxHealth} (${state.players.ali.lives}) x${state.positions.ali.toFixed(1)} · Samuray Jack ${Math.ceil(state.players.jack.health)}/${state.players.jack.maxHealth} (${state.players.jack.lives}) x${state.positions.jack.toFixed(1)}${targetReport}`)
+      console.log(`[OYUN] ${mode.label} · biyom ${state.biome + 1}/10 · düşman ${livingEnemies.length} · Hz. Ali ${Math.ceil(state.players.ali.health)}/${state.players.ali.maxHealth} (${state.players.ali.lives}) x${state.positions.ali.toFixed(1)} · Samuray Jack ${Math.ceil(state.players.jack.health)}/${state.players.jack.maxHealth} (${state.players.jack.lives}) x${state.positions.jack.toFixed(1)}${targetReport}`)
     }
     await page.waitForTimeout(105)
   }
 
   await releaseMovement()
-  throw new Error(`${mode.label} ${attempt}. deneme 12 dakikalık güvenlik sınırını aştı`)
+  throw new Error(`${mode.label} ${attempt}. deneme 18 dakikalık güvenlik sınırını aştı`)
 }
 
 test.describe.configure({ mode: 'serial' })
 
 for (const mode of MODES) {
   test(`${mode.label} modu dış klavye girdileriyle tamamlanabilir`, async ({ page }) => {
-    test.setTimeout(35 * 60_000)
+    test.setTimeout(60 * 60_000)
     const pageErrors: string[] = []
     page.on('pageerror', (error) => pageErrors.push(error.message))
     await startMode(page, mode)
@@ -209,11 +205,18 @@ for (const mode of MODES) {
     for (let attempt = attemptOffset + 1; attempt <= 25; attempt += 1) {
       const result = await playAttempt(page, mode, attempt)
       if (result.victory) {
-        expect(result.state.biome).toBe(6)
+        expect(result.state.biome).toBe(9)
         expect(pageErrors).toEqual([])
         return
       }
-      await page.getByRole('button', { name: 'TEKRAR OYNA' }).click()
+      // Like a player: continue from the realm's checkpoint when the game offers it.
+      const resume = page.getByRole('button', { name: 'KAYITTAN DEVAM ET' })
+      if (await resume.count()) {
+        await resume.click()
+        await page.waitForTimeout(400)
+        const briefing = page.getByRole('button', { name: 'SAVAŞA BAŞLA' })
+        if (await briefing.count()) await briefing.click()
+      } else await page.getByRole('button', { name: 'TEKRAR OYNA' }).click()
       await expect.poll(() => page.evaluate(() => window.__MERBUT__!.getSessionState().phase), { timeout: 10_000 }).toBe('playing')
     }
     throw new Error(`${mode.label} 25 denemede tamamlanamadı`)

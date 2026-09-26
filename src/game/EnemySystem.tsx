@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { isMachineVariant } from '../config/enemies'
+import { DroneActor } from './DroneActor'
 import { EnemyActor } from './EnemyActor'
 import { useSessionStore } from '../store/sessionStore'
 import { EvilJackBossActor } from './EvilJackBossActor'
@@ -11,7 +13,7 @@ import { buildEnemyRenderPlan, runtimeFullEnemyActorLimit } from './enemyRenderP
 import { EnemyHealthBars } from './EnemyHealthBars'
 
 export function EnemySystem() {
-  const roster = useSessionStore(useShallow((state) => state.enemies.map((enemy) => `${enemy.id}|${enemy.bossType ?? 'enemy'}`)))
+  const roster = useSessionStore(useShallow((state) => state.enemies.map((enemy) => `${enemy.id}|${enemy.bossType ?? (isMachineVariant(enemy.variant) ? 'drone' : 'enemy')}`)))
   const tier = usePerformanceStore((state) => state.tier)
   const qualityFactor = usePerformanceStore((state) => state.qualityFactor)
   const mountDistance = PERFORMANCE_PROFILES[tier].actorMountDistance
@@ -32,10 +34,10 @@ export function EnemySystem() {
     const enemies = useSessionStore.getState().enemies
     const plan = buildEnemyRenderPlan(enemies, cameraX, mountDistance, tier, stickyFullActors.current, fullActorLimit)
     stickyFullActors.current = plan.fullActorIds
-    const bossTypes = new Map(enemies.map((enemy) => [enemy.id, enemy.bossType]))
+    const bossTypes = new Map(enemies.map((enemy) => [enemy.id, enemy.bossType ?? (isMachineVariant(enemy.variant) ? 'drone' : null)]))
     return {
       actorKeys: plan.fullActorIds.map((id) => `${id}|${bossTypes.get(id) ?? 'enemy'}`),
-      healthBarIds: plan.fullActorIds.filter((id) => !bossTypes.get(id)),
+      healthBarIds: plan.fullActorIds.filter((id) => !bossTypes.get(id) || bossTypes.get(id) === 'drone'),
       proxyIds: plan.proxyIds,
     }
   }, [fullActorLimit, mountDistance, roster, tier, visibilityTick])
@@ -46,6 +48,8 @@ export function EnemySystem() {
       ? <EvilJackBossActor id={id} key={id} />
       : bossType === 'aku'
         ? <AkuBossActor id={id} key={id} />
-        : <EnemyActor id={id} key={id} />
+        : bossType === 'drone'
+          ? <DroneActor id={id} key={id} />
+          : <EnemyActor id={id} key={id} />
   })}<EnemyHealthBars ids={renderPlan.healthBarIds} /><CrowdEnemyProxies ids={renderPlan.proxyIds} /></>
 }

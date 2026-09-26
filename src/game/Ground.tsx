@@ -25,35 +25,7 @@ const GROUND_MARGIN = 7
 const GROUND_WIDTH = WORLD_VISUAL_RIGHT - WORLD_VISUAL_LEFT + GROUND_MARGIN * 2
 const GROUND_CENTER = (WORLD_VISUAL_LEFT + WORLD_VISUAL_RIGHT) * 0.5
 const GROUND_DEPTH = 42
-const PATH_STEP = 3.35
 const END_DEPTHS = [-2.4, 0, 2.4] as const
-
-const PATH_SLABS = Array.from(
-  { length: Math.ceil(GROUND_WIDTH / PATH_STEP) },
-  (_, index) => {
-    const x = WORLD_VISUAL_LEFT - GROUND_MARGIN + 1.7 + index * PATH_STEP
-    const blend = getBiomeBlend(x)
-    return {
-      id: `slab-${index}`,
-      x,
-      z: Math.sin(index * 1.31) * 0.13,
-      rotation: Math.sin(index * 2.17) * 0.055,
-      width: 3.12 + ((index * 17) % 7) * 0.045,
-      color: new Color(blend.from.groundLight)
-        .lerp(new Color(blend.to.groundLight), blend.mix)
-        .multiplyScalar(0.88)
-        .getStyle(),
-    }
-  },
-)
-
-const CRACKS = Array.from({ length: 72 }, (_, index) => ({
-  id: `crack-${index}`,
-  x: WORLD_VISUAL_LEFT + 1.2 + index * 2.92,
-  z: (index % 2 === 0 ? 1 : -1) * (1.85 + ((index * 11) % 9) * 0.16),
-  length: 0.55 + ((index * 7) % 8) * 0.09,
-  rotation: Math.sin(index * 2.43) * 0.72,
-}))
 
 const ROCKS = Array.from({ length: 54 }, (_, index) => {
   const x = WORLD_VISUAL_LEFT + 1.8 + index * 3.92
@@ -86,16 +58,6 @@ const HORIZON_RIDGES = Array.from({ length: 48 }, (_, index) => {
     color: new Color(blend.from.horizonColor)
       .lerp(new Color(blend.to.horizonColor), blend.mix)
       .getStyle(),
-  }
-})
-
-const BIOME_GATES = BIOMES.slice(0, -1).map((biome, index) => {
-  const next = BIOMES[index + 1]
-  return {
-    id: `${biome.id}-${next.id}`,
-    x: WORLD_VISUAL_LEFT + (index + 1) * BIOME_WORLD_WIDTH,
-    fromColor: biome.accentColor,
-    toColor: next.accentColor,
   }
 })
 
@@ -144,8 +106,8 @@ function StaticInstances({
     return new BoxGeometry(1, 1, 1)
   }, [kind])
   const material = useMemo(() => kind === 'box-basic'
-    ? new MeshBasicMaterial({ color: '#38242c', opacity, transparent: opacity < 1, vertexColors: true })
-    : new MeshStandardMaterial({ color: '#ffffff', flatShading: true, metalness, roughness, vertexColors: true }),
+    ? new MeshBasicMaterial({ color: '#38242c', opacity, transparent: opacity < 1 })
+    : new MeshStandardMaterial({ color: '#ffffff', flatShading: true, metalness, roughness }),
   [kind, metalness, opacity, roughness])
 
   useLayoutEffect(() => {
@@ -175,7 +137,7 @@ function StaticInstances({
 }
 
 function createGroundGeometry() {
-  const geometry = new PlaneGeometry(GROUND_WIDTH, GROUND_DEPTH, 168, 28)
+  const geometry = new PlaneGeometry(GROUND_WIDTH, GROUND_DEPTH, 320, 36)
   const positions = geometry.attributes.position
   const colors: number[] = []
   const fromDark = new Color()
@@ -208,6 +170,8 @@ function createGroundGeometry() {
     light.lerpColors(fromLight, toLight, blend.mix)
     color.copy(dark).lerp(light, 0.24 + broadNoise * 0.22 + pathMask * 0.22)
     color.offsetHSL(0, fineNoise * 0.025, (fineNoise - 0.5) * 0.035)
+    // Baked key light: brighter toward the camera and along the fighting lane.
+    color.multiplyScalar(1.02 + pathMask * 0.1 + Math.max(0, depth) * 0.004)
     colors.push(color.r, color.g, color.b)
   }
 
@@ -240,17 +204,6 @@ export function Ground() {
       rotation: [0, ridge.rotation, 0.05],
       scale: [ridge.width, ridge.height * 0.52, 1.35],
     })), [groundHeight])
-  const pathInstances = useMemo<StaticInstance[]>(() => PATH_SLABS.map((slab) => ({
-    color: slab.color,
-    position: [slab.x, groundHeight - 0.012, slab.z],
-    rotation: [0, slab.rotation, 0],
-    scale: [slab.width, 0.075, 3.45],
-  })), [groundHeight])
-  const crackInstances = useMemo<StaticInstance[]>(() => CRACKS.map((crack) => ({
-    position: [crack.x, groundHeight + 0.012, crack.z],
-    rotation: [0, crack.rotation, 0],
-    scale: [crack.length, 0.012, 0.022],
-  })), [groundHeight])
   const rockInstances = useMemo<StaticInstance[]>(() => ROCKS.map((rock) => ({
     color: rock.color,
     position: [rock.x, groundHeight + rock.y, rock.z],
@@ -262,45 +215,22 @@ export function Ground() {
     <group name="procedural-biome-world">
       <mesh
         name="visible-ground"
+        // Drawn after the set dressing so paths early-z reject the ground under them.
+        renderOrder={1}
         geometry={groundGeometry}
         position={[GROUND_CENTER, groundHeight - 0.055, -1]}
         rotation={[-Math.PI / 2, 0, 0]}
         receiveShadow
       >
-        <meshStandardMaterial vertexColors flatShading roughness={0.91} metalness={0.06} />
+        {/* The ground fills half the screen. Its light is baked into vertex colours,
+            so it costs one texture-free fragment instead of five light evaluations. */}
+        <meshBasicMaterial vertexColors />
       </mesh>
 
       <StaticInstances instances={horizonBandInstances} kind="box-standard" receiveShadow roughness={1} />
       <StaticInstances instances={pointedRidgeInstances} kind="cone-standard" castShadow receiveShadow roughness={0.96} />
       <StaticInstances instances={roundedRidgeInstances} kind="rock-standard" castShadow receiveShadow roughness={0.96} />
-      <StaticInstances instances={pathInstances} kind="box-standard" receiveShadow roughness={0.86} metalness={0.07} />
-      <StaticInstances instances={crackInstances} kind="box-basic" opacity={0.68} />
       <StaticInstances instances={rockInstances} kind="rock-standard" castShadow receiveShadow roughness={0.87} metalness={0.13} />
-
-      {BIOME_GATES.map((gate) => (
-        <group key={gate.id} position={[gate.x, groundHeight, -9.6]}>
-          <mesh position={[-1.3, 2.1, 0]} rotation={[0, 0, -0.1]} castShadow>
-            <cylinderGeometry args={[0.28, 0.52, 4.2, 5]} />
-            <meshStandardMaterial color="#16151c" flatShading roughness={0.73} metalness={0.24} />
-          </mesh>
-          <mesh position={[1.3, 2.1, 0]} rotation={[0, 0, 0.1]} castShadow>
-            <cylinderGeometry args={[0.28, 0.52, 4.2, 5]} />
-            <meshStandardMaterial color="#16151c" flatShading roughness={0.73} metalness={0.24} />
-          </mesh>
-          <mesh position={[0, 4.18, 0]} scale={[2.9, 0.34, 0.38]} castShadow>
-            <octahedronGeometry args={[1, 0]} />
-            <meshStandardMaterial color="#211d27" flatShading roughness={0.7} metalness={0.28} />
-          </mesh>
-          <mesh position={[-1.25, 2.6, 0.45]}>
-            <octahedronGeometry args={[0.18, 0]} />
-            <meshStandardMaterial color={gate.fromColor} emissive={gate.fromColor} emissiveIntensity={3} />
-          </mesh>
-          <mesh position={[1.25, 2.6, 0.45]}>
-            <octahedronGeometry args={[0.18, 0]} />
-            <meshStandardMaterial color={gate.toColor} emissive={gate.toColor} emissiveIntensity={3} />
-          </mesh>
-        </group>
-      ))}
 
       {WORLD_ENDS.map((end) => (
         <group key={end.id} position={[end.x, groundHeight, -0.4]} rotation={[0, end.rotation, 0]}>

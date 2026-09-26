@@ -7,7 +7,7 @@ import { useDebugStore } from '../store/debugStore'
 import { useGameStore } from '../store/gameStore'
 import { useSessionStore } from '../store/sessionStore'
 import { clampCameraX } from '../utils/clampCamera'
-import { currentPerformanceProfile } from '../store/performanceStore'
+import { currentTrauma } from './feedback/hitFeedback'
 
 export function GameCamera() {
   const cameraRef = useRef<ThreePerspectiveCamera>(null)
@@ -68,8 +68,13 @@ export function GameCamera() {
     const midpoint = (positions.ali[0] + positions.jack[0]) / 2
     const separation = Math.abs(positions.ali[0] - positions.jack[0])
     const highestPlayer = Math.max(positions.ali[1], positions.jack[1])
-    const targetX = clampCameraX(midpoint, GAME_CONFIG.camera.xBounds)
-    const pullback = MathUtils.clamp((separation - 2.6) * 0.48, 0, GAME_CONFIG.camera.maxDistance - cameraDistance)
+    // During a boss fight the camera leans toward the boss and pulls back so
+    // the whole duel (and every telegraph) stays in frame.
+    const boss = session.bossPhase === 'fight' ? session.enemies.find((enemy) => enemy.boss && enemy.animation !== 'dead') : undefined
+    const framedX = boss ? midpoint + MathUtils.clamp(boss.x - midpoint, -7, 7) * 0.32 : midpoint
+    const targetX = clampCameraX(framedX, GAME_CONFIG.camera.xBounds)
+    const bossPullback = boss ? 2.4 : 0
+    const pullback = MathUtils.clamp((separation - 2.6) * 0.48 + bossPullback, 0, GAME_CONFIG.camera.maxDistance + 2.4 - cameraDistance)
     const targetY = cameraHeight + highestPlayer * 0.13
     camera.up.set(0, 1, 0)
     const nextFov = MathUtils.damp(camera.fov, 42, 4.5, smoothingDelta)
@@ -82,21 +87,14 @@ export function GameCamera() {
     camera.position.y = MathUtils.damp(camera.position.y, targetY, 5.2, smoothingDelta)
     camera.position.z = MathUtils.damp(camera.position.z, cameraDistance + pullback, 4.2, smoothingDelta)
     const baseCameraX = camera.position.x
-    const now = performance.now()
-    let impactEnergy = 0
-    for (let index = Math.max(0, session.impacts.length - 6); index < session.impacts.length; index += 1) {
-      const impact = session.impacts[index]!
-      const progress = (now - impact.createdAt) / Math.max(1, impact.duration)
-      if (progress < 0 || progress >= 1) continue
-      const proximity = 1 - Math.min(1, Math.abs(impact.x - baseCameraX) / 18)
-      const weight = impact.lethal ? 0.13 : impact.kind === 'boss' || impact.kind === 'quake' ? 0.085 : 0.028
-      impactEnergy += weight * proximity * (1 - progress)
-    }
-    const shakeAmplitude = Math.min(0.17, impactEnergy * currentPerformanceProfile().particleRatio)
+    // Trauma-based shake: strong hits shake more, and it always settles quickly.
+    const trauma = currentTrauma()
+    const shakeAmplitude = trauma * trauma * 0.32
     if (shakeAmplitude > 0.001) {
+      const t = performance.now() * 0.001
       previousShake.current.set(
-        Math.sin(now * 0.047) * shakeAmplitude,
-        Math.cos(now * 0.061) * shakeAmplitude * 0.55,
+        (Math.sin(t * 47.3) + Math.sin(t * 31.7 + 1.3) * 0.6) * shakeAmplitude,
+        (Math.cos(t * 43.1) + Math.sin(t * 27.9 + 0.7) * 0.6) * shakeAmplitude * 0.6,
         0,
       )
       camera.position.add(previousShake.current)

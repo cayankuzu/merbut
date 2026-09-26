@@ -1,8 +1,8 @@
 import type { CharacterId } from './character'
-import type { EnemyKind } from '../config/enemies'
+import type { EnemyKind, EnemyVariant } from '../config/enemies'
 import type { Difficulty } from '../config/difficulty'
 
-export type GamePhase = 'menu' | 'controls' | 'countdown' | 'boss-intro' | 'final-intro' | 'playing' | 'paused' | 'ending' | 'victory' | 'defeat'
+export type GamePhase = 'menu' | 'controls' | 'prologue' | 'countdown' | 'boss-intro' | 'final-intro' | 'playing' | 'paused' | 'ending' | 'victory' | 'defeat'
 export type EnemyAnimation = 'idle' | 'walk' | 'attack' | 'dead'
 export type BossPhase = 'none' | 'offering' | 'drinking' | 'arrival' | 'prayer' | 'aku-arrival' | 'countdown' | 'fight' | 'complete' | 'defeated' | 'portal' | 'falling' | 'continued'
 export type BossForm = 'normal' | 'monster'
@@ -26,6 +26,8 @@ export interface PlayerStatus {
   lastAbilityShotAt: number
   healOverTime: number
   frozenUntil: number
+  /** Dash invulnerability; a strike blocked inside it counts as a perfect dodge. */
+  dodgeUntil: number
 }
 
 export interface EnemyState {
@@ -60,6 +62,16 @@ export interface EnemyState {
   nextSpecialAt: number
   specialHitMask: number
   nextAuraAt: number
+  variant: EnemyVariant
+  /** Visual depth lane so a crowd never stands inside itself or the heroes. */
+  z: number
+  /** Knockback velocity (units/s); decays every combat step. */
+  vx: number
+  /** Hit-stun or mechanic stun: no movement or attack before this time. */
+  stunUntil: number
+  /** Non-zero while a telegraphed attack is winding up; it lands at this time. */
+  windupUntil: number
+  spawnedAt: number
 }
 
 export interface ProjectileState {
@@ -88,6 +100,8 @@ export interface EnemyProjectileState {
   targetX: number
   damage: number
   travelled: number
+  /** Set when a hero's blade sent the shot back towards its thrower. */
+  reflectedBy?: CharacterId
 }
 
 export interface CombatImpactState {

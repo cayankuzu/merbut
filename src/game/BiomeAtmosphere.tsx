@@ -55,7 +55,7 @@ function isCinematicPhase() {
 function MotifField() {
   const mesh = useRef<InstancedMesh>(null)
   const geometry = useMemo(() => new OctahedronGeometry(1, 0), [])
-  const material = useMemo(() => new MeshBasicMaterial({ color: '#ffffff', vertexColors: true, transparent: true, opacity: 0.82, depthWrite: false, blending: AdditiveBlending, toneMapped: false }), [])
+  const material = useMemo(() => new MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.82, depthWrite: false, blending: AdditiveBlending, toneMapped: false }), [])
   const dummy = useMemo(() => new Object3D(), [])
   const colors = useMemo(() => MOTIFS.map((motif) => new Color(motif.color).lerp(new Color('#fff6d4'), 0.18)), [])
   const tier = usePerformanceStore((state) => state.tier)

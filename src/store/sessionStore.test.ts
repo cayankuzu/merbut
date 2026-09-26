@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { DIFFICULTIES } from '../config/difficulty'
 import type { EnemyState } from '../types/session'
 import { useSessionStore } from './sessionStore'
@@ -12,6 +12,7 @@ const enemy = (): EnemyState => ({
   bossForm: 'normal', mimicKind: null,
   special: 'none', specialStartedAt: 0, specialUntil: 0, nextSpecialAt: 0,
   specialHitMask: 0, nextAuraAt: 0,
+  variant: 'normal', z: 0, vx: 0, stunUntil: 0, windupUntil: 0, spawnedAt: 0,
 })
 
 const aku = (): EnemyState => ({
@@ -115,11 +116,18 @@ describe('session store', () => {
     expect(useSessionStore.getState().activateShield(20_100)).toBe(false)
   })
 
-  it('makes every difficulty materially change player survival resources', () => {
+  it('makes every difficulty strictly harder than the one before', () => {
     useSessionStore.getState().setDifficulty('easy')
-    expect(useSessionStore.getState().players.ali).toMatchObject({ health: 145, maxHealth: 145, lives: 5 })
+    expect(useSessionStore.getState().players.ali).toMatchObject({ health: 150, maxHealth: 150, lives: 5 })
     useSessionStore.getState().setDifficulty('soulslike')
-    expect(useSessionStore.getState().players.jack).toMatchObject({ health: 120, maxHealth: 120, lives: 6 })
+    expect(useSessionStore.getState().players.jack).toMatchObject({ health: 100, maxHealth: 100, lives: 2 })
+    const order = [DIFFICULTIES.easy, DIFFICULTIES.normal, DIFFICULTIES.hard, DIFFICULTIES.soulslike]
+    for (let index = 1; index < order.length; index += 1) {
+      expect(order[index]!.playerHealth).toBeLessThan(order[index - 1]!.playerHealth)
+      expect(order[index]!.playerLives).toBeLessThan(order[index - 1]!.playerLives)
+      expect(order[index]!.telegraphScale).toBeLessThan(order[index - 1]!.telegraphScale)
+      expect(order[index]!.healDropChance).toBeLessThan(order[index - 1]!.healDropChance)
+    }
   })
 
   it('runs Zemzem as visible gradual healing instead of an instant full heal', () => {
@@ -137,33 +145,57 @@ describe('session store', () => {
     expect(useSessionStore.getState().players.ali.health).toBeGreaterThan(rules.playerHealth - 30)
   })
 
-  it('shifts every world timer while paused, including falling meteors', () => {
-    const now = vi.spyOn(performance, 'now')
+  it('pauses without touching any world timer, because gameplay time simply stops', () => {
     const session = useSessionStore.getState()
     session.startCountdown()
     session.tick(4, 10_000)
     session.addMeteors([{ id: 'pause-meteor', x: 0, createdAt: 12_000, impactAt: 14_000, landedAt: 0, damage: 20, kind: 'shadow' }])
-    now.mockReturnValue(11_000)
     session.pause()
-    now.mockReturnValue(16_000)
-    session.resume()
-    expect(useSessionStore.getState().meteors[0]).toMatchObject({ createdAt: 17_000, impactAt: 19_000 })
-    now.mockRestore()
+    expect(useSessionStore.getState()).toMatchObject({ phase: 'paused', pausedPhase: 'playing' })
+    useSessionStore.getState().resume()
+    expect(useSessionStore.getState().phase).toBe('playing')
+    expect(useSessionStore.getState().meteors[0]).toMatchObject({ createdAt: 12_000, impactAt: 14_000 })
   })
 
-  it('freezes a portal victim for exactly three gameplay seconds', () => {
-    const now = vi.spyOn(performance, 'now')
+  it('freezes a portal victim for exactly three gameplay seconds, pauses included', () => {
     const session = useSessionStore.getState()
     session.startCountdown()
     session.tick(4, 10_000)
     session.freezePlayer('jack', 12_000)
     expect(useSessionStore.getState().players.jack.frozenUntil).toBe(15_000)
-    now.mockReturnValue(12_500)
     session.pause()
-    now.mockReturnValue(14_500)
-    session.resume()
-    expect(useSessionStore.getState().players.jack.frozenUntil).toBe(17_000)
-    now.mockRestore()
+    useSessionStore.getState().resume()
+    expect(useSessionStore.getState().players.jack.frozenUntil).toBe(15_000)
+  })
+
+  it('starts a chapter with every earlier wave marked as conquered', () => {
+    useSessionStore.getState().startAtBiome(4)
+    const state = useSessionStore.getState()
+    expect(state).toMatchObject({ phase: 'countdown', currentBiome: 4, startBiome: 4, bossPhase: 'complete' })
+    expect(state.spawnedWaves).toContain('golden-swamp-depth')
+    expect(state.spawnedWaves).not.toContain('beetle-foundry-entry')
+  })
+
+  it('chains a combo across hits and resets it when the hero is struck', () => {
+    const session = useSessionStore.getState()
+    session.startCountdown()
+    session.tick(4, 10_000)
+    session.spawnEnemies([{ ...enemy(), id: 'combo-dummy', health: 1_000, maxHealth: 1_000 }])
+    for (let hit = 0; hit < 5; hit += 1) useSessionStore.getState().damageEnemy('combo-dummy', 5, 'ali', 10_100 + hit * 300)
+    expect(useSessionStore.getState().players.ali).toMatchObject({ combo: 5, bestCombo: 5 })
+    useSessionStore.getState().damagePlayer('ali', 10, 11_700)
+    expect(useSessionStore.getState().players.ali).toMatchObject({ combo: 0, bestCombo: 5 })
+  })
+
+  it('treats a strike inside the dash window as a perfect dodge', () => {
+    const session = useSessionStore.getState()
+    session.startCountdown()
+    session.tick(4, 10_000)
+    expect(useSessionStore.getState().startDodge('jack', 10_000)).toBe(true)
+    expect(useSessionStore.getState().players.jack.dodgeUntil).toBe(10_260)
+    useSessionStore.getState().notePerfectDodge('jack', 10_100)
+    expect(useSessionStore.getState().players.jack.abilityCharge).toBe(18)
+    expect(useSessionStore.getState().players.jack.invulnerableUntil).toBeGreaterThanOrEqual(10_450)
   })
 
   it('shows portal travel information and clears it after the alert window', () => {

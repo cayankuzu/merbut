@@ -1,34 +1,27 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import { APP_VERSION } from '../src/config/version'
+import { openMainMenu, startGame, waitForAssets } from './helpers'
 
-async function waitForAssets(page: Page) {
-  await expect(page.locator('.loading-screen')).toHaveCount(0, { timeout: 60_000 })
-}
-
-async function startGame(page: Page) {
-  await page.goto('/')
-  await waitForAssets(page)
-  await page.getByRole('button', { name: 'OYUNA BAŞLA' }).click()
-  await expect(page.getByRole('heading', { name: 'Kahramanlarını tanı' })).toBeVisible()
-  await page.getByRole('button', { name: 'SAVAŞA BAŞLA' }).click()
-  await expect(page.locator('.countdown')).toBeVisible()
-  await expect(page.locator('.countdown')).toHaveCount(0, { timeout: 8_000 })
-}
-
-test('ana menü, kontrol brifingi ve duraklatma akışı çalışır', async ({ page }) => {
-  await page.goto('/')
-  await waitForAssets(page)
+test('başlık ekranı, ana menü, brifing, prolog ve duraklatma akışı çalışır', async ({ page }) => {
+  await openMainMenu(page)
   await expect(page.getByRole('heading', { name: 'MERBUT' })).toBeVisible()
   await expect(page.locator('.merbut-copyright')).toContainText(`SÜRÜM v${APP_VERSION}`)
-  await expect(page.locator('iframe[title="Merbut fon müziği · YouTube"]')).toHaveAttribute('src', /autoplay=1.*loop=1/)
+  await expect(page.locator('iframe')).toHaveCount(0)
   const audioDefaults = await page.evaluate(() => window.__MERBUT__!.getAudioState())
-  expect(audioDefaults).toMatchObject({ musicPlaying: true, musicLooping: true })
-  await page.getByRole('button', { name: 'OYUNA BAŞLA' }).click()
-  await expect(page.getByText('R', { exact: true })).toBeVisible()
-  await expect(page.getByText('L', { exact: true })).toBeVisible()
+  expect(audioDefaults).toMatchObject({ musicPlaying: true })
+  for (const label of ['BÖLÜM SEÇ', 'KARAKTERLER', 'BAŞARIMLAR', 'AYARLAR', 'YAPIMCILAR']) {
+    await expect(page.getByRole('button', { name: label })).toBeVisible()
+  }
+  await page.getByRole('button', { name: 'YENİ OYUN' }).click()
+  await expect(page.getByRole('heading', { name: 'Kahramanlarını tanı' })).toBeVisible()
   await expect(page.getByRole('button', { name: /Orta/ })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByText('Kaçınma · kırmızı halkadan sıyrıl').first()).toBeVisible()
   await page.getByRole('button', { name: 'SAVAŞA BAŞLA' }).click()
+  await expect(page.locator('.prologue')).toBeVisible()
+  await page.keyboard.press('Escape')
   await expect(page.locator('.countdown')).toHaveCount(0, { timeout: 8_000 })
+  await expect(page.locator('.merbut-copyright')).toHaveCount(0)
+  await expect(page.locator('.hero-card')).toHaveCount(2)
   await page.keyboard.press('Escape')
   await expect(page.getByRole('heading', { name: 'Zaman dondu' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'YENİDEN BAŞLA' })).toBeVisible()
@@ -37,17 +30,16 @@ test('ana menü, kontrol brifingi ve duraklatma akışı çalışır', async ({ 
   await expect(page.getByRole('heading', { name: 'Kontroller' })).toBeVisible()
   await expect(page.getByLabel('Oyun duraklatıldı').getByRole('heading', { name: 'Samuray Jack' })).toBeVisible()
   await page.getByRole('button', { name: 'GERİ' }).click()
-  const elapsedBefore = await page.evaluate(() => window.__MERBUT__!.getSessionState().elapsedSeconds)
+  const before = await page.evaluate(() => ({ elapsed: window.__MERBUT__!.getSessionState().elapsedSeconds, now: window.__MERBUT__!.now() }))
   await page.waitForTimeout(500)
-  const elapsedAfter = await page.evaluate(() => window.__MERBUT__!.getSessionState().elapsedSeconds)
-  expect(elapsedAfter).toBe(elapsedBefore)
+  const after = await page.evaluate(() => ({ elapsed: window.__MERBUT__!.getSessionState().elapsedSeconds, now: window.__MERBUT__!.now() }))
+  expect(after).toEqual(before)
   await page.getByRole('button', { name: 'DEVAM ET' }).click()
   await expect(page.getByRole('heading', { name: 'Zaman dondu' })).toHaveCount(0)
 })
 
 test('karakter arşivi tüm kadroyu, özellikleri ve döndürülebilir Aku modelini gösterir', async ({ page }) => {
-  await page.goto('/')
-  await waitForAssets(page)
+  await openMainMenu(page)
   await page.getByRole('button', { name: 'KARAKTERLER' }).click()
   const rosterButtons = page.locator('.character-gallery__strip button')
   await expect(rosterButtons).toHaveCount(10)
@@ -143,7 +135,7 @@ test('özel yetenekler etkinleşir ve sahne sınırları korunur', async ({ page
     const state = window.__MERBUT__!.getSessionState()
     state.grantAbilityCharge('ali', 100)
     state.grantAbilityCharge('jack', 100)
-    const now = performance.now()
+    const now = window.__MERBUT__!.now()
     const aliActivated = state.launchFireball(now, 0, 0, 0)
     const jackActivated = state.activateShield(now)
     const current = window.__MERBUT__!.getSessionState()
@@ -179,43 +171,31 @@ test('özel yetenekler etkinleşir ve sahne sınırları korunur', async ({ page
   expect(Math.abs(state.positions.ali[0] - state.positions.jack[0])).toBeLessThanOrEqual(7.3)
 })
 
-test('1920x1080 ekranda on dört paneli kırpmadan ve doğru sırayla gösterir', async ({ page }) => {
+test('1920x1080 ekranda on diyarı iki katmanlı tablolarla doğru sırayla gösterir', async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1080 })
   await page.goto('/')
   await waitForAssets(page)
   const canvasBounds = await page.locator('.game-canvas').boundingBox()
   const trackBounds = await page.locator('.scene-backdrop__track').boundingBox()
-  const footerBounds = await page.locator('.merbut-copyright').boundingBox()
-  const panels = page.locator('.scene-backdrop__panel')
-  await expect(panels).toHaveCount(14)
-  await expect(page.locator('.scene-backdrop__transition')).toHaveCount(6)
-  const gameHeight = 1080 - (footerBounds?.height ?? 0)
-  expect(canvasBounds).toMatchObject({ width: 1920, height: gameHeight })
-  expect(trackBounds).toMatchObject({ width: 26880, height: gameHeight })
-  const biomeOrder = await panels.evaluateAll((elements) => elements.map((element) => element.getAttribute('data-biome')))
-  expect(biomeOrder).toEqual([
-    'aku-city', 'aku-city',
-    'sunset-harbor', 'sunset-harbor',
-    'golden-swamp', 'golden-swamp',
-    'skull-island', 'skull-island',
-    'jade-ruins', 'jade-ruins',
-    'skull-field', 'skull-field',
-    'inferno-throne', 'inferno-throne',
-  ])
-  const panelSources = await page.locator('.scene-backdrop__image').evaluateAll((images) => images.map((image) => (image as HTMLImageElement).currentSrc))
-  for (let index = 0; index < panelSources.length; index += 2) expect(panelSources[index]).toBe(panelSources[index + 1])
-  await expect(page.locator('.scene-backdrop__image').first()).toHaveCSS('object-fit', 'cover')
-  await expect(page.locator('.scene-backdrop__backfill').first()).toHaveCSS('object-fit', 'cover')
-  const resolutions = await page.locator('.scene-backdrop__image').evaluateAll((images) => images.map((image) => ({
-    width: (image as HTMLImageElement).naturalWidth,
-    height: (image as HTMLImageElement).naturalHeight,
-  })))
-  expect(resolutions.every((resolution) => resolution.width >= 1920 && resolution.height > 700)).toBe(true)
+  const realms = page.locator('.realm-backdrop')
+  await expect(realms).toHaveCount(10)
+  expect(canvasBounds).toMatchObject({ width: 1920, height: 1080 })
+  // Ten realms of two panels each, one panel per screen width.
+  expect(trackBounds).toMatchObject({ width: 38400, height: 1080 })
+  const order = await realms.evaluateAll((elements) => elements.map((element) => element.getAttribute('data-biome')))
+  expect(order).toEqual(['aku-city', 'sunset-harbor', 'hourglass-desert', 'golden-swamp', 'beetle-foundry', 'skull-island', 'jade-ruins', 'storm-peak', 'skull-field', 'inferno-throne'])
+  await expect(page.locator('.realm-backdrop__back')).toHaveCount(10)
+  await expect(page.locator('.realm-backdrop__front')).toHaveCount(10)
+  // The first realm's layers are decoded at full painting resolution.
+  const layers = await page.locator('.realm-backdrop').first().locator('img').evaluateAll((images) => images.map((image) => (image as HTMLImageElement).naturalWidth))
+  expect(layers.every((width) => width >= 3000)).toBe(true)
+  // The painting's ground line follows the live 3D horizon.
+  await expect.poll(() => page.locator('.scene-backdrop').evaluate((element) => (element as HTMLElement).style.getPropertyValue('--horizon-y'))).toMatch(/^[\d.]+%$/)
   const overflow = await page.evaluate(() => ({ x: document.documentElement.scrollWidth - innerWidth, y: document.documentElement.scrollHeight - innerHeight }))
   expect(overflow).toEqual({ x: 0, y: 0 })
 })
 
-test('on dört panellik dünya kamera ile akıcı biçimde hareket eder', async ({ page }) => {
+test('yirmi panellik dünya kamera ile akıcı biçimde hareket eder', async ({ page }) => {
   await startGame(page)
   const track = page.locator('.scene-backdrop__track')
   const before = await track.evaluate((element) => (element as HTMLElement).style.transform)
@@ -232,7 +212,7 @@ test('on dört panellik dünya kamera ile akıcı biçimde hareket eder', async 
 
 test('bir kahraman düştüğünde yaşayan kahraman tek başına ilerleyebilir', async ({ page }) => {
   await startGame(page)
-  await page.evaluate(() => window.__MERBUT__!.getSessionState().damagePlayer('ali', 1_000, performance.now()))
+  await page.evaluate(() => window.__MERBUT__!.getSessionState().damagePlayer('ali', 1_000, window.__MERBUT__!.now()))
   const before = await page.evaluate(() => window.__MERBUT__!.getState().positions)
   await page.keyboard.down('ArrowRight')
   await page.waitForTimeout(1_850)
@@ -240,5 +220,5 @@ test('bir kahraman düştüğünde yaşayan kahraman tek başına ilerleyebilir'
   const after = await page.evaluate(() => window.__MERBUT__!.getState().positions)
   expect(after.jack[0]).toBeGreaterThan(before.jack[0] + 0.2)
   expect(after.jack[0] - after.ali[0]).toBeGreaterThan(before.jack[0] - before.ali[0])
-  await expect(page.getByText('Birlikte kalın')).not.toHaveClass(/is-visible/)
+  await expect(page.getByText('Birbirinizden kopmayın')).not.toHaveClass(/is-visible/)
 })

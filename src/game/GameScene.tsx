@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useRef } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { BackdropHorizon } from './BackdropHorizon'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import {
   ACESFilmicToneMapping,
@@ -23,6 +24,17 @@ const LOWER_TIER: Record<PerformanceTier, PerformanceTier> = {
   high: 'balanced', balanced: 'performance', performance: 'minimal', minimal: 'minimal',
 }
 const AdaptiveVisualGrade = lazy(() => import('./AdaptiveVisualGrade').then((module) => ({ default: module.AdaptiveVisualGrade })))
+
+/** DEV only: exposes the three.js scene for automated visual inspection. */
+function DevSceneHook() {
+  const scene = useThree((state) => state.scene)
+  const gl = useThree((state) => state.gl)
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    ;(window as unknown as { __MERBUT_SCENE__?: unknown }).__MERBUT_SCENE__ = { scene, gl }
+  }, [gl, scene])
+  return null
+}
 
 function ShadowRenderBudget({ enabled }: { enabled: boolean }) {
   const gl = useThree((state) => state.gl)
@@ -220,6 +232,7 @@ function RuntimePerformanceGovernor({ active, effectiveDpr }: { active: boolean;
 }
 
 export function GameScene() {
+  const [contextLost, setContextLost] = useState(false)
   const phase = useSessionStore((state) => state.phase)
   const enemyCount = useSessionStore((state) => state.enemies.length)
   const heavyBoss = useSessionStore((state) => state.enemies.some((enemy) => enemy.boss && enemy.animation !== 'dead'))
@@ -235,8 +248,19 @@ export function GameScene() {
   const dynamicShadows = !showCombatActors && runtimeDynamicShadows(tier, qualityFactor, enemyCount)
   // Full-screen post effects scale with pixel count rather than actor count and
   // caused the normal high-detail scene to cost more than a 100-enemy crowd.
+  // Full-screen post effects scale with pixel count rather than actor count and
+  // cost more than a 100-enemy crowd on integrated GPUs (measured: 57 → 22 fps),
+  // so combat glow comes from additive materials and the CSS grade instead.
   const postprocessing = !showCombatActors && runtimePostprocessing(tier, qualityFactor, enemyCount)
   return (
+    <>
+    {contextLost ? (
+      <div className="context-lost" role="alert">
+        <strong>Grafik bağlamı kayboldu</strong>
+        <span>Ekran kartı sürücüsü sıfırlandı. Oyun duraklatıldı; bağlam geri gelince devam edebilirsin.</span>
+        <button className="menu-primary" type="button" onClick={() => window.location.reload()}>YENİDEN YÜKLE</button>
+      </div>
+    ) : null}
     <Canvas
       className="game-canvas"
       data-graphics-tier={tier}
@@ -249,6 +273,13 @@ export function GameScene() {
       frameloop={active ? 'always' : 'demand'}
       gl={{ antialias: profile.antialias, alpha: true, powerPreference: 'high-performance' }}
       onCreated={({ gl }) => {
+        // A lost GPU context (driver reset, sleep) pauses the game and recovers when restored.
+        gl.domElement.addEventListener('webglcontextlost', (event) => {
+          event.preventDefault()
+          useSessionStore.getState().pause()
+          setContextLost(true)
+        })
+        gl.domElement.addEventListener('webglcontextrestored', () => setContextLost(false))
         gl.shadowMap.type = PCFShadowMap
         gl.toneMapping = ACESFilmicToneMapping
         gl.toneMappingExposure = 1.04
@@ -258,6 +289,8 @@ export function GameScene() {
     >
       <Suspense fallback={null}>
         <RuntimePerformanceGovernor active={active} effectiveDpr={effectiveDpr} />
+        <DevSceneHook />
+        <BackdropHorizon />
         <ScenePrecompiler />
         <ShadowRenderBudget enabled={dynamicShadows} />
         <TextureQuality />
@@ -267,5 +300,6 @@ export function GameScene() {
         ) : null}
       </Suspense>
     </Canvas>
+    </>
   )
 }

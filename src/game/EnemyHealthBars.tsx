@@ -1,4 +1,5 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
+import { isMachineVariant } from '../config/enemies'
 import { useFrame } from '@react-three/fiber'
 import {
   Color,
@@ -18,7 +19,7 @@ export function EnemyHealthBars({ ids }: { ids: readonly string[] }) {
   const fill = useRef<InstancedMesh>(null)
   const geometry = useMemo(() => new PlaneGeometry(1, 1), [])
   const backgroundMaterial = useMemo(() => new MeshBasicMaterial({ color: '#10070a', depthTest: false, depthWrite: false, fog: false, toneMapped: false }), [])
-  const fillMaterial = useMemo(() => new MeshBasicMaterial({ color: '#ffffff', depthTest: false, depthWrite: false, fog: false, toneMapped: false, vertexColors: true }), [])
+  const fillMaterial = useMemo(() => new MeshBasicMaterial({ color: '#ffffff', depthTest: false, depthWrite: false, fog: false, toneMapped: false }), [])
   const backgroundDummy = useMemo(() => new Object3D(), [])
   const fillDummy = useMemo(() => new Object3D(), [])
   const colors = useMemo(() => ids.map((id) => new Color(currentEnemyById(id)?.accent ?? '#ff7657')), [ids])
@@ -54,10 +55,11 @@ export function EnemyHealthBars({ ids }: { ids: readonly string[] }) {
       } else {
         const width = 1.24
         const ratio = Math.max(0, Math.min(1, enemy.health / enemy.maxHealth))
-        const y = enemy.scale * 1.9
-        backgroundDummy.position.set(enemy.x, y, 0.46)
+        // Machines are low and wide; creatures stand tall.
+        const y = enemy.scale * (isMachineVariant(enemy.variant) ? 0.78 : 1.9)
+        backgroundDummy.position.set(enemy.x, y, enemy.z + 0.46)
         backgroundDummy.scale.set(width, 0.105, 1)
-        fillDummy.position.set(enemy.x - width * (1 - ratio) * 0.5, y, 0.47)
+        fillDummy.position.set(enemy.x - width * (1 - ratio) * 0.5, y, enemy.z + 0.47)
         fillDummy.scale.set(Math.max(HIDDEN_SCALE, width * ratio), 0.058, 1)
       }
       backgroundDummy.updateMatrix()

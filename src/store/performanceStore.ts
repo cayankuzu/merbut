@@ -96,11 +96,11 @@ export const PERFORMANCE_PROFILES: Record<PerformanceTier, PerformanceProfile> =
     actorMountDistance: 24,
     animationFps: 30,
     antialias: true,
-    dpr: 0.75,
+    dpr: 0.85,
     dynamicLights: false,
     impactBudget: 6,
     menuFps: 24,
-    minimumDpr: 0.5,
+    minimumDpr: 0.7,
     particleRatio: 0.28,
     postprocessMultisampling: 0,
     postprocessResolutionScale: 0.65,
@@ -118,7 +118,7 @@ export const PERFORMANCE_PROFILES: Record<PerformanceTier, PerformanceProfile> =
     dynamicLights: false,
     impactBudget: 12,
     menuFps: 45,
-    minimumDpr: 0.55,
+    minimumDpr: 0.72,
     particleRatio: 0.5,
     postprocessMultisampling: 0,
     postprocessResolutionScale: 0.78,
@@ -136,7 +136,7 @@ export const PERFORMANCE_PROFILES: Record<PerformanceTier, PerformanceProfile> =
     dynamicLights: true,
     impactBudget: 20,
     menuFps: 60,
-    minimumDpr: 0.6,
+    minimumDpr: 0.75,
     particleRatio: 0.85,
     postprocessMultisampling: 0,
     postprocessResolutionScale: 0.6,
@@ -154,7 +154,7 @@ export const PERFORMANCE_PROFILES: Record<PerformanceTier, PerformanceProfile> =
     dynamicLights: true,
     impactBudget: 32,
     menuFps: 60,
-    minimumDpr: 0.6,
+    minimumDpr: 0.8,
     particleRatio: 1.25,
     postprocessMultisampling: 0,
     postprocessResolutionScale: 0.65,
@@ -355,12 +355,17 @@ export function runtimePostprocessing(tier: PerformanceTier, qualityFactor: numb
   return enemyCount <= (tier === 'high' ? 24 : 12)
 }
 
+/** Set dressing detail under crowd load: a huge crowd drops the decorative extras first. */
+export function runtimeCrowdDetail(enemyCount: number) {
+  return { weather: enemyCount >= 40 ? 0.35 : 1, foreground: enemyCount < 40 }
+}
+
 export function runtimeDetailedImpacts(tier: PerformanceTier, qualityFactor: number, enemyCount: number) {
   return PERFORMANCE_PROFILES[tier].particleRatio * qualityFactor >= 0.5 && enemyCount <= 24
 }
 
 export function runtimeRenderDpr(configuredDpr: number, enemyCount: number, heavyBoss = false) {
-  const crowdCap = enemyCount >= 80 ? 1.1 : enemyCount >= 40 ? 1.18 : enemyCount >= 20 ? 1.25 : configuredDpr
+  const crowdCap = enemyCount >= 80 ? 1 : enemyCount >= 40 ? 1.1 : enemyCount >= 20 ? 1.2 : configuredDpr
   const bossCap = heavyBoss ? 1 : configuredDpr
   return Math.min(configuredDpr, crowdCap, bossCap)
 }

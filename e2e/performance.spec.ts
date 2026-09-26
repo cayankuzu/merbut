@@ -1,4 +1,8 @@
 import { expect, test, type Page } from '@playwright/test'
+import { startGame } from './helpers'
+
+// Trace recording screencasts every frame and skews frame timing; measure without it.
+test.use({ trace: 'off', video: 'off' })
 
 interface FrameBenchmark {
   averageFps: number
@@ -11,11 +15,7 @@ interface FrameBenchmark {
 }
 
 async function startCombat(page: Page) {
-  await page.goto('/')
-  await expect(page.locator('.loading-screen')).toHaveCount(0, { timeout: 60_000 })
-  await page.getByRole('button', { name: 'OYUNA BAŞLA' }).click()
-  await page.getByRole('button', { name: 'SAVAŞA BAŞLA' }).click()
-  await expect.poll(() => page.evaluate(() => window.__MERBUT__?.getSessionState().phase), { timeout: 10_000 }).toBe('playing')
+  await startGame(page)
   await expect.poll(() => page.evaluate(() => window.__MERBUT__?.getSessionState().enemies.length)).toBeGreaterThan(0)
 }
 
@@ -24,7 +24,7 @@ async function installStressScene(page: Page, enemyCount: number) {
     const api = window.__MERBUT__!
     const session = api.getSessionState()
     const template = session.enemies.find((enemy) => !enemy.boss)!
-    const now = performance.now()
+    const now = window.__MERBUT__!.now()
     const enemies = Array.from({ length: count }, (_, index) => ({
       ...template,
       id: `perf-enemy-${index}`,
@@ -60,7 +60,7 @@ async function benchmarkFrames(page: Page, durationMs: number, attackIntervalMs 
     let hit = 0
     const deltas: number[] = []
     const attackTimer = window.setInterval(() => {
-      const now = performance.now()
+      const now = window.__MERBUT__!.now()
       api.getSessionState().damageEnemy(targetId, 1, hit % 2 === 0 ? 'ali' : 'jack', now, 'melee')
       hit += 1
     }, attackInterval)
@@ -109,7 +109,7 @@ test('100 düşman ve ardışık saldırıda kare sürelerini bütçe içinde tu
   await startCombat(page)
   await installStressScene(page, 100)
   const scene = page.locator('.game-canvas')
-  await expect(scene).toHaveAttribute('data-render-dpr', '1.10')
+  await expect(scene).toHaveAttribute('data-render-dpr', '1.00')
   await expect(scene).toHaveAttribute('data-dynamic-shadows', 'off')
   await expect(scene).toHaveAttribute('data-postprocessing', 'off')
   const high = await benchmarkFrames(page, 6_000)
@@ -143,11 +143,11 @@ test('100 düşman ve ardışık saldırıda kare sürelerini bütçe içinde tu
     const api = window.__MERBUT__!
     const session = api.getSessionState()
     const template = session.enemies[0]!
-    const now = performance.now()
+    const now = window.__MERBUT__!.now()
     const aku = {
       ...template,
       id: 'perf-aku',
-      biome: 6,
+      biome: 9,
       kind: 5 as const,
       title: 'Aku, Zamanın Efendisi',
       x: 0,

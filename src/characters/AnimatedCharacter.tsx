@@ -1,7 +1,7 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import { useGLTF } from '@react-three/drei'
-import { useFrame } from '@react-three/fiber'
-import { AnimationClip, Object3D } from 'three'
+import { useFrame, useThree } from '@react-three/fiber'
+import { AnimationClip, MathUtils, Object3D, Quaternion, Vector3 } from 'three'
 import { SkeletonUtils } from 'three-stdlib'
 import { prepareAnimationClip } from '../animation/animationLoader'
 import { validateClipTargets } from '../animation/animationRetargeting'
@@ -11,7 +11,9 @@ import { runtimeDynamicShadows, usePerformanceStore } from '../store/performance
 import { useSessionStore } from '../store/sessionStore'
 import type { AnimationState } from '../types/animation'
 import type { CharacterDefinition } from '../types/character'
+import { measureBlade, registerBlade, type BladeKey } from '../game/vfx/bladeRegistry'
 import { AliFaceLight } from './AliFaceLight'
+import { polishBlade, swordEnvironment } from './swordShine'
 import {
   alignWeaponAttachment,
   attachWeapon,
@@ -25,6 +27,13 @@ import {
 } from './WeaponSocket'
 
 const ALI_PALM_REACH = 0.48
+/** Resting guard: at ease, Zülfikar's tip sinks this far below the horizon. */
+const REST_ELEVATION = MathUtils.degToRad(-36)
+const UP = new Vector3(0, 1, 0)
+const restAxis = new Vector3()
+const restDirection = new Vector3()
+const restRotation = new Quaternion()
+const parentRotation = new Quaternion()
 
 interface AnimatedCharacterProps {
   continuousFaceLight?: boolean
@@ -34,6 +43,8 @@ interface AnimatedCharacterProps {
   animationSignal?: number
   /** Optional presentation duration; gameplay callers keep their normal rates. */
   animationDurationSeconds?: number
+  /** Gameplay heroes publish their blade so the sword trail can follow it. */
+  bladeId?: BladeKey
 }
 
 function configureShadows(root: Object3D, enabled: boolean) {
@@ -46,7 +57,7 @@ function configureShadows(root: Object3D, enabled: boolean) {
   })
 }
 
-export function AnimatedCharacter({ continuousFaceLight = true, definition, animationDurationSeconds, animationState, animationSignal = 0 }: AnimatedCharacterProps) {
+export function AnimatedCharacter({ bladeId, continuousFaceLight = true, definition, animationDurationSeconds, animationState, animationSignal = 0 }: AnimatedCharacterProps) {
   const idleFile = useGLTF(definition.assets.idle)
   const walkFile = useGLTF(definition.assets.walk)
   const jumpFile = useGLTF(definition.assets.jump)
@@ -60,10 +71,17 @@ export function AnimatedCharacter({ continuousFaceLight = true, definition, anim
   const dynamicShadows = (phase === 'menu' || phase === 'controls')
     && runtimeDynamicShadows(tier, qualityFactor, enemyCount)
   const attachmentRef = useRef<WeaponAttachment | null>(null)
+  const restDip = useRef(0)
   const initialWeaponTransform = useRef(transform.weapon)
 
   const characterScene = useMemo(() => SkeletonUtils.clone(idleFile.scene), [idleFile.scene])
-  const swordScene = useMemo(() => swordFile.scene.clone(true), [swordFile.scene])
+  const gl = useThree((state) => state.gl)
+  const swordScene = useMemo(() => {
+    const blade = swordFile.scene.clone(true)
+    // Jack's katana is the brightest steel in the game; Zülfikar keeps its darker bronze.
+    polishBlade(blade, swordEnvironment(gl), definition.id === 'jack' ? 0.42 : 0.16)
+    return blade
+  }, [definition.id, gl, swordFile.scene])
   const torso = useMemo(() => findTorsoBone(characterScene), [characterScene])
   const bodyGuard = useMemo(() => findWeaponBodyGuard(characterScene), [characterScene])
 
@@ -88,11 +106,14 @@ export function AnimatedCharacter({ continuousFaceLight = true, definition, anim
     const attachment = attachWeapon(characterScene, swordScene, initialWeaponTransform.current)
     if (definition.id === 'ali') placeWeaponGripInPalm(attachment, ALI_PALM_REACH)
     attachmentRef.current = attachment
+    const hips = ['mixamorigHips', 'Hips', 'hips', 'Pelvis'].map((name) => characterScene.getObjectByName(name)).find(Boolean) ?? null
+    const unregister = bladeId ? registerBlade(bladeId, { weapon: swordScene, hips, ...measureBlade(swordScene, initialWeaponTransform.current) }) : null
     return () => {
+      unregister?.()
       attachment.detach()
       attachmentRef.current = null
     }
-  }, [characterScene, definition.id, dynamicShadows, swordScene])
+  }, [bladeId, characterScene, definition.id, dynamicShadows, swordScene])
 
   useLayoutEffect(() => {
     if (attachmentRef.current) alignWeaponAttachment(attachmentRef.current, transform.weapon)
@@ -122,6 +143,24 @@ export function AnimatedCharacter({ continuousFaceLight = true, definition, anim
           definition.id === 'ali' ? 136 : 122,
           definition.id === 'ali' ? 15 : 13,
         )
+      }
+      // At rest Hz. Ali holds Zülfikar low, tip down, instead of levelled at his friend.
+      const resting = definition.id === 'ali' && (animationState === 'idle' || animationState === 'walk')
+      restDip.current = MathUtils.damp(restDip.current, resting ? 1 : 0, 9, Math.min(delta, 0.1))
+      if (restDip.current > 0.01) {
+        const attachment = attachmentRef.current
+        attachment.weapon.updateWorldMatrix(true, false)
+        restDirection.set(...transform.weapon.bladeDirection).transformDirection(attachment.weapon.matrixWorld)
+        const elevation = Math.asin(MathUtils.clamp(restDirection.y, -1, 1))
+        if (elevation > REST_ELEVATION) {
+          restAxis.crossVectors(restDirection, UP)
+          if (restAxis.lengthSq() > 0.0001) {
+            restRotation.setFromAxisAngle(restAxis.normalize(), -(elevation - REST_ELEVATION) * restDip.current)
+            attachment.root.getWorldQuaternion(parentRotation)
+            // world-space turn about the grip, expressed in the socket's parent frame
+            attachment.socket.quaternion.premultiply(parentRotation.clone().invert().multiply(restRotation).multiply(parentRotation))
+          }
+        }
       }
     }
   })

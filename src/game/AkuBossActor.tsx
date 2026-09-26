@@ -10,8 +10,9 @@ import { ASSET_PATHS } from '../config/assetPaths'
 import { ENEMIES, type EnemyKind } from '../config/enemies'
 import { useGameStore } from '../store/gameStore'
 import { useSessionStore } from '../store/sessionStore'
-import { getMiniAkuMotion, MINI_AKU_OFFSETS } from './akuMiniSwarm'
+import { getMiniAkuMotion, MINI_AKU_OFFSETS } from '../sim/akuMiniSwarm'
 import { currentEnemyById, enemyById } from './enemyLookup'
+import { simClock } from '../sim/clock'
 
 interface AkuBossActorProps { id: string }
 
@@ -91,7 +92,7 @@ function MiniAkuModel({ bossId, index }: { bossId: string; index: number }) {
     if (animationAccumulator.current < 1 / 20) return
     mixer.update(animationAccumulator.current)
     animationAccumulator.current = 0
-    const elapsed = performance.now() - enemy.specialStartedAt
+    const elapsed = simClock.now() - enemy.specialStartedAt
     const game = useGameStore.getState()
     const players = useSessionStore.getState().players
     const preferred = index % 2 === 0 ? 'ali' : 'jack'
@@ -264,7 +265,7 @@ export function AkuBossActor({ id }: AkuBossActorProps) {
   useFrame((_, delta) => {
     const current = currentEnemyById(id)
     if (!root.current || !normalRoot.current || !monsterRoot.current || !minisRoot.current || !current) return
-    const now = performance.now()
+    const now = simClock.now()
     root.current.position.x = MathUtils.damp(root.current.position.x, current.x, 15, Math.min(delta, 0.1))
     root.current.rotation.y = MathUtils.damp(root.current.rotation.y, current.direction > 0 ? Math.PI / 2 : -Math.PI / 2, 14, Math.min(delta, 0.1))
     const arriving = bossPhase === 'prayer' ? 0 : bossPhase === 'aku-arrival' ? Math.min(1, (now - useSessionStore.getState().bossPhaseStartedAt - 2_200) / 900) : 1

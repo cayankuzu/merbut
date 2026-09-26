@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { BIOMES, BIOME_WORLD_WIDTH, WORLD_VISUAL_LEFT } from './biomes'
 import { expandWaveSpawns, getWaveSpawnX, shouldTriggerWave, WAVES } from './waves'
 import { DIFFICULTIES } from './difficulty'
-import { getClosedBiomeLeftLimit, getClosedBiomeRightLimit } from '../game/biomeProgress'
+import { getClosedBiomeLeftLimit, getClosedBiomeRightLimit } from '../sim/biomeProgress'
 
 describe('boss wave placement', () => {
   it('places both bosses in the second panel of their requested biome', () => {
@@ -42,6 +42,19 @@ describe('wave biome gate', () => {
     expect(shouldTriggerWave(wave, 4, [], 10, wave.triggerX)).toBe(false)
     expect(shouldTriggerWave(wave, 3, [], 10, wave.triggerX)).toBe(true)
     expect(shouldTriggerWave(wave, 3, [wave.id], 10, wave.triggerX)).toBe(false)
+  })
+
+  it('gives every realm an entry and a depth wave, and a middle beat outside boss realms', () => {
+    for (const biome of BIOMES) {
+      const ids = WAVES.filter((wave) => wave.id.startsWith(`${biome.id}-`)).map((wave) => wave.id.slice(biome.id.length + 1))
+      const bossRealm = biome.id === 'golden-swamp' || biome.id === 'inferno-throne'
+      expect(ids).toEqual(bossRealm ? ['entry', 'depth'] : ['entry', 'mid', 'depth'])
+    }
+    // waves of a realm trigger in order along the path
+    for (let biome = 0; biome < BIOMES.length; biome += 1) {
+      const triggers = WAVES.filter((wave) => wave.biome === biome).map((wave) => wave.triggerX)
+      expect([...triggers].sort((a, b) => a - b)).toEqual(triggers)
+    }
   })
 
   it('keeps every entry spawn inside the active biome gates', () => {

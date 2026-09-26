@@ -1,0 +1,20 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>MERBUT art studio</title></head>
+<body style="margin:0;background:#111">
+<script type="module">
+  import { REALMS, cover } from './realms.js'
+  import { STORY, PORTRAITS, keyArt } from './story.js'
+  const png = (target) => target.element.toDataURL('image/png')
+  window.studio = {
+    realm: (id) => { const { back, front } = REALMS[id](); return { back: png(back), front: png(front) } },
+    cover: (id) => png(cover(id)),
+    story: (name) => png(STORY[name]()),
+    portrait: (name) => png(PORTRAITS[name]()),
+    keyArt: (width, height) => png(keyArt(width, height)),
+    list: () => ({ realms: Object.keys(REALMS), story: Object.keys(STORY), portraits: Object.keys(PORTRAITS) }),
+  }
+  window.studioReady = true
+</script>
+</body>
+</html>

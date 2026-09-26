@@ -1,10 +1,16 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { Canvas, createPortal, useFrame, useThree } from '@react-three/fiber'
 import { ContactShadows, useAnimations, useGLTF } from '@react-three/drei'
 import { AnimationClip, Box3, Group, LoopOnce, MathUtils, type Object3D, Vector3 } from 'three'
 import { SkeletonUtils } from 'three-stdlib'
 import { AnimatedCharacter } from '../characters/AnimatedCharacter'
 import { EvilJackCharacter, type EvilJackAction } from '../characters/EvilJackCharacter'
+import { JackSheath, type SheathSource } from '../characters/JackSheath'
+import { ATTACK_DURATION } from '../config/combat'
+import type { BladeKey } from '../game/vfx/bladeRegistry'
+import { EFFECTS } from '../game/vfx/effects'
+import { BladeTrail, type TrailSource } from '../game/vfx/SwordTrails'
+import type { AttackStep } from '../store/gameStore'
 import { prepareAnimationClip } from '../animation/animationLoader'
 import { validateClipTargets } from '../animation/animationRetargeting'
 import { ASSET_PATHS } from '../config/assetPaths'
@@ -14,10 +20,22 @@ import { CHARACTERS } from '../config/gameConfig'
 import type { AnimationState } from '../types/animation'
 import { isSafariWebkitEngine, PERFORMANCE_PROFILES, usePerformanceStore } from '../store/performanceStore'
 import { MenuAttackEffect, type MenuAttackEffectKind } from './MenuAttackEffect'
-import { advanceShowcaseMove, getMenuAttackDurationMs } from './menuShowcaseCycle'
+import { advanceShowcaseMove, getMenuAttackDurationMs, HERO_COMBO_OFFSETS_MS, HERO_COMBO_MS } from './menuShowcaseCycle'
+import { useStageVfx, type StageVfx } from './stageVfx'
+import { StageVfxLayer } from './StageVfxLayer'
 
 export type MenuStageAction = 'idle' | 'heroes' | 'enemies'
 type MenuStageVariant = 'menu' | 'splash'
+/**
+ * 'wide' frames the title and splash with the heroes at the left edge. 'duel'
+ * is the main menu: the menu column owns the left, so the heroes step into
+ * the middle and face the enemy across the right two thirds.
+ */
+export type MenuStageComposition = 'wide' | 'duel'
+const FIGHTER_SCREEN_X: Record<MenuStageComposition, Record<'heroes' | 'enemies', number>> = {
+  wide: { heroes: -0.41, enemies: 0.41 },
+  duel: { heroes: 0.07, enemies: 0.39 },
+}
 type FighterSide = 'heroes' | 'enemies'
 type MotionSet = readonly [string, string, string, string, string]
 type EffectSet = readonly [MenuAttackEffectKind, MenuAttackEffectKind, MenuAttackEffectKind, MenuAttackEffectKind, MenuAttackEffectKind]
@@ -29,9 +47,14 @@ interface AttackState {
   variant: number
 }
 
+interface FighterStage extends AttackState {
+  originYRef: MutableRefObject<number>
+  vfx: StageVfx
+}
+
 interface FighterProps {
   accent: string
-  children: (state: AttackState) => ReactNode
+  children: (state: FighterStage) => ReactNode
   displayScale: number
   effects: EffectSet
   forced: boolean
@@ -39,7 +62,13 @@ interface FighterProps {
   index: number
   onCycleComplete: () => void
   onMove: (moveNumber: number) => void
+  /** Called once the fighter's models have loaded and it is on stage. */
+  onReady: (id: string) => void
   originY: number
+  /** Pause after a move; heroes use it to settle and sheathe the blade. */
+  recoveryMs?: number
+  /** Horizontal position as a fraction of the viewport width from its centre. */
+  screenX: number
   side: FighterSide
 }
 
@@ -90,8 +119,9 @@ const ENEMY_SHOWCASE: readonly EnemyShowcaseDefinition[] = [
 const CAMERA_CENTER_Y = 2.15
 const HERO_SHOWCASE = ['ali', 'jack'] as const
 const HERO_SHOWCASE_DEFINITIONS = {
-  ali: { id: 'hz-ali', originY: 1.15, accent: '#f7c65f', effects: ['ali-slash', 'ali-fireball', 'impact-ember', 'ali-fireball', 'ali-slash'] },
-  jack: { id: 'samuray-jack', originY: 1.15, accent: '#ff4c87', effects: ['jack-slash', 'jack-shield', 'impact-quake', 'jack-shield', 'jack-slash'] },
+  // The same moves the heroes have in play: the three-cut chain with its spinning finisher, and each hero's ability.
+  ali: { id: 'hz-ali', originY: 1.15, accent: '#f7c65f', effects: ['ali-slash', 'ali-fireball', 'ali-slash', 'ali-fireball', 'ali-slash'] },
+  jack: { id: 'samuray-jack', originY: 1.15, accent: '#ff4c87', effects: ['jack-slash', 'jack-shield', 'jack-slash', 'jack-shield', 'jack-slash'] },
 } as const satisfies Record<(typeof HERO_SHOWCASE)[number], { id: string; originY: number; accent: string; effects: EffectSet }>
 
 function pickDifferentIndex(length: number, current: number) {
@@ -151,6 +181,7 @@ function useRandomAttackCycle(
   onCycleComplete: () => void,
   onMove: (moveNumber: number) => void,
   seed: number,
+  recoveryMs: number,
 ): AttackState {
   const variantCount = effects.length
   const [trigger, setTrigger] = useState(0)
@@ -187,12 +218,13 @@ function useRandomAttackCycle(
       actionTimer = window.setTimeout(() => {
         if (disposed) return
         if (progress.characterComplete) {
-          onCycleComplete()
+          if (recoveryMs > 180) recoveryTimer = window.setTimeout(onCycleComplete, recoveryMs)
+          else onCycleComplete()
           return
         }
         // This is a combat recovery pose, not an idle/locomotion clip. The
         // character swap itself is driven solely by the completed move count.
-        recoveryTimer = window.setTimeout(strike, 180)
+        recoveryTimer = window.setTimeout(strike, recoveryMs)
       }, nextDurationMs)
     }
 
@@ -202,7 +234,7 @@ function useRandomAttackCycle(
       window.clearTimeout(actionTimer)
       window.clearTimeout(recoveryTimer)
     }
-  }, [drawVariant, effects, onCycleComplete, onMove, seed])
+  }, [drawVariant, effects, onCycleComplete, onMove, recoveryMs, seed])
 
   useEffect(() => {
     if (!forced) return
@@ -296,13 +328,115 @@ function ActionModel({ base, durationMs, motions, scale, trigger, variant }: { b
   return <group ref={proceduralRoot}><primitive object={scene} scale={scale} /></group>
 }
 
-function Hero({ durationMs, id, trigger, variant }: { durationMs: number; id: 'ali' | 'jack'; trigger: number; variant: number }) {
-  const animation: AnimationState = id === 'ali' && (variant === 1 || variant === 3)
-      ? 'fireball'
-      : id === 'jack' && (variant === 1 || variant === 3)
-        ? 'shield'
-        : 'attack'
-  return <AnimatedCharacter definition={CHARACTERS[id]} animationDurationSeconds={durationMs / 1_000} animationState={animation} animationSignal={trigger} />
+const HERO_TINT = { ali: '#ffb347', jack: '#9fd8ff' } as const
+/** How far into each cut the blow lands; the finisher connects as the spin comes back around. */
+const CUT_CONTACT: Record<AttackStep, number> = { 1: 0.45, 2: 0.45, 3: 0.8 }
+const CUT_LUNGE: Record<AttackStep, number> = { 1: 0.12, 2: 0.26, 3: 0.46 }
+const CUT_ANGLE: Record<AttackStep, number> = { 1: -0.62, 2: 0.52, 3: 0.08 }
+
+function comboStepAt(elapsedMs: number): AttackStep {
+  if (elapsedMs >= HERO_COMBO_OFFSETS_MS[2]) return 3
+  if (elapsedMs >= HERO_COMBO_OFFSETS_MS[1]) return 2
+  return 1
+}
+
+function Hero({ durationMs, id, kind, originYRef, trigger, vfx }: {
+  durationMs: number
+  id: 'ali' | 'jack'
+  kind: MenuAttackEffectKind
+  originYRef: MutableRefObject<number>
+  trigger: number
+  vfx: StageVfx
+}) {
+  const ability = kind === 'ali-fireball' || kind === 'jack-shield'
+  const move: AnimationState = kind === 'ali-fireball' ? 'fireball' : kind === 'jack-shield' ? 'shield' : 'attack'
+  const [cut, setCut] = useState<{ trigger: number; step: AttackStep }>({ trigger: 0, step: 1 })
+  const [restingAfter, setRestingAfter] = useState(-1)
+  const step: AttackStep = cut.trigger === trigger ? cut.step : 1
+  const animation: AnimationState = restingAfter === trigger ? 'idle' : move
+  const body = useRef<Group>(null)
+  const timeline = useRef({ startedAt: Number.NEGATIVE_INFINITY, moveEndsAt: Number.NEGATIVE_INFINITY, landed: 0, combo: false })
+  const blade: BladeKey = `showcase-${id}`
+  const scene = useThree((state) => state.scene)
+
+  useEffect(() => {
+    if (trigger === 0) return
+    const now = performance.now()
+    timeline.current = { startedAt: now, moveEndsAt: now + durationMs, landed: 0, combo: !ability }
+    const rest = window.setTimeout(() => setRestingAfter(trigger), durationMs)
+    // Same chain as in play: two quick cuts, then the spinning finisher.
+    const cuts = ability ? [] : ([2, 3] as const).map((next) => window.setTimeout(() => setCut({ trigger, step: next }), HERO_COMBO_OFFSETS_MS[next - 1]))
+    return () => {
+      window.clearTimeout(rest)
+      cuts.forEach((timer) => window.clearTimeout(timer))
+    }
+  }, [ability, durationMs, trigger])
+
+  const trailSource = useMemo<TrailSource>(() => ({
+    swinging: () => {
+      const elapsed = performance.now() - timeline.current.startedAt
+      return timeline.current.combo && elapsed >= 0 && elapsed < HERO_COMBO_MS
+    },
+    now: () => performance.now() / 1_000,
+  }), [])
+  const sheathSource = useMemo<SheathSource>(() => ({
+    fighting: () => performance.now() < timeline.current.moveEndsAt,
+    keepDrawn: () => false,
+    audible: () => false,
+    glint: () => true,
+    now: () => performance.now(),
+    sheatheAfterMs: 380,
+    pools: vfx.pools,
+    toPoolSpace: vfx.toLocal,
+  }), [vfx])
+
+  useFrame((_, delta) => {
+    const group = body.current
+    if (!group) return
+    const elapsed = performance.now() - timeline.current.startedAt
+    const inCombo = trailSource.swinging()
+    const current = comboStepAt(elapsed)
+    const cutProgress = (elapsed - HERO_COMBO_OFFSETS_MS[current - 1]!) / (ATTACK_DURATION[current] * 1_000)
+
+    // The finisher turns a full circle and ends facing the same way.
+    if (inCombo && current === 3) {
+      const spin = MathUtils.clamp(cutProgress, 0, 1)
+      group.rotation.y = spin * spin * (3 - 2 * spin) * Math.PI * 2
+    } else {
+      group.rotation.y = 0
+    }
+    group.position.x = MathUtils.damp(group.position.x, inCombo ? CUT_LUNGE[current] : 0, inCombo ? 10 : 3.5, delta)
+
+    // Each cut lands on an unseen foe in front: sparks, an anime cut line, dust on the finisher.
+    const bit = 1 << current
+    if (inCombo && cutProgress >= CUT_CONTACT[current] && !(timeline.current.landed & bit)) {
+      timeline.current.landed |= bit
+      const heavy = current === 3
+      const x = group.position.x + 1.35
+      const y = originYRef.current + (current === 1 ? 0.1 : 0)
+      vfx.slashes.spawn(x, y, 1, heavy ? 3 : 2.2, HERO_TINT[id], { angle: CUT_ANGLE[current], ms: heavy ? 200 : 150 })
+      vfx.emit(() => {
+        EFFECTS.swordHit(x, y, 1, HERO_TINT[id], heavy)
+        if (heavy) EFFECTS.dust(group.position.x + 0.3, 0, 1.1)
+      })
+    }
+  })
+
+  return (
+    <>
+      <group ref={body}>
+        <AnimatedCharacter
+          bladeId={blade}
+          definition={CHARACTERS[id]}
+          animationDurationSeconds={ability ? durationMs / 1_000 : ATTACK_DURATION[step]}
+          animationState={animation}
+          animationSignal={trigger * 4 + step}
+        />
+        {id === 'jack' ? <JackSheath blade={blade} facingGroup={body} source={sheathSource} /> : null}
+      </group>
+      {createPortal(<BladeTrail blade={blade} hero={id} source={trailSource} />, scene)}
+    </>
+  )
 }
 
 const SHADOW_SHOWCASE_ACTIONS: readonly EvilJackAction[] = ['slash', 'double', 'triple', 'cast', 'slash']
@@ -363,16 +497,17 @@ function FootAlignedModel({ children, effectOriginY, effectScale }: { children: 
   return <group ref={anchor}><group ref={visual}>{children}</group></group>
 }
 
-function Fighter({ accent, children, displayScale, effects, forced, id, index, onCycleComplete, onMove, originY, side }: FighterProps) {
+function Fighter({ accent, children, displayScale, effects, forced, id, index, onCycleComplete, onMove, onReady, originY, recoveryMs = 180, screenX, side }: FighterProps) {
   const root = useRef<Group>(null)
+  useEffect(() => onReady(id), [id, onReady])
   const effectOriginY = useRef(originY * displayScale)
+  const vfx = useStageVfx(root)
   const viewportWidth = useThree((state) => state.viewport.width)
   const viewportHeight = useThree((state) => state.viewport.height)
   const shadows = usePerformanceStore((state) => PERFORMANCE_PROFILES[state.tier].shadows)
-  const attack = useRandomAttackCycle(effects, forced, onCycleComplete, onMove, index + (side === 'enemies' ? 20 : 0))
+  const attack = useRandomAttackCycle(effects, forced, onCycleComplete, onMove, index + (side === 'enemies' ? 20 : 0), recoveryMs)
   const screenPosition = 0.79
-  const desiredX = viewportWidth * (side === 'heroes' ? -0.41 : 0.41)
-  const baseX = desiredX
+  const baseX = viewportWidth * screenX
   const baseY = CAMERA_CENTER_Y + (0.5 - screenPosition) * viewportHeight
 
   useFrame(({ clock }, delta) => {
@@ -388,7 +523,7 @@ function Fighter({ accent, children, displayScale, effects, forced, id, index, o
   return (
     <group ref={root} name={id} position={[baseX, baseY, side === 'heroes' ? -0.08 : -0.28]}>
       <group rotation={[0, side === 'heroes' ? 0 : -Math.PI / 2, 0]} scale={displayScale}>
-        <FootAlignedModel effectOriginY={effectOriginY} effectScale={displayScale}>{children(attack)}</FootAlignedModel>
+        <FootAlignedModel effectOriginY={effectOriginY} effectScale={displayScale}>{children({ ...attack, originYRef: effectOriginY, vfx })}</FootAlignedModel>
       </group>
       {shadows ? <ContactShadows position={[0, 0.01, 0]} scale={side === 'heroes' ? 5 : 7} opacity={0.32} blur={2.4} far={4} color="#060104" /> : null}
       <MenuAttackEffect
@@ -400,14 +535,17 @@ function Fighter({ accent, children, displayScale, effects, forced, id, index, o
         originYRef={effectOriginY}
         presentationScale={displayScale}
         trigger={attack.trigger}
-        variant={attack.variant}
+        vfx={vfx}
       />
+      <StageVfxLayer vfx={vfx} />
     </group>
   )
 }
 
-function StageCast({ action, activeEnemyIndex, activeHeroIndex, onEnemyCycleComplete, onEnemyMove, onHeroCycleComplete, onHeroMove }: {
+function StageCast({ action, activeEnemyIndex, activeHeroIndex, composition, onEnemyCycleComplete, onEnemyMove, onHeroCycleComplete, onHeroMove, onReady }: {
   action: MenuStageAction
+  composition: MenuStageComposition
+  onReady: (id: string) => void
   activeEnemyIndex: number
   activeHeroIndex: number
   onEnemyCycleComplete: () => void
@@ -421,8 +559,8 @@ function StageCast({ action, activeEnemyIndex, activeHeroIndex, onEnemyCycleComp
   return (
     <>
       <Suspense fallback={null}>
-        <Fighter key={hero.id} id={hero.id} side="heroes" index={activeHeroIndex} displayScale={1} originY={hero.originY} accent={hero.accent} effects={hero.effects} forced={action === 'heroes'} onCycleComplete={onHeroCycleComplete} onMove={onHeroMove}>
-          {({ durationMs, trigger, variant }) => <Hero durationMs={durationMs} id={heroId} trigger={trigger} variant={variant} />}
+        <Fighter key={hero.id} id={hero.id} side="heroes" index={activeHeroIndex} displayScale={1} originY={hero.originY} accent={hero.accent} effects={hero.effects} forced={action === 'heroes'} onCycleComplete={onHeroCycleComplete} onMove={onHeroMove} onReady={onReady} recoveryMs={700} screenX={FIGHTER_SCREEN_X[composition].heroes}>
+          {({ durationMs, originYRef, trigger, variant, vfx }) => <Hero durationMs={durationMs} id={heroId} kind={hero.effects[variant] ?? hero.effects[0]} originYRef={originYRef} trigger={trigger} vfx={vfx} />}
         </Fighter>
       </Suspense>
       <Suspense fallback={null}>
@@ -430,6 +568,7 @@ function StageCast({ action, activeEnemyIndex, activeHeroIndex, onEnemyCycleComp
           key={enemy.id}
           id={enemy.id}
           side="enemies"
+          screenX={FIGHTER_SCREEN_X[composition].enemies}
           index={activeEnemyIndex + 2}
           displayScale={enemy.displayScale}
           originY={enemy.row === 1 ? 2.1 : 1.15}
@@ -438,6 +577,7 @@ function StageCast({ action, activeEnemyIndex, activeHeroIndex, onEnemyCycleComp
           forced={action === 'enemies'}
           onCycleComplete={onEnemyCycleComplete}
           onMove={onEnemyMove}
+          onReady={onReady}
         >
           {({ durationMs, trigger, variant }) => enemy.id === 'aku-shadow'
             ? <ShadowShowcase trigger={trigger} variant={variant} />
@@ -458,7 +598,7 @@ function BudgetedMenuFrames({ enabled, fps }: { enabled: boolean; fps: number })
   return null
 }
 
-export function MenuBattleStage({ action = 'idle', variant = 'menu' }: { action?: MenuStageAction; variant?: MenuStageVariant }) {
+export function MenuBattleStage({ action = 'idle', composition = 'wide', variant = 'menu' }: { action?: MenuStageAction; composition?: MenuStageComposition; variant?: MenuStageVariant }) {
   const splash = variant === 'splash'
   const [activeHeroIndex, setActiveHeroIndex] = useState(() => Math.floor(Math.random() * HERO_SHOWCASE.length))
   const [activeEnemyIndex, setActiveEnemyIndex] = useState(() => Math.floor(Math.random() * ENEMY_SHOWCASE.length))
@@ -477,6 +617,12 @@ export function MenuBattleStage({ action = 'idle', variant = 'menu' }: { action?
     || (graphicsPreference === 'auto' && isSafariWebkitEngine())
   const effectiveMenuFps = qualityFactor < 0.5 ? 30 : qualityFactor < 0.75 ? 45 : profile.menuFps
 
+  // Names appear with their fighter, never over an empty stage while models stream in.
+  const [readyIds, setReadyIds] = useState<ReadonlySet<string>>(() => new Set())
+  const markReady = useCallback((id: string) => setReadyIds((ids) => (ids.has(id) ? ids : new Set(ids).add(id))), [])
+  const heroReady = readyIds.has(HERO_SHOWCASE_DEFINITIONS[HERO_SHOWCASE[activeHeroIndex] ?? 'ali'].id)
+  const enemyReady = readyIds.has((ENEMY_SHOWCASE[activeEnemyIndex] ?? ENEMY_SHOWCASE[0]).id)
+
   const rotateHero = useCallback(() => {
     setHeroMoveNumber(0)
     setActiveHeroIndex((index) => pickDifferentIndex(HERO_SHOWCASE.length, index))
@@ -488,7 +634,7 @@ export function MenuBattleStage({ action = 'idle', variant = 'menu' }: { action?
 
   return (
     <div
-      className={`menu-battle-stage menu-battle-stage--${variant} is-${action}`}
+      className={`menu-battle-stage menu-battle-stage--${variant} menu-battle-stage--${composition} is-${action}`}
       aria-label="Hz. Ali, Samuray Jack ve Aku lejyonu dikey sütunlarda savaş pozunda"
       data-enemy-move={enemyMoveNumber}
       data-hero-move={heroMoveNumber}
@@ -504,19 +650,21 @@ export function MenuBattleStage({ action = 'idle', variant = 'menu' }: { action?
         </> : null}
         <StageCast
           action={action}
+          composition={composition}
           activeEnemyIndex={activeEnemyIndex}
           activeHeroIndex={activeHeroIndex}
           onEnemyCycleComplete={rotateEnemy}
           onEnemyMove={setEnemyMoveNumber}
           onHeroCycleComplete={rotateHero}
           onHeroMove={setHeroMoveNumber}
+          onReady={markReady}
         />
       </Canvas>
       <div className="menu-battle-stage__hero-glow" aria-hidden="true" />
       <div className="menu-battle-stage__enemy-glow" aria-hidden="true" />
       <div className="menu-battle-stage__fighter-labels" aria-hidden="true">
-        <span className="menu-fighter-name menu-fighter-name--heroes">{activeHeroName}</span>
-        <span className="menu-fighter-name menu-fighter-name--enemies">{activeEnemyName}</span>
+        <span className={`menu-fighter-name menu-fighter-name--heroes${heroReady ? ' is-ready' : ''}`}>{activeHeroName}</span>
+        <span className={`menu-fighter-name menu-fighter-name--enemies${enemyReady ? ' is-ready' : ''}`}>{activeEnemyName}</span>
       </div>
       <ul className="sr-only" aria-label="Kahramanlar">
         {['Hz. Ali', 'Samuray Jack'].map((name) => <li key={name}>{name}</li>)}

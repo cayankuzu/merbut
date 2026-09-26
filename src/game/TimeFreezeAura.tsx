@@ -4,6 +4,7 @@ import { Group } from 'three'
 import { useSessionStore } from '../store/sessionStore'
 import type { CharacterId } from '../types/character'
 import { TimeSpiralDisc } from './TimeSpiralDisc'
+import { simClock } from '../sim/clock'
 
 interface TimeFreezeAuraProps {
   id: CharacterId
@@ -14,7 +15,7 @@ export function TimeFreezeAura({ id }: TimeFreezeAuraProps) {
 
   useFrame((_, delta) => {
     if (!root.current) return
-    const active = useSessionStore.getState().players[id].frozenUntil > performance.now()
+    const active = useSessionStore.getState().players[id].frozenUntil > simClock.now()
     root.current.visible = active
     if (!active) return
     root.current.rotation.z += delta * (id === 'ali' ? 2.2 : -2.2)

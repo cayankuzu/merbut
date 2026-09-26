@@ -1,7 +1,7 @@
 {
   "name": "merbut",
   "private": true,
-  "version": "1.2.7",
+  "version": "3.1.0",
   "type": "module",
   "scripts": {
     "dev": "node ./node_modules/vite/bin/vite.js",
@@ -14,7 +14,9 @@
     "test:e2e": "node ./node_modules/@playwright/test/cli.js test",
     "preview": "node ./node_modules/vite/bin/vite.js preview",
     "prepare:aku": "node scripts/prepare-aku-assets.mjs",
-    "optimize:web-assets": "node scripts/optimize-web-assets.mjs"
+    "optimize:web-assets": "node scripts/optimize-web-assets.mjs",
+    "art": "node scripts/art/generate-art.mjs",
+    "package:itch": "npm run build && node scripts/package-itch.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",

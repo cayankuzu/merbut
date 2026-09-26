@@ -16,6 +16,7 @@ import { useDebugStore } from '../store/debugStore'
 import { useGameStore } from '../store/gameStore'
 import { useSessionStore } from '../store/sessionStore'
 import { currentEnemyById } from './enemyLookup'
+import { simClock } from '../sim/clock'
 
 const CHARACTER_IDS = ['ali', 'jack'] as const
 const HIDDEN_SCALE = 0.0001
@@ -107,7 +108,7 @@ export function ActorContactShadows() {
       target.setMatrixAt(index, dummy.matrix)
     })
 
-    const now = performance.now()
+    const now = simClock.now()
     ids.forEach((id, idIndex) => {
       const index = CHARACTER_IDS.length + idIndex
       const enemy = currentEnemyById(id)

@@ -24,7 +24,7 @@ const BURST_GEOMETRIES = {
   shard: new TetrahedronGeometry(0.23, 0),
   spark: new OctahedronGeometry(0.13, 0),
 }
-const BURST_MATERIAL = new MeshBasicMaterial({ side: DoubleSide, toneMapped: false, vertexColors: true })
+const BURST_MATERIAL = new MeshBasicMaterial({ side: DoubleSide, toneMapped: false })
 const IMPACT_COLORS = Object.fromEntries(IMPACT_KINDS.map((kind) => [kind, {
   primary: new Color(COMBAT_EFFECT_STYLE[kind].primary),
   secondary: new Color(COMBAT_EFFECT_STYLE[kind].secondary),

@@ -1,259 +1,337 @@
+import { audioEngine, noise, tone } from './audioEngine'
+
 type EnemyKind = 1 | 2 | 3 | 4 | 5
 type EnemyVoice = `enemy-${EnemyKind}-${'hurt' | 'death'}`
 
 export type SoundEffect =
   | 'ali-slash' | 'jack-slash' | 'ali-hurt' | 'ali-down' | 'jack-hurt' | 'jack-down'
-  | 'ui-confirm' | 'menu-hero-strike' | 'menu-enemy-strike' | 'defeat'
+  | 'hit-impact' | 'kill-impact' | 'dash' | 'perfect-dodge' | 'telegraph'
+  | 'ui-confirm' | 'ui-move' | 'ui-back' | 'menu-hero-strike' | 'menu-enemy-strike' | 'defeat'
   | EnemyVoice
   | 'shadow-hurt' | 'shadow-roar' | 'shadow-death'
   | 'aku-hurt' | 'aku-roar' | 'aku-death'
-  | 'xp' | 'fireball' | 'shield' | 'heal' | 'wave' | 'biome-shift' | 'portal' | 'time-portal'
+  | 'fireball' | 'shield' | 'heal' | 'wave' | 'biome-shift' | 'gate-open' | 'portal' | 'time-portal'
   | 'stone-throw' | 'dark-orb' | 'aku-fire' | 'meteor-warning' | 'victory'
+  | 'tide-warn' | 'lava-warn' | 'gust-warn' | 'hazard-strike'
+  | 'neon-break' | 'bell' | 'resonance' | 'firefly' | 'achievement'
+  | 'hourglass' | 'sand-burst' | 'press-warn' | 'press-slam' | 'machine-break'
+  | 'rod-charge' | 'chain-zap' | 'bolt-warn' | 'thunder'
+  | 'parry' | 'finisher' | 'team-strike' | 'sword-draw' | 'sword-sheathe'
 
-const MIN_INTERVAL: Record<SoundEffect, number> = {
-  'ali-slash': 90, 'jack-slash': 90, 'ali-hurt': 220, 'ali-down': 700, 'jack-hurt': 220, 'jack-down': 700,
-  'ui-confirm': 120, 'menu-hero-strike': 700, 'menu-enemy-strike': 700, defeat: 1_200,
-  'enemy-1-hurt': 170, 'enemy-1-death': 260, 'enemy-2-hurt': 170, 'enemy-2-death': 260,
-  'enemy-3-hurt': 190, 'enemy-3-death': 280, 'enemy-4-hurt': 190, 'enemy-4-death': 280,
-  'enemy-5-hurt': 210, 'enemy-5-death': 300,
-  'shadow-hurt': 250, 'shadow-roar': 850, 'shadow-death': 1_200,
-  'aku-hurt': 260, 'aku-roar': 850, 'aku-death': 1_200,
-  xp: 120, fireball: 180, shield: 600, heal: 300, wave: 600, 'biome-shift': 900, portal: 650, 'time-portal': 420,
-  'stone-throw': 180, 'dark-orb': 200, 'aku-fire': 180, 'meteor-warning': 520, victory: 1_500,
+/** Minimum spacing (ms) per cue so chained combat never turns into noise. */
+const MIN_INTERVAL: Partial<Record<SoundEffect, number>> = {
+  'ali-slash': 80, 'jack-slash': 80, 'ali-hurt': 200, 'jack-hurt': 200, 'ali-down': 700, 'jack-down': 700,
+  'hit-impact': 45, 'kill-impact': 70, dash: 90, 'perfect-dodge': 400, telegraph: 110,
+  'ui-move': 40, 'ui-confirm': 90, defeat: 1_200,
+  'shadow-hurt': 220, 'aku-hurt': 220, 'shadow-roar': 850, 'aku-roar': 850,
+  fireball: 150, shield: 600, heal: 300, wave: 600, 'biome-shift': 900, 'gate-open': 900,
+  portal: 650, 'time-portal': 420, 'stone-throw': 160, 'dark-orb': 180, 'aku-fire': 160,
+  'meteor-warning': 260, 'hazard-strike': 180, bell: 120, firefly: 200, achievement: 800,
+  hourglass: 400, 'sand-burst': 60, 'press-warn': 300, 'press-slam': 200, 'machine-break': 70,
+  'rod-charge': 500, 'chain-zap': 50, 'bolt-warn': 200, thunder: 250,
+  parry: 90, finisher: 200, 'team-strike': 600, 'sword-draw': 300, 'sword-sheathe': 300,
+}
+const DEFAULT_INTERVAL = 150
+
+/** Inharmonic partials of a struck bell (Rayleigh's ratios). */
+function bell(frequency: number, level: number, pan: number, delay = 0, seconds = 3.2) {
+  ;[[1, 1], [2.76, 0.55], [5.4, 0.3], [8.93, 0.16], [0.5, 0.35]].forEach(([ratio, weight]) => {
+    tone({ from: frequency * ratio!, duration: seconds * (ratio! < 1 ? 1.2 : 1 / Math.sqrt(ratio!)), level: level * weight!, type: 'sine', delay, pan, attack: 0.004 })
+  })
 }
 
-class GameAudioEngine {
-  private context: AudioContext | null = null
-  private masterGain: GainNode | null = null
-  private masterLimiter: DynamicsCompressorNode | null = null
-  private noiseBuffer: AudioBuffer | null = null
-  private volume = 0.78
+function taiko(level: number, pan: number, delay = 0) {
+  tone({ from: 150, to: 52, duration: 0.55, level, type: 'sine', delay, pan, drive: 0.5 })
+  noise({ duration: 0.12, level: level * 0.4, filter: 'lowpass', frequency: 900, to: 200, delay, pan })
+}
+
+class GameAudio {
   private lastPlayed = new Map<SoundEffect, number>()
-  private effectPan = 0
-  private pitchVariation = 1
+  private variation = 1
 
   setVolume(volume: number) {
-    this.volume = Math.max(0, Math.min(1, volume))
-    if (this.context && this.masterGain) {
-      this.masterGain.gain.setTargetAtTime(this.volume, this.context.currentTime, 0.018)
-    }
+    audioEngine.setLevel('sfx', volume)
   }
 
   unlock() {
-    const context = this.getContext()
-    if (context?.state === 'suspended') void context.resume()
+    audioEngine.resume()
   }
 
   suspend() {
-    if (this.context?.state === 'running') void this.context.suspend()
+    audioEngine.suspend()
   }
 
   play(effect: SoundEffect, pan = 0) {
-    if (this.volume <= 0) return
+    if (audioEngine.level('sfx') <= 0) return
     const now = performance.now()
-    if (now - (this.lastPlayed.get(effect) ?? -Infinity) < MIN_INTERVAL[effect]) return
-    const context = this.getContext()
+    if (now - (this.lastPlayed.get(effect) ?? -Infinity) < (MIN_INTERVAL[effect] ?? DEFAULT_INTERVAL)) return
+    const context = audioEngine.resume()
     if (!context) return
-    if (context.state === 'suspended') void context.resume()
     this.lastPlayed.set(effect, now)
-    this.effectPan = Math.max(-1, Math.min(1, pan))
-    // Tiny per-hit variation prevents repeated attacks from sounding like the
-    // exact same sample while keeping each character's sonic identity intact.
-    this.pitchVariation = 0.965 + Math.random() * 0.07
+    // Tiny per-hit pitch variation keeps repeats from sounding like a sample.
+    this.variation = 0.96 + Math.random() * 0.08
+    const v = this.variation
+    const p = Math.max(-1, Math.min(1, pan))
 
     if (effect.startsWith('enemy-')) {
       const [, kindValue, state] = effect.split('-')
       const kind = Number(kindValue) as EnemyKind
       const death = state === 'death'
-      const base = [0, 210, 176, 132, 98, 245][kind]!
+      const base = ([0, 210, 176, 132, 98, 245][kind] ?? 180) * v
       const wave: OscillatorType[] = ['sine', 'sawtooth', 'square', 'triangle', 'sawtooth', 'square']
-      this.tone(base, death ? base * 0.19 : base * 0.57, death ? 0.62 + kind * 0.045 : 0.2 + kind * 0.024, death ? 0.17 : 0.1, wave[kind]!)
-      this.noise(death ? 0.48 : 0.14, death ? 0.14 : 0.065, 380 + kind * 185, kind % 2 ? 'bandpass' : 'lowpass', kind * 0.008)
-      if (kind === 4) this.tone(510, death ? 72 : 320, death ? 0.5 : 0.16, 0.055, 'triangle', 0.03)
-      if (kind === 5) this.tone(690, death ? 46 : 880, death ? 0.7 : 0.19, 0.05, 'sine', 0.04)
+      tone({ from: base, to: death ? base * 0.22 : base * 0.6, duration: death ? 0.7 : 0.22, level: death ? 0.13 : 0.08, type: wave[kind], pan: p, filter: { type: 'bandpass', frequency: 700 + kind * 120, q: 1.4 }, drive: 0.35 })
+      noise({ duration: death ? 0.45 : 0.12, level: death ? 0.1 : 0.05, filter: 'bandpass', frequency: 420 + kind * 160, pan: p })
       return
     }
 
     switch (effect) {
       case 'ali-slash':
-        this.noise(0.14, 0.14, 2_250, 'highpass')
-        this.tone(410, 1_040, 0.13, 0.08, 'sawtooth')
-        this.tone(960, 360, 0.18, 0.045, 'sine', 0.035)
+        noise({ duration: 0.2, level: 0.16, filter: 'bandpass', frequency: 700 * v, to: 3_400, q: 1.2, pan: p })
+        tone({ from: 190 * v, to: 85, duration: 0.18, level: 0.07, type: 'triangle', pan: p })
+        tone({ from: 1_260 * v, to: 1_150, duration: 0.26, level: 0.025, type: 'sine', delay: 0.05, pan: p, vibrato: 6 })
         break
       case 'jack-slash':
-        this.noise(0.2, 0.12, 3_100, 'highpass')
-        this.tone(1_180, 240, 0.17, 0.075, 'triangle')
-        this.tone(1_720, 680, 0.1, 0.045, 'sine', 0.025)
+        noise({ duration: 0.15, level: 0.15, filter: 'highpass', frequency: 2_200 * v, to: 6_500, pan: p })
+        tone({ from: 2_350 * v, to: 1_900, duration: 0.2, level: 0.03, type: 'sine', delay: 0.03, pan: p })
+        tone({ from: 3_520 * v, to: 3_300, duration: 0.14, level: 0.016, type: 'sine', delay: 0.035, pan: p })
+        break
+      case 'hit-impact':
+        tone({ from: 150 * v, to: 55, duration: 0.13, level: 0.2, type: 'sine', pan: p, drive: 0.45 })
+        noise({ duration: 0.09, level: 0.16, filter: 'lowpass', frequency: 2_400, to: 300, pan: p })
+        tone({ from: 900, duration: 0.012, level: 0.06, type: 'square', pan: p, attack: 0.001 })
+        break
+      case 'kill-impact':
+        tone({ from: 120 * v, to: 36, duration: 0.34, level: 0.27, type: 'sine', pan: p, drive: 0.75 })
+        noise({ duration: 0.28, level: 0.18, filter: 'bandpass', frequency: 760, to: 240, pan: p })
+        noise({ duration: 0.05, level: 0.12, filter: 'highpass', frequency: 3_000, pan: p })
+        break
+      case 'dash':
+        noise({ duration: 0.2, level: 0.12, filter: 'bandpass', frequency: 500, to: 2_600, q: 1.1, pan: p })
+        break
+      case 'perfect-dodge':
+        tone({ from: 1_320, to: 220, duration: 0.6, level: 0.09, type: 'sine', pan: p })
+        tone({ from: 1_760, to: 1_760, duration: 0.7, level: 0.04, type: 'triangle', delay: 0.05, pan: p, vibrato: 18 })
+        noise({ duration: 0.5, level: 0.05, filter: 'highpass', frequency: 5_000, pan: p, attack: 0.08 })
+        audioEngine.duck('music', 0.55, 0.5)
+        break
+      case 'telegraph':
+        tone({ from: 1_640, duration: 0.09, level: 0.022, type: 'sine', pan: p })
+        tone({ from: 2_460, duration: 0.07, level: 0.014, type: 'sine', delay: 0.02, pan: p })
         break
       case 'ali-hurt':
-        this.tone(284, 126, 0.27, 0.13, 'triangle'); this.noise(0.15, 0.06, 1_050, 'bandpass')
-        break
-      case 'ali-down':
-        this.tone(390, 62, 0.82, 0.18, 'sawtooth'); this.noise(0.6, 0.1, 620, 'bandpass')
+        tone({ from: 270 * v, to: 150, duration: 0.24, level: 0.1, type: 'triangle', pan: p, filter: { type: 'bandpass', frequency: 800, q: 2 } })
+        noise({ duration: 0.12, level: 0.06, filter: 'bandpass', frequency: 1_100, pan: p })
         break
       case 'jack-hurt':
-        this.tone(196, 92, 0.31, 0.14, 'square'); this.noise(0.18, 0.055, 1_420, 'highpass')
+        tone({ from: 210 * v, to: 120, duration: 0.26, level: 0.1, type: 'sawtooth', pan: p, filter: { type: 'bandpass', frequency: 950, q: 2.2 } })
+        noise({ duration: 0.12, level: 0.05, filter: 'highpass', frequency: 1_500, pan: p })
         break
+      case 'ali-down':
       case 'jack-down':
-        this.tone(520, 88, 0.74, 0.16, 'triangle'); this.tone(176, 44, 0.86, 0.09, 'square', 0.08)
+        tone({ from: effect === 'ali-down' ? 360 : 440, to: 60, duration: 0.9, level: 0.14, type: 'sawtooth', pan: p, filter: { type: 'lowpass', frequency: 1_200 } })
+        taiko(0.2, p, 0.12)
+        audioEngine.duck('music', 0.4, 0.9)
+        break
+      case 'ui-move':
+        tone({ from: 1_180, duration: 0.05, level: 0.03, type: 'sine' })
         break
       case 'ui-confirm':
-        this.tone(520, 780, 0.09, 0.07, 'sine')
-        this.tone(780, 1_040, 0.1, 0.05, 'triangle', 0.055)
+        tone({ from: 660, to: 880, duration: 0.1, level: 0.06, type: 'sine' })
+        tone({ from: 990, to: 1_320, duration: 0.12, level: 0.04, type: 'triangle', delay: 0.05 })
+        break
+      case 'ui-back':
+        tone({ from: 700, to: 460, duration: 0.1, level: 0.05, type: 'sine' })
         break
       case 'menu-hero-strike':
-        this.noise(0.42, 0.16, 2_800, 'highpass')
-        this.tone(260, 1_240, 0.46, 0.13, 'sawtooth')
-        this.tone(740, 1_480, 0.28, 0.08, 'triangle', 0.12)
+        noise({ duration: 0.42, level: 0.16, filter: 'highpass', frequency: 2_800 })
+        tone({ from: 260, to: 1_240, duration: 0.46, level: 0.1, type: 'sawtooth', filter: { type: 'lowpass', frequency: 2_600 } })
+        taiko(0.22, 0, 0.1)
         break
       case 'menu-enemy-strike':
-        this.tone(118, 34, 0.76, 0.22, 'square')
-        this.noise(0.62, 0.19, 510, 'bandpass')
-        this.tone(76, 210, 0.52, 0.1, 'sawtooth', 0.16)
+        tone({ from: 118, to: 34, duration: 0.76, level: 0.2, type: 'square', filter: { type: 'lowpass', frequency: 700 }, drive: 0.4 })
+        noise({ duration: 0.62, level: 0.16, filter: 'bandpass', frequency: 510 })
         break
       case 'defeat':
-        this.tone(246, 33, 1.4, 0.2, 'sawtooth'); this.tone(116, 22, 1.6, 0.13, 'square', 0.16); this.noise(1.1, 0.12, 280, 'lowpass')
+        tone({ from: 246, to: 33, duration: 1.6, level: 0.18, type: 'sawtooth', filter: { type: 'lowpass', frequency: 900 } })
+        bell(110, 0.14, 0, 0.2, 4)
         break
       case 'shadow-hurt':
-        this.tone(164, 74, 0.34, 0.14, 'sawtooth'); this.noise(0.22, 0.08, 720, 'bandpass')
+        tone({ from: 164 * v, to: 74, duration: 0.34, level: 0.12, type: 'sawtooth', pan: p, filter: { type: 'bandpass', frequency: 600 } })
+        noise({ duration: 0.22, level: 0.08, filter: 'bandpass', frequency: 720, pan: p })
         break
       case 'shadow-roar':
-        this.tone(92, 38, 0.9, 0.25, 'sawtooth'); this.tone(61, 31, 1.05, 0.16, 'square'); this.noise(0.95, 0.16, 240, 'lowpass')
+      case 'aku-roar':
+        tone({ from: effect === 'aku-roar' ? 74 : 92, to: effect === 'aku-roar' ? 146 : 38, duration: 1.1, level: 0.24, type: 'sawtooth', filter: { type: 'lowpass', frequency: 900 }, drive: 0.6 })
+        tone({ from: 61, to: 31, duration: 1.2, level: 0.16, type: 'square', filter: { type: 'lowpass', frequency: 300 } })
+        noise({ duration: 1.1, level: 0.16, filter: 'bandpass', frequency: 420, to: 900 })
+        audioEngine.duck('music', 0.5, 1.2)
         break
       case 'shadow-death':
-        this.tone(145, 24, 1.35, 0.26, 'sawtooth'); this.noise(1.2, 0.21, 330, 'lowpass'); this.tone(54, 18, 1.5, 0.17, 'square', 0.2)
+      case 'aku-death':
+        tone({ from: 280, to: 21, duration: 1.8, level: 0.25, type: 'sawtooth', filter: { type: 'lowpass', frequency: 1_400 }, drive: 0.5 })
+        noise({ duration: 1.6, level: 0.22, filter: 'lowpass', frequency: 1_600, to: 120 })
+        bell(98, 0.18, 0, 0.3, 4.5)
         break
       case 'aku-hurt':
-        this.tone(118, 238, 0.32, 0.13, 'square'); this.noise(0.25, 0.075, 1_180, 'bandpass')
-        break
-      case 'aku-roar':
-        this.tone(74, 146, 1.05, 0.24, 'square'); this.tone(220, 42, 0.92, 0.16, 'sawtooth'); this.noise(1, 0.18, 640, 'bandpass')
-        break
-      case 'aku-death':
-        this.tone(280, 21, 1.55, 0.25, 'square'); this.tone(880, 48, 1.3, 0.1, 'sine', 0.08); this.noise(1.45, 0.2, 920, 'bandpass')
-        break
-      case 'xp':
-        this.tone(660, 880, 0.11, 0.09, 'sine'); this.tone(880, 1_320, 0.14, 0.08, 'sine', 0.08)
+        tone({ from: 118 * v, to: 238, duration: 0.32, level: 0.12, type: 'square', pan: p, filter: { type: 'lowpass', frequency: 1_200 } })
+        noise({ duration: 0.25, level: 0.08, filter: 'bandpass', frequency: 1_180, pan: p })
         break
       case 'fireball':
-        this.noise(0.38, 0.18, 1_100, 'bandpass'); this.tone(180, 760, 0.34, 0.12, 'sawtooth')
+        noise({ duration: 0.4, level: 0.16, filter: 'bandpass', frequency: 900, to: 2_000, pan: p })
+        tone({ from: 160, to: 620, duration: 0.34, level: 0.09, type: 'sawtooth', pan: p, filter: { type: 'lowpass', frequency: 1_800 } })
         break
       case 'shield':
-        this.tone(360, 1_100, 0.48, 0.13, 'sine'); this.tone(540, 1_450, 0.55, 0.08, 'triangle', 0.06)
+        ;[523, 659, 784, 1_046].forEach((frequency, index) => tone({ from: frequency, duration: 0.9, level: 0.05, type: 'sine', delay: index * 0.05, pan: p, vibrato: 4 }))
+        noise({ duration: 0.5, level: 0.05, filter: 'highpass', frequency: 4_000, pan: p, attack: 0.06 })
         break
       case 'heal':
-        this.tone(440, 660, 0.3, 0.1, 'sine'); this.tone(660, 990, 0.42, 0.08, 'sine', 0.16)
+        ;[660, 880, 1_320].forEach((frequency, index) => tone({ from: frequency, duration: 0.5, level: 0.05, type: 'sine', delay: index * 0.09, pan: p }))
+        ;[0.05, 0.14, 0.22].forEach((delay) => tone({ from: 420 + Math.random() * 300, to: 900, duration: 0.07, level: 0.03, type: 'sine', delay, pan: p }))
         break
       case 'wave':
-        this.tone(82, 164, 0.65, 0.18, 'sawtooth'); this.noise(0.45, 0.1, 420, 'lowpass')
+        taiko(0.26, 0)
+        taiko(0.2, 0, 0.28)
+        tone({ from: 82, to: 98, duration: 1.1, level: 0.08, type: 'sawtooth', delay: 0.1, filter: { type: 'lowpass', frequency: 520 } })
         break
       case 'biome-shift':
-        this.tone(196, 392, 0.46, 0.07, 'sine')
-        this.tone(294, 588, 0.5, 0.055, 'triangle', 0.07)
-        this.noise(0.28, 0.045, 1_620, 'bandpass', 0.02)
+        bell(110, 0.16, 0, 0, 3.8)
+        noise({ duration: 1.4, level: 0.04, filter: 'highpass', frequency: 5_500, attack: 0.3 })
+        break
+      case 'gate-open':
+        noise({ duration: 1.3, level: 0.14, filter: 'lowpass', frequency: 320, pan: p, attack: 0.1 })
+        tone({ from: 520, duration: 0.5, level: 0.05, type: 'triangle', delay: 0.4, pan: p })
+        tone({ from: 780, duration: 0.7, level: 0.04, type: 'sine', delay: 0.55, pan: p })
         break
       case 'portal':
-        this.tone(780, 42, 0.9, 0.18, 'sine'); this.noise(0.8, 0.12, 1_500, 'bandpass')
+        tone({ from: 780, to: 42, duration: 1.2, level: 0.16, type: 'sine' })
+        noise({ duration: 1.1, level: 0.12, filter: 'bandpass', frequency: 1_500, to: 300 })
         break
       case 'time-portal':
-        this.tone(1_360, 86, 0.62, 0.12, 'triangle'); this.tone(340, 1_020, 0.55, 0.07, 'sine', 0.06); this.noise(0.5, 0.08, 2_200, 'bandpass')
+        tone({ from: 1_360, to: 86, duration: 0.7, level: 0.1, type: 'triangle', pan: p })
+        tone({ from: 340, to: 1_020, duration: 0.6, level: 0.06, type: 'sine', delay: 0.06, pan: p, vibrato: 20 })
+        noise({ duration: 0.6, level: 0.07, filter: 'bandpass', frequency: 2_200, pan: p })
         break
       case 'stone-throw':
-        this.noise(0.2, 0.16, 310, 'lowpass'); this.tone(104, 62, 0.22, 0.1, 'triangle')
+        noise({ duration: 0.22, level: 0.14, filter: 'lowpass', frequency: 420, pan: p })
+        tone({ from: 104, to: 62, duration: 0.22, level: 0.08, type: 'triangle', pan: p })
         break
       case 'dark-orb':
-        this.tone(188, 620, 0.48, 0.1, 'square'); this.tone(740, 124, 0.5, 0.055, 'sine', 0.04)
+        tone({ from: 188, to: 620, duration: 0.5, level: 0.08, type: 'square', pan: p, filter: { type: 'lowpass', frequency: 1_400 } })
+        tone({ from: 740, to: 124, duration: 0.5, level: 0.045, type: 'sine', delay: 0.04, pan: p })
         break
       case 'aku-fire':
-        this.noise(0.44, 0.17, 1_620, 'bandpass'); this.tone(96, 920, 0.4, 0.1, 'sawtooth')
+        noise({ duration: 0.46, level: 0.16, filter: 'bandpass', frequency: 1_620, to: 700, pan: p })
+        tone({ from: 96, to: 920, duration: 0.4, level: 0.09, type: 'sawtooth', pan: p, filter: { type: 'lowpass', frequency: 2_000 } })
         break
       case 'meteor-warning':
-        this.tone(72, 44, 0.7, 0.18, 'square'); this.tone(440, 220, 0.52, 0.06, 'triangle', 0.12); this.noise(0.55, 0.09, 260, 'lowpass')
+        tone({ from: 440, to: 330, duration: 0.3, level: 0.05, type: 'triangle', pan: p })
+        noise({ duration: 0.5, level: 0.06, filter: 'lowpass', frequency: 260, pan: p })
         break
       case 'victory':
-        ;[392, 523, 659, 784].forEach((frequency, index) => this.tone(frequency, frequency * 1.08, 0.5, 0.1, 'triangle', index * 0.13))
+        ;[392, 523, 659, 784, 1_046].forEach((frequency, index) => tone({ from: frequency, to: frequency * 1.005, duration: 0.8, level: 0.08, type: 'triangle', delay: index * 0.12 }))
+        bell(196, 0.12, 0, 0.6, 4)
+        break
+      case 'tide-warn':
+        noise({ duration: 1.7, level: 0.16, filter: 'lowpass', frequency: 260, to: 2_200, pan: p, attack: 1.2 })
+        break
+      case 'lava-warn':
+        tone({ from: 55, to: 48, duration: 1.1, level: 0.12, type: 'sine', pan: p, vibrato: 6 })
+        noise({ duration: 1.1, level: 0.08, filter: 'lowpass', frequency: 380, pan: p, attack: 0.4 })
+        break
+      case 'gust-warn':
+        noise({ duration: 2.2, level: 0.14, filter: 'bandpass', frequency: 380, to: 1_300, q: 3, pan: -0.4, attack: 0.9 })
+        break
+      case 'hazard-strike':
+        noise({ duration: 0.7, level: 0.2, filter: 'lowpass', frequency: 1_400, to: 180, pan: p })
+        tone({ from: 90, to: 38, duration: 0.6, level: 0.18, type: 'sine', pan: p, drive: 0.6 })
+        break
+      case 'neon-break':
+        noise({ duration: 0.35, level: 0.16, filter: 'highpass', frequency: 4_200, pan: p })
+        ;[3_100, 4_400, 5_200, 3_700].forEach((frequency, index) => tone({ from: frequency, duration: 0.18, level: 0.03, type: 'sine', delay: index * 0.03, pan: p }))
+        tone({ from: 60, duration: 0.5, level: 0.1, type: 'square', pan: p, filter: { type: 'lowpass', frequency: 900 } })
+        tone({ from: 120, to: 1_600, duration: 0.3, level: 0.06, type: 'sawtooth', delay: 0.05, pan: p, filter: { type: 'bandpass', frequency: 1_500 } })
+        break
+      case 'bell':
+        bell(392, 0.1, p)
+        break
+      case 'resonance':
+        bell(392, 0.12, -0.6)
+        bell(392 * 1.498, 0.12, 0.6, 0.04)
+        tone({ from: 98, duration: 3, level: 0.08, type: 'sawtooth', attack: 0.6, filter: { type: 'lowpass', frequency: 700 } })
+        audioEngine.duck('music', 0.6, 1.8)
+        break
+      case 'firefly':
+        ;[2_100, 2_640, 3_150, 2_800].forEach((frequency, index) => tone({ from: frequency, duration: 0.14, level: 0.025, type: 'sine', delay: index * 0.05, pan: p }))
+        break
+      case 'hourglass':
+        // A reversed glass chime: the notes rise as time folds back.
+        ;[1_320, 1_760, 2_090, 2_640].forEach((frequency, index) => tone({ from: frequency, duration: 0.9 - index * 0.12, level: 0.035, type: 'sine', delay: index * 0.06, pan: p, attack: 0.25 }))
+        noise({ duration: 1.4, level: 0.06, filter: 'bandpass', frequency: 5_200, q: 1.5, pan: p, attack: 0.3 })
+        tone({ from: 220, to: 110, duration: 1.6, level: 0.05, type: 'triangle', pan: p, attack: 0.4, vibrato: 3 })
+        break
+      case 'sand-burst':
+        noise({ duration: 0.35, level: 0.1 * v, filter: 'bandpass', frequency: 3_400, to: 900, q: 0.8, pan: p })
+        break
+      case 'press-warn':
+        noise({ duration: 1, level: 0.08, filter: 'highpass', frequency: 2_800, pan: p, attack: 0.5 })
+        ;[0, 0.28, 0.56].forEach((delay) => tone({ from: 740, to: 700, duration: 0.18, level: 0.035, type: 'square', delay, pan: p, filter: { type: 'lowpass', frequency: 1_800 } }))
+        break
+      case 'press-slam':
+        tone({ from: 70, to: 32, duration: 0.5, level: 0.24, type: 'sine', pan: p, drive: 0.8 })
+        noise({ duration: 0.3, level: 0.18, filter: 'lowpass', frequency: 2_400, to: 300, pan: p })
+        ;[1_900, 2_700, 3_600].forEach((frequency, index) => tone({ from: frequency * v, duration: 0.5, level: 0.02, type: 'triangle', delay: 0.02 + index * 0.01, pan: p }))
+        audioEngine.duck('music', 0.75, 0.35)
+        break
+      case 'machine-break':
+        ;[900, 1_400, 2_300, 3_100].forEach((frequency, index) => tone({ from: frequency * v, to: frequency * 0.5, duration: 0.16, level: 0.03, type: 'square', delay: index * 0.035, pan: p, filter: { type: 'bandpass', frequency: 1_800, q: 2 } }))
+        noise({ duration: 0.25, level: 0.08, filter: 'highpass', frequency: 3_000, pan: p })
+        break
+      case 'rod-charge':
+        tone({ from: 180, to: 1_800, duration: 0.6, level: 0.06, type: 'sawtooth', pan: p, filter: { type: 'bandpass', frequency: 1_400, q: 2 } })
+        noise({ duration: 0.7, level: 0.08, filter: 'highpass', frequency: 5_000, pan: p })
+        bell(880, 0.04, p, 0.35, 1.4)
+        break
+      case 'chain-zap':
+        noise({ duration: 0.14, level: 0.09, filter: 'bandpass', frequency: 4_200 * v, q: 2, pan: p })
+        tone({ from: 2_400 * v, to: 600, duration: 0.12, level: 0.03, type: 'sawtooth', pan: p })
+        break
+      case 'bolt-warn':
+        noise({ duration: 1.2, level: 0.05, filter: 'bandpass', frequency: 900, to: 5_000, q: 3, pan: p, attack: 0.9 })
+        break
+      case 'thunder':
+        noise({ duration: 0.12, level: 0.2, filter: 'highpass', frequency: 2_000, pan: p })
+        noise({ duration: 2.4, level: 0.14, filter: 'lowpass', frequency: 300, to: 90, pan: p, delay: 0.06 })
+        tone({ from: 55, to: 36, duration: 1.8, level: 0.12, type: 'sine', pan: p, delay: 0.05, drive: 0.5 })
+        break
+      case 'parry':
+        // a bright ringing "ting" of steel meeting steel
+        ;[2_637, 3_951, 5_274].forEach((frequency, index) => tone({ from: frequency * v, duration: 0.5 - index * 0.1, level: 0.05 - index * 0.012, type: 'sine', pan: p, attack: 0.002 }))
+        noise({ duration: 0.08, level: 0.12, filter: 'highpass', frequency: 5_000, pan: p })
+        break
+      case 'finisher':
+        noise({ duration: 0.34, level: 0.16, filter: 'bandpass', frequency: 700, to: 2_600, q: 1.2, pan: p, attack: 0.05 })
+        tone({ from: 180 * v, to: 60, duration: 0.3, level: 0.08, type: 'sawtooth', pan: p, filter: { type: 'lowpass', frequency: 900 } })
+        break
+      case 'team-strike':
+        taiko(0.22, -0.3)
+        taiko(0.22, 0.3, 0.05)
+        ;[1_318, 1_976].forEach((frequency, index) => tone({ from: frequency, duration: 0.9, level: 0.04, type: 'triangle', delay: 0.04 + index * 0.03 }))
+        audioEngine.duck('music', 0.6, 0.6)
+        break
+      case 'sword-draw':
+        noise({ duration: 0.28, level: 0.08, filter: 'bandpass', frequency: 4_200, to: 7_000, q: 3, pan: p })
+        tone({ from: 3_300 * v, duration: 0.6, level: 0.022, type: 'sine', pan: p, delay: 0.12, vibrato: 7 })
+        break
+      case 'sword-sheathe':
+        noise({ duration: 0.22, level: 0.06, filter: 'bandpass', frequency: 3_000, to: 1_400, q: 2, pan: p })
+        tone({ from: 1_100, duration: 0.05, level: 0.06, type: 'square', pan: p, delay: 0.22, filter: { type: 'lowpass', frequency: 2_500 } })
+        break
+      case 'achievement':
+        ;[523, 659, 784].forEach((frequency, index) => tone({ from: frequency, duration: 0.5, level: 0.06, type: 'triangle', delay: index * 0.08 }))
+        tone({ from: 1_568, duration: 0.8, level: 0.03, type: 'sine', delay: 0.26, vibrato: 5 })
         break
     }
-  }
-
-  private getContext() {
-    if (typeof window === 'undefined') return null
-    const AudioContextConstructor = window.AudioContext
-      ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-    if (!AudioContextConstructor) return null
-    if (!this.context) {
-      this.context = new AudioContextConstructor({ latencyHint: 'interactive' })
-      this.masterGain = this.context.createGain()
-      this.masterLimiter = this.context.createDynamicsCompressor()
-      this.masterGain.gain.value = this.volume
-      this.masterLimiter.threshold.value = -8
-      this.masterLimiter.knee.value = 12
-      this.masterLimiter.ratio.value = 7
-      this.masterLimiter.attack.value = 0.002
-      this.masterLimiter.release.value = 0.12
-      this.masterGain.connect(this.masterLimiter).connect(this.context.destination)
-    }
-    return this.context
-  }
-
-  private connectToMix(node: AudioNode) {
-    const context = this.context
-    const output = this.masterGain
-    if (!context || !output) return
-    if ('createStereoPanner' in context) {
-      const panner = context.createStereoPanner()
-      panner.pan.value = this.effectPan
-      node.connect(panner).connect(output)
-      return
-    }
-    node.connect(output)
-  }
-
-  private getNoiseBuffer(context: AudioContext) {
-    if (this.noiseBuffer) return this.noiseBuffer
-    const buffer = context.createBuffer(1, context.sampleRate * 1.5, context.sampleRate)
-    const data = buffer.getChannelData(0)
-    for (let index = 0; index < data.length; index += 1) data[index] = Math.random() * 2 - 1
-    this.noiseBuffer = buffer
-    return buffer
-  }
-
-  private tone(startFrequency: number, endFrequency: number, duration: number, level: number, type: OscillatorType, delay = 0) {
-    const context = this.context
-    if (!context) return
-    const start = context.currentTime + delay
-    const oscillator = context.createOscillator()
-    const gain = context.createGain()
-    oscillator.type = type
-    oscillator.frequency.setValueAtTime(Math.max(1, startFrequency * this.pitchVariation), start)
-    oscillator.frequency.exponentialRampToValueAtTime(Math.max(1, endFrequency * this.pitchVariation), start + duration)
-    gain.gain.setValueAtTime(0.0001, start)
-    gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, level), start + 0.018)
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration)
-    oscillator.connect(gain)
-    this.connectToMix(gain)
-    oscillator.start(start)
-    oscillator.stop(start + duration + 0.03)
-  }
-
-  private noise(duration: number, level: number, frequency: number, type: BiquadFilterType, delay = 0) {
-    const context = this.context
-    if (!context) return
-    const source = context.createBufferSource()
-    const filter = context.createBiquadFilter()
-    const gain = context.createGain()
-    source.buffer = this.getNoiseBuffer(context)
-    filter.type = type
-    filter.frequency.value = frequency
-    filter.Q.value = type === 'bandpass' ? 1.8 : 0.7
-    const start = context.currentTime + delay
-    gain.gain.setValueAtTime(Math.max(0.0001, level), start)
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration)
-    source.connect(filter).connect(gain)
-    this.connectToMix(gain)
-    source.start(start)
-    source.stop(start + duration + 0.02)
   }
 }
 
-export const gameAudio = new GameAudioEngine()
+export const gameAudio = new GameAudio()

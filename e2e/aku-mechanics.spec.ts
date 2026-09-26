@@ -1,13 +1,11 @@
 import { expect, test, type Page } from '@playwright/test'
+import { startQuick } from './helpers'
+
+const DIFFICULTY_IDS = ['easy', 'normal', 'hard', 'soulslike'] as const
 
 async function startCombat(page: Page, difficultyIndex = 1) {
-  await page.goto('/')
-  await expect(page.locator('.loading-screen')).toHaveCount(0, { timeout: 60_000 })
-  await page.getByRole('button', { name: 'OYUNA BAŞLA' }).click()
-  await page.locator('.difficulty-select button').nth(difficultyIndex).click()
-  await page.getByRole('button', { name: 'SAVAŞA BAŞLA' }).click()
-  await expect.poll(() => page.evaluate(() => window.__MERBUT__?.getSessionState().phase), { timeout: 10_000 }).toBe('playing')
-  await expect.poll(() => page.evaluate(() => window.__MERBUT__?.getSessionState().enemies.length)).toBeGreaterThan(0)
+  await startQuick(page, DIFFICULTY_IDS[difficultyIndex])
+  await expect.poll(() => page.evaluate(() => window.__MERBUT__?.getSessionState().enemies.length), { timeout: 15_000 }).toBeGreaterThan(0)
 }
 
 test('Ali dört saniyelik pencerede en fazla dokuz alev topu atar', async ({ page }) => {
@@ -16,7 +14,7 @@ test('Ali dört saniyelik pencerede en fazla dokuz alev topu atar', async ({ pag
     const session = window.__MERBUT__!.getSessionState()
     const target = session.enemies.find((enemy) => !enemy.boss)!
     session.grantAbilityCharge('ali', 100)
-    const startedAt = performance.now()
+    const startedAt = window.__MERBUT__!.now()
     const attempts = Array.from({ length: 12 }, (_, index) => session.launchFireball(startedAt + index * 280, 0, 0, 0))
     for (let hit = 0; hit < 12; hit += 1) {
       session.damageEnemy(target.id, 1, 'ali', startedAt + 100 + hit * 200, 'fireball')
@@ -32,7 +30,7 @@ test('Ali dört saniyelik pencerede en fazla dokuz alev topu atar', async ({ pag
   expect(result.attempts.slice(9).every((accepted) => !accepted)).toBe(true)
   expect(result.chargeAfterHits).toBe(0)
   expect(result.reopenedAfterWindow).toBe(false)
-  await expect(page.locator('.player-hud--ali .player-hud__ability span')).toContainText('0/9 ATIŞ')
+  await expect(page.locator('.hero-card--ali .hero-card__ability span')).toContainText('Alev Penceresi')
 })
 
 test('Jack kalkanı aktifken kendini yeniden şarj edip zincirlenemez', async ({ page }) => {
@@ -40,7 +38,7 @@ test('Jack kalkanı aktifken kendini yeniden şarj edip zincirlenemez', async ({
   const result = await page.evaluate(() => {
     const session = window.__MERBUT__!.getSessionState()
     const target = session.enemies.find((enemy) => !enemy.boss)!
-    const startedAt = performance.now()
+    const startedAt = window.__MERBUT__!.now()
     session.grantAbilityCharge('jack', 100, startedAt)
     const activated = session.activateShield(startedAt)
     for (let hit = 0; hit < 6; hit += 1) {
@@ -56,7 +54,7 @@ test('Jack kalkanı aktifken kendini yeniden şarj edip zincirlenemez', async ({
   })
 
   expect(result).toEqual({ activated: true, chargeDuringShield: 0, chainedDuringShield: false, reopenedAfterShield: false })
-  await expect(page.locator('.player-hud--jack .player-hud__ability span')).toContainText(/\d\.\d SN/)
+  await expect(page.locator('.hero-card--jack .hero-card__ability span')).toContainText('Koruyucu Kalkan')
 })
 
 test('Aku ateş yağmurunda çevresindeki diken alanı oyuncuya hasar verir', async ({ page }) => {
@@ -66,11 +64,11 @@ test('Aku ateş yağmurunda çevresindeki diken alanı oyuncuya hasar verir', as
     const game = window.__MERBUT__!.getState()
     const template = session.enemies.find((enemy) => !enemy.boss)!
     const akuX = (game.positions.ali[0] + game.positions.jack[0]) / 2
-    const now = performance.now()
+    const now = window.__MERBUT__!.now()
     const aku = {
       ...template,
       id: 'aku-fire-rain-e2e',
-      biome: 6,
+      biome: 9,
       kind: 5 as const,
       title: 'Aku, Zamanın Efendisi',
       x: akuX,
@@ -120,12 +118,12 @@ test('Aku zaman portalı Zor modda hedef biyoma beş rastgele düşman yollar', 
     const session = window.__MERBUT__!.getSessionState()
     const game = window.__MERBUT__!.getState()
     const template = session.enemies.find((enemy) => !enemy.boss)!
-    const now = performance.now()
+    const now = window.__MERBUT__!.now()
     const playerX = game.positions.ali[0]
     const aku = {
       ...template,
       id: 'aku-time-portal-e2e',
-      biome: 6,
+      biome: 9,
       kind: 5 as const,
       title: 'Aku, Zamanın Efendisi',
       x: playerX + 7,

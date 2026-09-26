@@ -6,51 +6,40 @@ import {
   InstancedMesh,
   MeshBasicMaterial,
   Object3D,
-  OctahedronGeometry,
 } from 'three'
 import { useShallow } from 'zustand/react/shallow'
 import { useSessionStore } from '../store/sessionStore'
 import { currentFireballById } from './projectileLookup'
+import { createShellMaterial } from './vfx/shellMaterial'
 
 const HIDDEN_SCALE = 0.0001
-const TRAILS = [
-  { color: '#ff9a24', distance: 0.45, opacity: 0.72, scale: 1 },
-  { color: '#d92b08', distance: 0.85, opacity: 0.56, scale: 0.8 },
-  { color: '#d92b08', distance: 1.2, opacity: 0.4, scale: 0.6 },
-] as const
 
-/** Nine fireballs previously expanded to 45 meshes. The same five visual
- * layers now stay at five draw calls regardless of projectile count. */
+/** Every fireball in flight shares three draw calls: a white-hot core, a
+ * rolling shell of flame and a faint outer halo. The ember wake comes from
+ * the particle system (VfxLayer). */
 export function FireballProjectiles() {
   const ids = useSessionStore(useShallow((state) => state.projectiles.map((projectile) => projectile.id)))
   const core = useRef<InstancedMesh>(null)
-  const glow = useRef<InstancedMesh>(null)
-  const trails = useRef<Array<InstancedMesh | null>>([])
+  const flame = useRef<InstancedMesh>(null)
+  const halo = useRef<InstancedMesh>(null)
   const dummy = useMemo(() => new Object3D(), [])
-  const coreGeometry = useMemo(() => new IcosahedronGeometry(0.28, 2), [])
-  const glowGeometry = useMemo(() => new IcosahedronGeometry(0.27, 1), [])
-  const trailGeometry = useMemo(() => new OctahedronGeometry(0.19, 0), [])
-  const coreMaterial = useMemo(() => new MeshBasicMaterial({ color: '#fff0a2', toneMapped: false }), [])
-  const glowMaterial = useMemo(() => new MeshBasicMaterial({ color: '#ff3b0b', opacity: 0.42, toneMapped: false, transparent: true }), [])
-  const trailMaterials = useMemo(() => TRAILS.map((trail) => new MeshBasicMaterial({
-    color: trail.color,
-    opacity: trail.opacity,
-    toneMapped: false,
-    transparent: true,
-  })), [])
+  const coreGeometry = useMemo(() => new IcosahedronGeometry(0.17, 2), [])
+  const shellGeometry = useMemo(() => new IcosahedronGeometry(1, 3), [])
+  const coreMaterial = useMemo(() => new MeshBasicMaterial({ color: '#fff6d0', toneMapped: false }), [])
+  const flameMaterial = useMemo(() => createShellMaterial({ color: '#ff4a0e', core: '#ffd27a', fill: 0.9, bands: 16 }), [])
+  const haloMaterial = useMemo(() => createShellMaterial({ color: '#ff2a06', core: '#ff9a24', opacity: 0.45, bands: 6 }), [])
   const elapsed = useRef(0)
 
   useEffect(() => () => {
     coreGeometry.dispose()
-    glowGeometry.dispose()
-    trailGeometry.dispose()
+    shellGeometry.dispose()
     coreMaterial.dispose()
-    glowMaterial.dispose()
-    trailMaterials.forEach((material) => material.dispose())
-  }, [coreGeometry, coreMaterial, glowGeometry, glowMaterial, trailGeometry, trailMaterials])
+    flameMaterial.dispose()
+    haloMaterial.dispose()
+  }, [coreGeometry, coreMaterial, flameMaterial, haloMaterial, shellGeometry])
 
   useLayoutEffect(() => {
-    for (const mesh of [core.current, glow.current, ...trails.current]) {
+    for (const mesh of [core.current, flame.current, halo.current]) {
       if (!mesh) continue
       mesh.instanceMatrix.setUsage(DynamicDrawUsage)
       mesh.frustumCulled = false
@@ -58,12 +47,16 @@ export function FireballProjectiles() {
   }, [ids.length])
 
   useFrame((_, rawDelta) => {
-    elapsed.current += Math.min(rawDelta, 0.1)
+    const delta = Math.min(rawDelta, 0.1)
+    flameMaterial.uniforms.uTime!.value += delta * 2.4
+    haloMaterial.uniforms.uTime!.value += delta * 1.6
+    elapsed.current += delta
     if (elapsed.current < 1 / 30) return
     elapsed.current %= 1 / 30
     const coreMesh = core.current
-    const glowMesh = glow.current
-    if (!coreMesh || !glowMesh) return
+    const flameMesh = flame.current
+    const haloMesh = halo.current
+    if (!coreMesh || !flameMesh || !haloMesh) return
 
     for (let index = 0; index < ids.length; index += 1) {
       const projectile = currentFireballById(ids[index]!)
@@ -71,49 +64,31 @@ export function FireballProjectiles() {
         dummy.scale.setScalar(HIDDEN_SCALE)
         dummy.updateMatrix()
         coreMesh.setMatrixAt(index, dummy.matrix)
-        glowMesh.setMatrixAt(index, dummy.matrix)
-        trails.current.forEach((mesh) => mesh?.setMatrixAt(index, dummy.matrix))
+        flameMesh.setMatrixAt(index, dummy.matrix)
+        haloMesh.setMatrixAt(index, dummy.matrix)
         continue
       }
-
       dummy.position.set(projectile.x, projectile.y, projectile.z)
       dummy.rotation.set(0, 0, 0)
       dummy.scale.setScalar(1)
       dummy.updateMatrix()
       coreMesh.setMatrixAt(index, dummy.matrix)
-
-      dummy.scale.setScalar(1.75)
+      dummy.scale.setScalar(0.34)
       dummy.updateMatrix()
-      glowMesh.setMatrixAt(index, dummy.matrix)
-
-      TRAILS.forEach((trail, trailIndex) => {
-        dummy.position.set(
-          projectile.x - projectile.directionX * trail.distance,
-          projectile.y,
-          projectile.z - projectile.directionZ * trail.distance,
-        )
-        dummy.scale.setScalar(trail.scale)
-        dummy.updateMatrix()
-        trails.current[trailIndex]?.setMatrixAt(index, dummy.matrix)
-      })
+      flameMesh.setMatrixAt(index, dummy.matrix)
+      dummy.scale.setScalar(0.56)
+      dummy.updateMatrix()
+      haloMesh.setMatrixAt(index, dummy.matrix)
     }
-    for (const mesh of [coreMesh, glowMesh, ...trails.current]) {
-      if (mesh) mesh.instanceMatrix.needsUpdate = true
-    }
+    for (const mesh of [coreMesh, flameMesh, haloMesh]) mesh.instanceMatrix.needsUpdate = true
   })
 
   if (ids.length === 0) return null
   return (
     <group name="instanced-fireballs">
       <instancedMesh ref={core} args={[coreGeometry, coreMaterial, ids.length]} />
-      <instancedMesh ref={glow} args={[glowGeometry, glowMaterial, ids.length]} />
-      {TRAILS.map((trail, index) => (
-        <instancedMesh
-          ref={(mesh) => { trails.current[index] = mesh }}
-          args={[trailGeometry, trailMaterials[index], ids.length]}
-          key={trail.distance}
-        />
-      ))}
+      <instancedMesh ref={flame} args={[shellGeometry, flameMaterial, ids.length]} renderOrder={12} />
+      <instancedMesh ref={halo} args={[shellGeometry, haloMaterial, ids.length]} renderOrder={12} />
     </group>
   )
 }

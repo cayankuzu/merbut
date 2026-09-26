@@ -1,15 +1,16 @@
-import { useEffect, useRef, type MutableRefObject } from 'react'
+import { useEffect, useMemo, useRef, type MutableRefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { AdditiveBlending, DoubleSide, Group, MathUtils, Mesh, MeshBasicMaterial } from 'three'
-import { AliFlameTrailVisual } from '../game/AliFlameTrailVisual'
-import { FireballVisual } from '../game/FireballVisual'
-import { ALI_FLAME_ARCS, JACK_SLASHES } from '../game/heroCombatGeometry'
-import { JackShieldVisual } from '../game/JackShieldVisual'
-import { JackSlashVisual } from '../game/JackSlashVisual'
-import { CombatImpactVisual } from '../game/CombatImpactVisual'
+import { DoubleSide, Group, MeshBasicMaterial, RingGeometry } from 'three'
+import { emitImpactParticles } from '../game/vfx/impactParticles'
+import { COMBAT_EFFECT_STYLE } from '../game/combatEffectConfig'
 import { EnemyProjectileVisual } from '../game/EnemyProjectileVisual'
+import { FireballVisual } from '../game/FireballVisual'
+import { JackShieldVisual } from '../game/JackShieldVisual'
+import { EFFECTS, burst, flash } from '../game/vfx/effects'
+import { LIGHT_BLENDING } from '../game/vfx/lightBlending'
 import type { EnemyProjectileState, ImpactKind } from '../types/session'
 import { getMenuAttackDurationMs } from './menuShowcaseCycle'
+import type { StageVfx } from './stageVfx'
 
 export type MenuAttackEffectKind =
   | 'none'
@@ -43,244 +44,228 @@ interface MenuAttackEffectProps {
   /** Keeps the visual envelope aligned with its model's showcase move. */
   durationMs?: number
   trigger: number
-  variant: number
+  vfx: StageVfx
 }
 
-export function MenuAttackEffect({ accent, direction, durationMs, kind, originY, originYRef, presentationScale = 1, trigger, variant }: MenuAttackEffectProps) {
-  const root = useRef<Group>(null)
-  const aliArcs = useRef<Mesh[]>([])
-  const aliMaterials = useRef<MeshBasicMaterial[]>([])
-  const jackMeshes = useRef<Mesh[]>([])
-  const jackMaterials = useRef<MeshBasicMaterial[]>([])
-  const shadowArcs = useRef<Mesh[]>([])
-  const shadowMaterials = useRef<MeshBasicMaterial[]>([])
-  const elapsed = useRef(Number.POSITIVE_INFINITY)
+const RING = new RingGeometry(0.86, 1, 56)
+/** Tilted towards the camera so a ground ring reads as an ellipse on the orthographic stage. */
+const RING_TILT = -1.22
+const RING_MS = 560
+
+const PROJECTILE_TRAIL: Record<EnemyProjectileState['kind'], { color: string; end: string; impact: ImpactKind }> = {
+  stone: { color: '#c8ffca', end: '#2f6b35', impact: 'stone' },
+  'dark-orb': { color: '#ff6a8a', end: '#5a0018', impact: 'void' },
+  'aku-fire': { color: '#fff0a8', end: '#ff3b0b', impact: 'ember' },
+  'time-portal': { color: '#9aefff', end: '#4d1bff', impact: 'portal' },
+}
+
+const SHADOW_CUTS: Partial<Record<MenuAttackEffectKind, readonly number[]>> = {
+  'shadow-slash': [0.38],
+  'shadow-combo': [0.24, 0.47, 0.7],
+}
+
+/**
+ * Menu showcase effects in the game's own vocabulary. Every move is a timeline
+ * of cues (fire once when the move passes a point) and streams (emit while the
+ * move is inside a window); visuals come from the shared particle presets.
+ */
+export function MenuAttackEffect({ accent, direction, durationMs, kind, originY, originYRef, presentationScale = 1, trigger, vfx }: MenuAttackEffectProps) {
+  const mover = useRef<Group>(null)
+  const ring = useRef<Group>(null)
+  const ringMaterial = useMemo(() => new MeshBasicMaterial({ color: accent, transparent: true, opacity: 0, depthWrite: false, ...LIGHT_BLENDING, side: DoubleSide, toneMapped: false }), [accent])
+  const timeline = useRef({ elapsed: Number.POSITIVE_INFINITY, cues: 0, lastStream: 0, ringAt: Number.NEGATIVE_INFINITY })
   const impactKind = kind.startsWith('impact-') ? kind.slice('impact-'.length) as ImpactKind : null
   const projectileKind = kind.startsWith('projectile-')
     ? kind.slice('projectile-'.length) as EnemyProjectileState['kind']
-    : null
+    : kind === 'shadow-cast' ? 'dark-orb' : null
+
+  useEffect(() => () => ringMaterial.dispose(), [ringMaterial])
 
   useEffect(() => {
     if (trigger === 0) return
-    elapsed.current = 0
-    if (root.current) root.current.visible = true
+    timeline.current = { elapsed: 0, cues: 0, lastStream: 0, ringAt: Number.NEGATIVE_INFINITY }
   }, [trigger])
 
   useFrame((_, delta) => {
-    const group = root.current
-    if (!group) return
-    const effectOriginY = originYRef?.current ?? originY
+    const state = timeline.current
+    const group = mover.current
+    state.elapsed += Math.min(delta, 0.1)
+    const elapsedMs = state.elapsed * 1_000
 
-    elapsed.current += delta
-    const duration = Math.max(0.1, (durationMs ?? getMenuAttackDurationMs(kind)) / 1_000)
-    const progress = elapsed.current / duration
+    // Ground ring: expands and fades on its own clock once a cue starts it.
+    if (ring.current) {
+      const ringProgress = (elapsedMs - state.ringAt) / RING_MS
+      ring.current.visible = ringProgress >= 0 && ringProgress < 1
+      if (ring.current.visible) {
+        const eased = 1 - (1 - ringProgress) * (1 - ringProgress)
+        ring.current.scale.setScalar((0.3 + eased * 2.3) * presentationScale)
+        ringMaterial.opacity = (1 - ringProgress) * 0.85
+      }
+    }
+
+    const duration = Math.max(100, durationMs ?? getMenuAttackDurationMs(kind))
+    const progress = elapsedMs / duration
+    if (!group) return
     if (progress >= 1) {
       group.visible = false
       return
     }
 
-    const eased = 1 - (1 - progress) ** 3
-    if (kind === 'ali-slash') {
-      group.position.set(direction * 1.3, effectOriginY, 0.15)
-      group.rotation.set(0, direction < 0 ? Math.PI : 0, 0)
-      group.scale.setScalar(presentationScale)
-      const envelope = Math.sin(Math.PI * Math.min(1, progress * 1.12))
-      aliArcs.current.forEach((arc, index) => {
-        arc.scale.setScalar(ALI_FLAME_ARCS[index]!.scale * (0.72 + progress * 0.66))
-        arc.position.y = ALI_FLAME_ARCS[index]!.position[1] + progress * 0.22
-        if (aliMaterials.current[index]) aliMaterials.current[index]!.opacity = envelope * (0.9 - index * 0.13)
-      })
-      return
+    const y = originYRef?.current ?? originY
+    const cue = (index: number, at: number) => {
+      if (progress < at || state.cues & (1 << index)) return false
+      state.cues |= 1 << index
+      return true
     }
-    if (kind === 'jack-slash') {
-      group.position.set(direction * 1.5, effectOriginY, 0.18)
-      group.rotation.set(0, direction < 0 ? Math.PI : 0, 0)
-      group.scale.setScalar((0.78 + progress * 0.48) * presentationScale)
-      const reveal = Math.min(1, progress / 0.14)
-      const opacity = reveal * Math.pow(1 - progress, 1.7)
-      JACK_SLASHES.forEach((_, index) => {
-        if (jackMaterials.current[index]) jackMaterials.current[index]!.opacity = opacity * (1 - index * 0.19)
-        if (jackMeshes.current[index]) jackMeshes.current[index]!.position.x = (index - 1) * 0.16 + progress * 0.28
-      })
-      return
+    const stream = (from: number, to: number, everyMs: number) => {
+      if (progress < from || progress > to || elapsedMs - state.lastStream < everyMs) return false
+      state.lastStream = elapsedMs
+      return true
     }
+    const pulseRing = (x: number, color: string) => {
+      ring.current?.position.set(x, 0.05, 0.1)
+      ringMaterial.color.set(color)
+      state.ringAt = elapsedMs
+    }
+
     if (kind === 'ali-fireball') {
-      group.position.set(direction * (1.15 + eased * 1.7), effectOriginY + Math.sin(progress * Math.PI) * 0.06, 0.15)
-      group.rotation.set(0, 0, 0)
-      group.scale.setScalar(presentationScale)
+      // Cast pose first, then the fireball leaves the hand and bursts downrange.
+      const launch = 0.16
+      const land = 0.86
+      const flight = Math.min(1, Math.max(0, (progress - launch) / (land - launch)))
+      const x = direction * (0.95 + flight * flight * 2.4)
+      const height = y + Math.sin(flight * Math.PI) * 0.08
+      group.visible = progress >= launch && progress < land
+      group.position.set(x, height, 0.2)
+      group.scale.setScalar(presentationScale * (0.6 + Math.min(1, flight * 6) * 0.4))
+      if (cue(0, launch)) vfx.emit(() => {
+        flash(direction * 0.9, y, '#ffb347', 1.8, 0.18)
+        EFFECTS.embers(direction * 0.9, y, '#ffb347', 8)
+      })
+      if (stream(launch, land, 34)) vfx.emit(() => EFFECTS.embers(x - direction * 0.2, height, '#ffb347', 3))
+      if (cue(1, land)) {
+        vfx.emit(() => EFFECTS.shower(x, height, '#fff0a8', '#ff4b12', 26))
+        pulseRing(x, '#ff8a3a')
+      }
       return
     }
+
     if (kind === 'jack-shield') {
-      group.position.set(0, effectOriginY, 0)
+      // The guard pops up with a burst of cold light, hums, then folds away.
+      const grow = Math.min(1, progress / 0.12)
+      const fold = progress > 0.84 ? 1 - (progress - 0.84) / 0.16 : 1
+      group.visible = true
+      group.position.set(0, y + 0.25, 0)
       group.rotation.y += delta * 0.72
-      group.rotation.z = 0
-      group.scale.setScalar(presentationScale)
+      group.scale.setScalar(presentationScale * 0.62 * (1 - (1 - grow) ** 3) * fold)
+      if (cue(0, 0)) vfx.emit(() => {
+        flash(0, y + 0.25, '#9fe6ff', 2.6, 0.2)
+        EFFECTS.sparkle(0, y + 0.25, '#9fe6ff', 18)
+      })
+      if (stream(0.1, 0.8, 220)) vfx.emit(() => EFFECTS.sparkle(direction * 0.3, y + 0.3, '#dff6ff', 3))
+      if (cue(1, 0.84)) vfx.emit(() => EFFECTS.sparkle(0, y + 0.25, '#e6fbff', 12))
       return
     }
-    if (kind === 'shadow-slash' || kind === 'shadow-combo') {
-      // Evil Jack carries the blade below his torso; anchor these trails to
-      // that weapon lane instead of the generic chest-centred impact origin.
-      group.position.set(direction * 0.78, effectOriginY - 0.78, 0.32)
-      group.rotation.set(0, direction < 0 ? Math.PI : 0, direction * (0.42 - progress * 0.18))
-      group.scale.setScalar(presentationScale * (0.92 + eased * 0.34))
-      shadowArcs.current.forEach((arc, index) => {
-        const delay = kind === 'shadow-combo' ? index * 0.13 : index * 0.045
-        const phase = MathUtils.clamp((progress - delay) / 0.54, 0, 1)
-        const envelope = Math.sin(phase * Math.PI)
-        arc.rotation.z = direction * (index * 0.2 - 0.18 + phase * 0.34)
-        arc.scale.setScalar(0.82 + phase * (kind === 'shadow-combo' ? 0.72 : 0.48))
-        if (shadowMaterials.current[index]) {
-          shadowMaterials.current[index]!.opacity = envelope * (0.92 - index * 0.16)
-        }
+
+    if (projectileKind) {
+      const palette = PROJECTILE_TRAIL[projectileKind]
+      const launch = kind === 'shadow-cast' ? 0.34 : 0.22
+      const land = 0.88
+      const flight = Math.min(1, Math.max(0, (progress - launch) / (land - launch)))
+      const startY = kind === 'shadow-cast' ? y - 0.4 : y
+      const x = direction * (0.6 + (1 - (1 - flight) ** 2) * 2.5)
+      const height = startY + Math.sin(flight * Math.PI) * 0.14
+      group.visible = progress >= launch && progress < land
+      group.position.set(x, height, 0.2)
+      group.rotation.set(flight * 2.2, flight, flight * 1.4)
+      group.scale.setScalar(presentationScale)
+      if (cue(0, launch)) vfx.emit(() => flash(direction * 0.6, startY, palette.color, 1.6, 0.14))
+      if (stream(launch, land, 30)) vfx.emit(() => burst({ x: x - direction * 0.15, y: height, count: 3, kind: 'glow', color: palette.color, endColor: palette.end, speed: [0.3, 1.2], life: [0.3, 0.55], size: [0.2, 0.02], drag: 2, angle: direction > 0 ? Math.PI : 0, spread: 0.7 }))
+      if (cue(1, land)) {
+        vfx.emit(() => emitImpactParticles(palette.impact, x, height, true))
+        pulseRing(x, palette.color)
+      }
+      return
+    }
+
+    group.visible = false
+    const reach = direction * 1.2
+
+    if (kind === 'projectile') {
+      // A comet of the fighter's colour: a hot head and a glowing wake.
+      const flight = Math.min(1, Math.max(0, (progress - 0.2) / 0.66))
+      const x = direction * (0.6 + (1 - (1 - flight) ** 2) * 2.5)
+      if (progress >= 0.2 && progress <= 0.86) vfx.emit(() => {
+        flash(x, y, '#fff8de', 0.55, 0.05)
+        if (stream(0.2, 0.86, 26)) burst({ x, y, count: 3, kind: 'glow', color: accent, endColor: '#ffffff', speed: [0.2, 1], life: [0.25, 0.5], size: [0.22, 0.02], drag: 2 })
+      })
+      if (cue(0, 0.86)) vfx.emit(() => EFFECTS.shower(x, y, '#ffffff', accent, 22))
+      return
+    }
+
+    if (kind === 'slash') {
+      if (cue(0, 0.42)) {
+        vfx.slashes.spawn(reach, y, direction, 2.4, accent)
+        vfx.emit(() => EFFECTS.swordHit(reach, y, direction, accent, true))
+      }
+      return
+    }
+
+    if (kind === 'shockwave') {
+      if (cue(0, 0.38)) {
+        vfx.emit(() => {
+          EFFECTS.slam(reach, '#8a6a4a')
+          flash(reach, 0.3, accent, 2.2, 0.16)
+        })
+        pulseRing(reach, accent)
+      }
+      return
+    }
+
+    if (kind === 'flame') {
+      // Breath of fire: a cone of glowing tongues with smoke rolling off it.
+      if (cue(0, 0.22)) vfx.emit(() => flash(direction * 0.8, y, '#fff0a8', 1.8, 0.14))
+      if (stream(0.22, 0.72, 28)) vfx.emit(() => {
+        burst({ x: direction * 0.8, y, count: 4, kind: 'glow', color: '#fff0a8', endColor: accent, speed: [4, 7.5], life: [0.3, 0.55], size: [0.2, 0.75], drag: 1.6, angle: direction > 0 ? 0 : Math.PI, spread: 0.24, depth: 0.2 })
+        if (Math.random() < 0.35) burst({ x: direction * 1.6, y: y + 0.1, count: 1, kind: 'puff', color: '#3a2420', endColor: '#0e0806', speed: [1.5, 3], life: [0.6, 0.9], size: [0.4, 1.1], gravity: 0.8, drag: 1.4, angle: direction > 0 ? 0.3 : Math.PI - 0.3, spread: 0.3 })
       })
       return
     }
-    if (kind === 'shadow-cast') {
-      group.position.set(direction * (0.55 + eased * 1.75), effectOriginY - 0.4 + Math.sin(progress * Math.PI) * 0.12, 0.26)
-      group.rotation.set(progress * 1.2, direction * progress * 2.8, progress * 0.7)
-      group.scale.setScalar(presentationScale * (0.82 + Math.sin(progress * Math.PI) * 0.34))
-      return
-    }
+
     if (impactKind) {
-      group.position.set(direction * 0.9, effectOriginY, 0.15)
-      group.rotation.y += delta * 3.2
-      group.rotation.z -= delta * 1.7
-      group.scale.setScalar((0.35 + progress * 1.45) * Math.sin(Math.PI * Math.min(1, progress + 0.08)) * presentationScale)
-      return
-    }
-    if (projectileKind) {
-      group.position.set(direction * (0.62 + eased * 1.7), effectOriginY + Math.sin(progress * Math.PI) * 0.12, 0.2)
-      group.rotation.set(progress * 2.2, progress, progress * 1.4)
-      group.scale.setScalar(presentationScale)
+      if (cue(0, 0.34)) {
+        const style = COMBAT_EFFECT_STYLE[impactKind]
+        vfx.emit(() => {
+          flash(reach, y, style.primary, 2, 0.16)
+          emitImpactParticles(impactKind, reach, y, true)
+        })
+        pulseRing(reach, style.secondary)
+      }
       return
     }
 
-    const travel = kind === 'projectile' ? 1.7 : kind === 'slash' ? 0.72 : 0.38
-    group.position.set(direction * (0.42 + eased * travel), effectOriginY + Math.sin(progress * Math.PI) * 0.16, 0.72)
-    group.rotation.z = direction * ((variant - 1) * 0.22 + progress * 0.18)
-    const pulse = Math.sin(Math.min(1, progress * 1.4) * Math.PI)
-    const scale = kind === 'shockwave' ? 0.38 + eased * 1.55 : 0.52 + pulse * 0.72
-    group.scale.setScalar(scale * 0.74 * presentationScale)
-
-    const opacity = MathUtils.clamp((1 - progress) * 1.45, 0, 0.92)
-    group.traverse((node) => {
-      if (!(node as Mesh).isMesh) return
-      const material = (node as Mesh).material
-      if (material instanceof MeshBasicMaterial) material.opacity = opacity
-    })
+    const cuts = SHADOW_CUTS[kind]
+    if (cuts) {
+      cuts.forEach((at, index) => {
+        if (!cue(index, at)) return
+        // Evil Jack carries the blade low: the cuts land below his torso.
+        const cutY = y - 0.55 + (index % 2) * 0.2
+        vfx.slashes.spawn(direction * 0.95, cutY, direction, 2.6, index === cuts.length - 1 ? '#ff315f' : '#ff8aa0', { angle: direction * (index % 2 ? -0.5 : 0.55) })
+        vfx.emit(() => EFFECTS.swordHit(direction * 0.95, cutY, direction, '#ff315f', index === cuts.length - 1))
+      })
+    }
   })
 
-  const slashEffect = (
-    <>
-      <mesh rotation={[0, 0, direction * 0.48]}>
-        <planeGeometry args={[1.55, 0.085]} />
-        <meshBasicMaterial color="#fff4d2" transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} />
-      </mesh>
-      <mesh rotation={[0, 0, direction * -0.38]}>
-        <planeGeometry args={[1.1, 0.055]} />
-        <meshBasicMaterial color={accent} transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} />
-      </mesh>
-      <mesh scale={[1.2, 0.72, 1]}>
-        <ringGeometry args={[0.72, 0.82, 40, 1, 0.2, Math.PI * 1.22]} />
-        <meshBasicMaterial color={accent} transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} />
-      </mesh>
-    </>
-  )
-
-  const projectileEffect = (
-    <>
-      <mesh>
-        <sphereGeometry args={[0.18, 16, 12]} />
-        <meshBasicMaterial color="#fff8de" transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} />
-      </mesh>
-      <mesh scale={[1.5, 1.5, 1]}>
-        <ringGeometry args={[0.2, 0.27, 28]} />
-        <meshBasicMaterial color={accent} transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} />
-      </mesh>
-      {[-0.48, -0.3, -0.14].map((offset, index) => (
-        <mesh key={offset} position={[direction * offset, (index - 1) * 0.09, -0.02]} scale={1 - index * 0.2}>
-          <sphereGeometry args={[0.1, 10, 8]} />
-          <meshBasicMaterial color={accent} transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} />
-        </mesh>
-      ))}
-    </>
-  )
-
-  const shockwaveEffect = (
-    <>
-      {[0, 1, 2].map((index) => (
-        <mesh key={index} rotation={[0, 0, index * 1.7]} scale={0.72 + index * 0.26}>
-          <torusGeometry args={[0.58, 0.038 + index * 0.008, 6, 40, Math.PI * (0.72 + index * 0.12)]} />
-          <meshBasicMaterial color={index === 1 ? '#fff1c4' : accent} transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
-        </mesh>
-      ))}
-      {[0, 1, 2, 3, 4].map((index) => {
-        const angle = index / 5 * Math.PI * 2
-        return (
-          <mesh key={`shard-${index}`} position={[Math.cos(angle) * 0.62, Math.sin(angle) * 0.42, 0]} rotation={[0, 0, angle]}>
-            <tetrahedronGeometry args={[0.075, 0]} />
-            <meshBasicMaterial color={index % 2 ? '#fff1c4' : accent} transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
-          </mesh>
-        )
-      })}
-    </>
-  )
-
-  const shadowBladeEffect = (
-    <>
-      {[0, 1, 2].map((index) => (
-        <mesh
-          key={index}
-          ref={(node) => {
-            if (node) shadowArcs.current[index] = node
-          }}
-          position={[0.08 * index, 0.1 - index * 0.08, index * -0.025]}
-          rotation={[0, 0, index * 0.16 - 0.2]}
-        >
-          <torusGeometry args={[0.7 + index * 0.14, 0.034 + index * 0.009, 6, 48, Math.PI * (0.76 + index * 0.09)]} />
-          <meshBasicMaterial
-            ref={(node) => {
-              if (node) shadowMaterials.current[index] = node
-            }}
-            color={index === 0 ? '#fff0df' : index === 1 ? '#ff315f' : '#7e0926'}
-            transparent
-            opacity={0}
-            side={DoubleSide}
-            blending={AdditiveBlending}
-            depthWrite={false}
-            toneMapped={false}
-          />
-        </mesh>
-      ))}
-    </>
-  )
-
-  const flameEffect = (
-    <>
-      {[0, 1, 2, 3, 4].map((index) => (
-        <mesh key={index} position={[direction * (index * 0.16), Math.sin(index * 2.1) * 0.16, index * -0.035]} scale={1 - index * 0.1}>
-          <octahedronGeometry args={[0.22, 0]} />
-          <meshBasicMaterial color={index % 2 === 0 ? '#fff1a8' : accent} transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} />
-        </mesh>
-      ))}
-      <mesh scale={[1.7, 0.75, 1]}>
-        <ringGeometry args={[0.35, 0.46, 32]} />
-        <meshBasicMaterial color={accent} transparent opacity={0} side={DoubleSide} blending={AdditiveBlending} depthWrite={false} />
-      </mesh>
-    </>
-  )
-
   return (
-    <group ref={root} visible={false}>
-      {kind === 'ali-slash' ? <AliFlameTrailVisual arcs={aliArcs} materials={aliMaterials} /> : null}
-      {kind === 'ali-fireball' ? <FireballVisual directionX={direction} /> : null}
-      {kind === 'jack-slash' ? <JackSlashVisual meshes={jackMeshes} materials={jackMaterials} /> : null}
-      {kind === 'jack-shield' ? <JackShieldVisual /> : null}
-      {kind === 'shadow-slash' || kind === 'shadow-combo' ? shadowBladeEffect : null}
-      {kind === 'shadow-cast' ? <EnemyProjectileVisual kind="dark-orb" /> : null}
-      {impactKind ? <CombatImpactVisual kind={impactKind} /> : null}
-      {projectileKind ? <EnemyProjectileVisual kind={projectileKind} /> : null}
-      {kind === 'slash' ? slashEffect : kind === 'projectile' ? projectileEffect : kind === 'shockwave' ? shockwaveEffect : kind === 'flame' ? flameEffect : null}
-    </group>
+    <>
+      <group ref={mover} visible={false}>
+        {kind === 'ali-fireball' ? <FireballVisual /> : null}
+        {kind === 'jack-shield' ? <JackShieldVisual /> : null}
+        {projectileKind ? <EnemyProjectileVisual kind={projectileKind} /> : null}
+      </group>
+      <group ref={ring} visible={false} rotation={[RING_TILT, 0, 0]}>
+        <mesh geometry={RING} material={ringMaterial} dispose={null} />
+      </group>
+    </>
   )
 }

@@ -1,7 +1,8 @@
 import path from 'node:path'
 import sharp from 'sharp'
 
-const directory = path.resolve('public/assets/backgrounds')
+// Source paintings live outside public/; optimize-backgrounds.mjs publishes WebP.
+const directory = path.resolve('assets-src/backgrounds')
 const jobs = [
   ['scene-01-hd.png', 'scene-01-master.jpg'],
   ['scene-02-harbor.jpg', 'scene-02-harbor-hd.jpg'],

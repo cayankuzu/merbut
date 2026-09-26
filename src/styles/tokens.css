@@ -1,0 +1,43 @@
+/* MERBUT design tokens: every colour, size and curve the UI uses. */
+:root {
+  --font-display: 'Cinzel', 'Palatino Linotype', 'Times New Roman', serif;
+  --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+
+  --ink-0: #080204;
+  --ink-1: #12050a;
+  --ink-2: #1d0b12;
+  --ink-3: #2b1520;
+  --paper: #fff4e2;
+  --paper-dim: #dcc9b1;
+  --muted: #a8917f;
+  --line: rgba(255, 228, 196, 0.14);
+  --line-strong: rgba(255, 228, 196, 0.32);
+  --glass: rgba(14, 5, 9, 0.74);
+  --glass-strong: rgba(10, 3, 7, 0.9);
+
+  --gold: #f7c65f;
+  --gold-deep: #b9832a;
+  --crimson: #ff3b5c;
+  --sakura: #ff7aa8;
+  --jade: #57ffc0;
+  --ember: #ff7a1a;
+  --frost: #9fe6ff;
+  --ali: #f7c65f;
+  --jack: #ff4c87;
+  --danger: #ff4136;
+
+  --radius-s: 4px;
+  --radius-m: 10px;
+  --radius-l: 18px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 18px;
+  --space-5: 28px;
+  --space-6: 44px;
+
+  --shadow-panel: 0 20px 70px rgba(0, 0, 0, 0.6);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ui-scale: 1;
+}

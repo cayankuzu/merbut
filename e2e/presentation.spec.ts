@@ -1,10 +1,11 @@
 import { expect, test } from '@playwright/test'
+import { startGame, waitForAssets } from './helpers'
 
 test('karakter brifingi ve arşiv metinleri okunabilir, modeller doğru yönden başlar', async ({ page }) => {
   test.setTimeout(90_000)
   await page.setViewportSize({ width: 1500, height: 920 })
   await page.goto('/')
-  await expect(page.locator('.loading-screen')).toHaveCount(0, { timeout: 60_000 })
+  await waitForAssets(page)
 
   await expect(page.locator('.menu-battle-stage__categories')).toHaveCount(0)
   await expect(page.locator('.menu-fighter-name')).toHaveCount(2)
@@ -12,6 +13,7 @@ test('karakter brifingi ve arşiv metinleri okunabilir, modeller doğru yönden 
   await page.waitForTimeout(6_100)
   await expect.poll(async () => page.locator('.menu-fighter-name').allTextContents()).not.toEqual(firstNames)
 
+  await page.locator('.title-screen').click()
   await page.getByRole('button', { name: 'KARAKTERLER' }).click()
   await expect(page.locator('.character-gallery')).toBeVisible()
   await expect(page.locator('.character-gallery__model canvas')).toBeVisible()
@@ -41,9 +43,9 @@ test('karakter brifingi ve arşiv metinleri okunabilir, modeller doğru yönden 
   await page.screenshot({ path: 'e2e-artifacts/samuray-jack-weapon-grip-v8.png' })
 
   await page.locator('.character-gallery > header button').click()
-  await page.getByRole('button', { name: 'OYUNA BAŞLA' }).click()
+  await page.getByRole('button', { name: 'YENİ OYUN' }).click()
   await expect(page.locator('.controls-screen')).toBeVisible()
-  await expect(page.getByText(/4 sn boyunca en fazla 9 alev topu/i)).toBeVisible()
+  await expect(page.getByText(/Alev Penceresi · 4 sn, 9 alev topu/i)).toBeVisible()
   const difficultyFontSize = await page.locator('.controls-screen .difficulty-select button span').first().evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize))
   expect(difficultyFontSize).toBeGreaterThanOrEqual(10)
   await page.waitForTimeout(700)
@@ -53,21 +55,16 @@ test('karakter brifingi ve arşiv metinleri okunabilir, modeller doğru yönden 
 test('savaş HUD yalnızca isim-can barını ve kalan canı gösterir', async ({ page }) => {
   test.setTimeout(90_000)
   await page.setViewportSize({ width: 1500, height: 920 })
-  await page.goto('/')
-  await expect(page.locator('.loading-screen')).toHaveCount(0, { timeout: 60_000 })
-  await page.getByRole('button', { name: 'OYUNA BAŞLA' }).click()
-  await page.getByRole('button', { name: 'SAVAŞA BAŞLA' }).click()
-  await expect.poll(() => page.evaluate(() => window.__MERBUT__?.getSessionState().phase), { timeout: 10_000 }).toBe('playing')
+  await startGame(page)
 
-  await expect(page.locator('.world-health--player')).toHaveCount(2)
-  await expect(page.locator('.world-health--player small, .world-health--player em')).toHaveCount(0)
-  await expect(page.locator('.player-hud__lives')).toHaveCount(2)
-  await expect(page.locator('.player-hud footer', { hasText: 'SKOR' })).toHaveCount(0)
+  await expect(page.locator('.hero-card')).toHaveCount(2)
+  await expect(page.locator('.hero-card__lives')).toHaveCount(2)
+  await expect(page.locator('.world-health')).toHaveCount(0)
 
   const fireballLimit = await page.evaluate(() => {
     const session = window.__MERBUT__!.getSessionState()
     session.grantAbilityCharge('ali', 100)
-    const start = performance.now()
+    const start = window.__MERBUT__!.now()
     const attempts = Array.from({ length: 14 }, (_, index) => session.launchFireball(start + index * 280, 0, 0, 0))
     return { accepted: attempts.filter(Boolean).length, rejected: attempts.filter((accepted) => !accepted).length }
   })
@@ -80,11 +77,7 @@ test('savaş HUD yalnızca isim-can barını ve kalan canı gösterir', async ({
 test('çift zıplama çalışır ve kamera sürgüsü sahneyi canlı gösterir', async ({ page }) => {
   test.setTimeout(90_000)
   await page.setViewportSize({ width: 1500, height: 920 })
-  await page.goto('/')
-  await expect(page.locator('.loading-screen')).toHaveCount(0, { timeout: 60_000 })
-  await page.getByRole('button', { name: 'OYUNA BAŞLA' }).click()
-  await page.getByRole('button', { name: 'SAVAŞA BAŞLA' }).click()
-  await expect.poll(() => page.evaluate(() => window.__MERBUT__?.getSessionState().phase), { timeout: 10_000 }).toBe('playing')
+  await startGame(page)
 
   await page.keyboard.press('w')
   await page.waitForTimeout(150)
@@ -103,8 +96,8 @@ test('çift zıplama çalışır ve kamera sürgüsü sahneyi canlı gösterir',
   await slider.fill('18')
   await slider.dispatchEvent('pointerdown', { button: 0, buttons: 1, isPrimary: true, pointerId: 1, pointerType: 'mouse' })
   await expect(page.locator('html')).toHaveClass(/is-camera-previewing/)
-  await expect(page.locator('.pause-screen')).toHaveCSS('opacity', '0')
-  await expect(page.locator('.audio-settings__panel')).toHaveCSS('visibility', 'hidden')
+  await expect(page.locator('.pause-screen')).toHaveCSS('visibility', 'hidden')
+  await expect(page.locator('.settings-panel__frame')).toHaveCSS('visibility', 'hidden')
   await expect(page.locator('.camera-preview-readout')).toBeVisible()
   await page.screenshot({ path: 'e2e-artifacts/camera-live-preview-v8.png' })
   await page.evaluate(() => window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, pointerType: 'mouse' })))

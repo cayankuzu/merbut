@@ -2,6 +2,24 @@ import { useEffect, useState } from 'react'
 import { useAudioStore } from '../audio/audioStore'
 import { runtimeRenderDpr, usePerformanceStore, type PerformanceTier } from '../store/performanceStore'
 import { useSessionStore } from '../store/sessionStore'
+import { safeStorage } from '../utils/safeStorage'
+
+/** The calibration report is a first-launch courtesy, not a toast on every boot. */
+const SEEN_KEY = 'merbut-graphics-notice-seen'
+const alreadySeen = () => {
+  try {
+    return safeStorage().getItem(SEEN_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+const markSeen = () => {
+  try {
+    safeStorage().setItem(SEEN_KEY, '1')
+  } catch {
+    // storage may be blocked; the notice then simply shows again next launch
+  }
+}
 
 const TIER_NAMES: Record<PerformanceTier, string> = {
   minimal: 'AKICI',
@@ -11,7 +29,7 @@ const TIER_NAMES: Record<PerformanceTier, string> = {
 }
 
 export function GraphicsAutoNotice() {
-  const [visible, setVisible] = useState(true)
+  const [visible, setVisible] = useState(() => !alreadySeen())
   const preference = usePerformanceStore((state) => state.preference)
   const qualityFactor = usePerformanceStore((state) => state.qualityFactor)
   const renderDpr = usePerformanceStore((state) => state.renderDpr)
@@ -22,9 +40,11 @@ export function GraphicsAutoNotice() {
   const openSettings = useAudioStore((state) => state.openPanel)
 
   useEffect(() => {
+    if (!visible) return
+    markSeen()
     const timer = window.setTimeout(() => setVisible(false), 9_000)
     return () => window.clearTimeout(timer)
-  }, [])
+  }, [visible])
 
   if (!visible) return null
   return (

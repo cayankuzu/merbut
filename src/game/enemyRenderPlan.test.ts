@@ -35,6 +35,12 @@ function enemy(id: string, x: number, overrides: Partial<EnemyState> = {}): Enem
     nextSpecialAt: 0,
     specialHitMask: 0,
     nextAuraAt: 0,
+    variant: 'normal',
+    z: 0,
+    vx: 0,
+    stunUntil: 0,
+    windupUntil: 0,
+    spawnedAt: 0,
     ...overrides,
   }
 }

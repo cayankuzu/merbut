@@ -5,9 +5,25 @@ export const PANELS_PER_BIOME = 2
 export const BIOME_WORLD_WIDTH = PANEL_WORLD_WIDTH * PANELS_PER_BIOME
 export const BIOME_TRANSITION_HALF_WIDTH = PANEL_WORLD_WIDTH * 0.5
 
+export type BiomeId =
+  | 'aku-city' | 'sunset-harbor' | 'hourglass-desert' | 'golden-swamp' | 'beetle-foundry'
+  | 'skull-island' | 'jade-ruins' | 'storm-peak' | 'skull-field' | 'inferno-throne'
+
+export type Weather = 'embers' | 'rain' | 'sand' | 'fireflies' | 'sparks' | 'ash' | 'mist' | 'storm' | 'snow' | 'firestorm'
+
+export interface BiomeArt {
+  back: string
+  front: string
+  cover: string
+}
+
 export interface BiomeDefinition {
-  id: string
-  image: string
+  id: BiomeId
+  /** Original paintings: slow back layer, mid front layer and a square album cover. */
+  art: BiomeArt
+  /** Colour above the painting (tall screens) and below it (behind the floor). */
+  skyTop: string
+  floorColor: string
   panelColor: string
   fogColor: string
   skyColor: string
@@ -16,14 +32,16 @@ export interface BiomeDefinition {
   horizonColor: string
   accentColor: string
   title: string
-  weather: 'embers' | 'rain' | 'fireflies' | 'ash' | 'mist' | 'snow' | 'firestorm'
+  weather: Weather
   bossPanel?: boolean
 }
 
 export const BIOMES: readonly BiomeDefinition[] = [
   {
     id: 'aku-city',
-    image: ASSET_PATHS.backgrounds.city,
+    art: ASSET_PATHS.realms['aku-city'],
+    skyTop: '#12040c',
+    floorColor: '#2a0818',
     panelColor: '#3a2229',
     fogColor: '#56342f',
     skyColor: '#ffe0bb',
@@ -36,7 +54,9 @@ export const BIOMES: readonly BiomeDefinition[] = [
   },
   {
     id: 'sunset-harbor',
-    image: ASSET_PATHS.backgrounds.harbor,
+    art: ASSET_PATHS.realms['sunset-harbor'],
+    skyTop: '#231733',
+    floorColor: '#241a30',
     panelColor: '#726766',
     fogColor: '#756c69',
     skyColor: '#ffebc6',
@@ -48,8 +68,25 @@ export const BIOMES: readonly BiomeDefinition[] = [
     weather: 'rain',
   },
   {
+    id: 'hourglass-desert',
+    art: ASSET_PATHS.realms['hourglass-desert'],
+    skyTop: '#5fb3ad',
+    floorColor: '#c98a55',
+    panelColor: '#b8844f',
+    fogColor: '#c9975e',
+    skyColor: '#fff1cf',
+    groundDark: '#6b4128',
+    groundLight: '#d69a5c',
+    horizonColor: '#3a2027',
+    accentColor: '#ffc94d',
+    title: 'Kum Saati Çölü',
+    weather: 'sand',
+  },
+  {
     id: 'golden-swamp',
-    image: ASSET_PATHS.backgrounds.swamp,
+    art: ASSET_PATHS.realms['golden-swamp'],
+    skyTop: '#2f3814',
+    floorColor: '#4c5222',
     panelColor: '#78752c',
     fogColor: '#77763d',
     skyColor: '#fff19d',
@@ -62,8 +99,25 @@ export const BIOMES: readonly BiomeDefinition[] = [
     bossPanel: true,
   },
   {
+    id: 'beetle-foundry',
+    art: ASSET_PATHS.realms['beetle-foundry'],
+    skyTop: '#0b0808',
+    floorColor: '#1a0d0a',
+    panelColor: '#2b2a2c',
+    fogColor: '#3a2e2a',
+    skyColor: '#ffcf8a',
+    groundDark: '#1b1a1c',
+    groundLight: '#4f4a46',
+    horizonColor: '#0f0c0d',
+    accentColor: '#ff8a1f',
+    title: 'Böcek Dökümhanesi',
+    weather: 'sparks',
+  },
+  {
     id: 'skull-island',
-    image: ASSET_PATHS.backgrounds.skullIsland,
+    art: ASSET_PATHS.realms['skull-island'],
+    skyTop: '#0f180c',
+    floorColor: '#1d2a15',
     panelColor: '#42532a',
     fogColor: '#596238',
     skyColor: '#d8ed8c',
@@ -76,7 +130,9 @@ export const BIOMES: readonly BiomeDefinition[] = [
   },
   {
     id: 'jade-ruins',
-    image: ASSET_PATHS.backgrounds.ruins,
+    art: ASSET_PATHS.realms['jade-ruins'],
+    skyTop: '#07141a',
+    floorColor: '#1d4a42',
     panelColor: '#214742',
     fogColor: '#28524f',
     skyColor: '#b7f3d8',
@@ -88,8 +144,25 @@ export const BIOMES: readonly BiomeDefinition[] = [
     weather: 'mist',
   },
   {
+    id: 'storm-peak',
+    art: ASSET_PATHS.realms['storm-peak'],
+    skyTop: '#06070f',
+    floorColor: '#161a36',
+    panelColor: '#262a4a',
+    fogColor: '#343a63',
+    skyColor: '#d9e2ff',
+    groundDark: '#1c1f33',
+    groundLight: '#4a5078',
+    horizonColor: '#0e1020',
+    accentColor: '#8fb4ff',
+    title: 'Şimşek Zirvesi',
+    weather: 'storm',
+  },
+  {
     id: 'skull-field',
-    image: ASSET_PATHS.backgrounds.skullField,
+    art: ASSET_PATHS.realms['skull-field'],
+    skyTop: '#070d16',
+    floorColor: '#b8d2de',
     panelColor: '#34434d',
     fogColor: '#3c4851',
     skyColor: '#b8e7f5',
@@ -102,7 +175,9 @@ export const BIOMES: readonly BiomeDefinition[] = [
   },
   {
     id: 'inferno-throne',
-    image: ASSET_PATHS.backgrounds.finalBoss,
+    art: ASSET_PATHS.realms['inferno-throne'],
+    skyTop: '#140302',
+    floorColor: '#2a0806',
     panelColor: '#6f210f',
     fogColor: '#54180f',
     skyColor: '#ffb044',
@@ -114,7 +189,11 @@ export const BIOMES: readonly BiomeDefinition[] = [
     weather: 'firestorm',
     bossPanel: true,
   },
-] as const
+]
+
+export const BIOME_INDEX = Object.fromEntries(BIOMES.map((biome, index) => [biome.id, index])) as Record<BiomeId, number>
+
+export const biomeIndexOf = (id: BiomeId) => BIOME_INDEX[id]
 
 export const BACKDROP_PANELS = BIOMES.flatMap((biome) =>
   Array.from({ length: PANELS_PER_BIOME }, (_, repeatIndex) => ({

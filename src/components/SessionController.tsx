@@ -1,28 +1,22 @@
 import { useEffect } from 'react'
 import { useAudioStore } from '../audio/audioStore'
 import { useGameStore } from '../store/gameStore'
-import { useSessionStore } from '../store/sessionStore'
+import { ACTIVE_PHASES, useSessionStore } from '../store/sessionStore'
+import { getClosedBiomeLeftLimit } from '../sim/biomeProgress'
 
+/**
+ * Session-level wiring that is not simulation: scene reset per run, Esc to
+ * pause, and an automatic pause whenever the window loses focus or is hidden
+ * (a two-player couch game must never keep fighting behind an alt-tab).
+ */
 export function SessionController() {
   const sessionToken = useSessionStore((state) => state.sessionToken)
 
   useEffect(() => {
-    useGameStore.getState().resetScene()
+    // Chapter starts place the heroes just inside that biome's rear gate.
+    const startBiome = useSessionStore.getState().startBiome
+    useGameStore.getState().resetScene(startBiome > 0 ? getClosedBiomeLeftLimit(startBiome) + 2.4 : 0)
   }, [sessionToken])
-
-  useEffect(() => {
-    let previous = performance.now()
-    const timer = window.setInterval(() => {
-      const now = performance.now()
-      const delta = Math.max(0, (now - previous) / 1_000)
-      previous = now
-      const session = useSessionStore.getState()
-      if (['countdown', 'boss-intro', 'final-intro', 'playing', 'ending'].includes(session.phase)) {
-        session.tick(delta, now)
-      }
-    }, 50)
-    return () => window.clearInterval(timer)
-  }, [])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -37,8 +31,21 @@ export function SessionController() {
       else if (session.phase === 'controls') session.returnToMenu()
       else session.pause()
     }
+    const autoPause = () => {
+      const session = useSessionStore.getState()
+      if (ACTIVE_PHASES.includes(session.phase)) session.pause()
+    }
+    const onVisibility = () => {
+      if (document.hidden) autoPause()
+    }
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    window.addEventListener('blur', autoPause)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('blur', autoPause)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [])
 
   return null

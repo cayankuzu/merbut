@@ -1,0 +1,12 @@
+{
+  "name": "Merbut · On Diyar, Tek Kader",
+  "short_name": "Merbut",
+  "description": "Hz. Ali ve Samuray Jack, Aku’yu durdurmak için on diyarı aşar.",
+  "lang": "tr",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#12050a",
+  "theme_color": "#17070c",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

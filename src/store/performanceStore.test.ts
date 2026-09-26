@@ -89,7 +89,8 @@ describe('graphics performance preferences', () => {
 
   it('caps only the active render resolution while a very large crowd is visible', () => {
     expect(runtimeRenderDpr(1.35, 12)).toBe(1.35)
-    expect(runtimeRenderDpr(1.35, 100)).toBe(1.1)
+    expect(runtimeRenderDpr(1.35, 100)).toBe(1)
+    expect(runtimeRenderDpr(1.35, 45)).toBe(1.1)
     expect(runtimeRenderDpr(1, 100)).toBe(1)
     expect(runtimeRenderDpr(1.35, 1, true)).toBe(1)
   })

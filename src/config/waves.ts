@@ -1,9 +1,11 @@
 import { BIOMES, BIOME_WORLD_WIDTH, WORLD_VISUAL_LEFT, WORLD_VISUAL_RIGHT } from './biomes'
-import type { EnemyKind } from './enemies'
+import { BIOME_CONTENT } from '../content/biomeContent'
+import type { EnemyKind, EnemyVariant } from './enemies'
 
 export interface WaveSpawn {
   kind: EnemyKind
   side: -1 | 1
+  variant?: EnemyVariant
   boss?: 'swamp' | 'final'
 }
 
@@ -30,10 +32,12 @@ export function getWaveSpawnX(
 }
 
 export function expandWaveSpawns(wave: WaveDefinition, extraEnemies: number): WaveSpawn[] {
-  const regular = wave.spawns.filter((spawn) => !spawn.boss)
+  // Extra difficulty enemies copy the wave's regular creatures, never a boss or giant.
+  const regular = wave.spawns.filter((spawn) => !spawn.boss && spawn.variant !== 'giant' && spawn.variant !== 'queen')
   return [
     ...wave.spawns,
     ...Array.from({ length: extraEnemies }, (_, index) => ({
+      variant: 'normal' as const,
       ...(regular[index % Math.max(1, regular.length)] ?? {
         kind: ((wave.biome + index) % 5 + 1) as EnemyKind,
         side: index % 2 ? -1 as const : 1 as const,
@@ -56,28 +60,19 @@ export function shouldTriggerWave(
     && midpoint + 7.5 >= wave.triggerX
 }
 
+/** Wave ids read as a realm's story: entry, an optional middle beat, then the depth wave. */
+function waveName(index: number, count: number) {
+  if (index === 0) return 'entry'
+  return index === count - 1 ? 'depth' : 'mid'
+}
+
 export const WAVES: readonly WaveDefinition[] = BIOMES.flatMap((biome, biomeIndex) => {
   const start = WORLD_VISUAL_LEFT + biomeIndex * BIOME_WORLD_WIDTH
-  const firstKind = (biomeIndex % 5 + 1) as EnemyKind
-  const secondKind = ((biomeIndex + 1) % 5 + 1) as EnemyKind
-  const entry: WaveDefinition = {
-    id: `${biome.id}-entry`,
+  const waves = BIOME_CONTENT[biomeIndex]!.waves
+  return waves.map((wave, index) => ({
+    id: `${biome.id}-${waveName(index, waves.length)}`,
     biome: biomeIndex,
-    triggerX: start + 6,
-    spawns: [
-      { kind: firstKind, side: 1 },
-      { kind: secondKind, side: -1 },
-    ],
-  }
-  const depthSpawns: WaveSpawn[] = [
-    { kind: secondKind, side: 1 },
-    { kind: firstKind, side: -1 },
-    { kind: ((biomeIndex + 2) % 5 + 1) as EnemyKind, side: 1 },
-  ]
-  if (biomeIndex === 2) depthSpawns.splice(0, depthSpawns.length, { kind: 4, side: 1, boss: 'swamp' })
-  if (biomeIndex === BIOMES.length - 1) depthSpawns.splice(0, depthSpawns.length, { kind: 5, side: 1, boss: 'final' })
-  return [
-    entry,
-    { id: `${biome.id}-depth`, biome: biomeIndex, triggerX: start + 23, spawns: depthSpawns },
-  ]
+    triggerX: start + wave.trigger,
+    spawns: [...wave.spawns],
+  }))
 })

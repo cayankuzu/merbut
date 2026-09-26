@@ -1,4 +1,14 @@
-import { GAME_KEY_CODES } from './playerBindings'
+import { useSettingsStore } from '../store/settingsStore'
+
+function isGameKey(code: string) {
+  const { bindings } = useSettingsStore.getState()
+  return Object.values(bindings.ali).includes(code) || Object.values(bindings.jack).includes(code)
+}
+
+function typingIntoField(event: KeyboardEvent) {
+  const target = event.target as HTMLElement | null
+  return Boolean(target && (target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'text'))
+}
 
 class KeyboardManager {
   private pressed = new Set<string>()
@@ -6,13 +16,13 @@ class KeyboardManager {
   private listening = false
 
   private onKeyDown = (event: KeyboardEvent) => {
-    if (GAME_KEY_CODES.has(event.code)) event.preventDefault()
+    if (typingIntoField(event)) return
+    if (isGameKey(event.code) && document.body.classList.contains('is-in-combat')) event.preventDefault()
     if (!this.pressed.has(event.code)) this.justPressed.add(event.code)
     this.pressed.add(event.code)
   }
 
   private onKeyUp = (event: KeyboardEvent) => {
-    if (GAME_KEY_CODES.has(event.code)) event.preventDefault()
     this.pressed.delete(event.code)
   }
 
@@ -21,7 +31,7 @@ class KeyboardManager {
   start() {
     if (this.listening) return
     window.addEventListener('keydown', this.onKeyDown, { passive: false })
-    window.addEventListener('keyup', this.onKeyUp, { passive: false })
+    window.addEventListener('keyup', this.onKeyUp)
     window.addEventListener('blur', this.onBlur)
     this.listening = true
   }
@@ -36,7 +46,7 @@ class KeyboardManager {
   }
 
   isPressed(code: string) {
-    return this.pressed.has(code)
+    return code !== '' && this.pressed.has(code)
   }
 
   consumePress(code: string) {
