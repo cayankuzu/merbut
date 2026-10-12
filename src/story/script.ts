@@ -1,5 +1,7 @@
 import { ASSET_PATHS } from '../config/assetPaths'
 import type { BiomeId } from '../config/biomes'
+import { pick, type Locale } from '../i18n/locale'
+import { BARKS_EN, BIOME_SCENES_EN, PROLOGUE_EN, SCENES_EN, SPEAKER_NAMES_EN } from './script.en'
 
 /**
  * MERBUT — the whole story as data.
@@ -261,3 +263,27 @@ export const BARKS: Record<string, readonly Line[]> = {
     { speaker: 'aku', text: 'Şu kılıçlar... Ahh! Kim onları bu kadar keskin yapıyor?!' },
   ],
 }
+
+export interface ScriptBundle {
+  speakers: Record<Speaker, { name: string; color: string; pitch: number }>
+  prologue: readonly PrologueBeat[]
+  biomeScenes: Record<BiomeId, readonly Line[]>
+  scenes: Record<string, readonly Line[]>
+  barks: Record<string, readonly Line[]>
+}
+
+const SCRIPT_TR: ScriptBundle = { speakers: SPEAKERS, prologue: PROLOGUE, biomeScenes: BIOME_SCENES, scenes: SCENES, barks: BARKS }
+
+/** The English script, line for line (same keys, same speakers, same order); voices and colours are shared. */
+const SCRIPT_EN: ScriptBundle = {
+  speakers: Object.fromEntries(
+    Object.entries(SPEAKERS).map(([id, voice]) => [id, { ...voice, name: SPEAKER_NAMES_EN[id as Speaker] }]),
+  ) as ScriptBundle['speakers'],
+  prologue: PROLOGUE_EN,
+  biomeScenes: BIOME_SCENES_EN,
+  scenes: SCENES_EN,
+  barks: BARKS_EN,
+}
+
+/** The whole script in the player's language. */
+export const scriptFor = (locale: Locale): ScriptBundle => pick(locale, SCRIPT_TR, SCRIPT_EN)

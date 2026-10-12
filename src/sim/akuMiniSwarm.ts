@@ -1,5 +1,5 @@
-// Altı küçük Aku, tek sıra hâlinde ama kompakt bir saldırı düzeni alır.
-// Y ekseninde hiç hareket etmezler; bütün yaklaşma ve hamleler yatay düzlemdedir.
+// Six little Akus line up in a single, compact attack formation.
+// They never move on the Y axis; every approach and lunge stays on the ground plane.
 export const MINI_AKU_OFFSETS = [-1.5, -0.9, -0.3, 0.3, 0.9, 1.5] as const
 export const MINI_AKU_ATTACK_TIMES = [700, 1_250, 1_800, 2_350, 2_900, 3_450] as const
 export const MINI_AKU_COUNT = MINI_AKU_OFFSETS.length

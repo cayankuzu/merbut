@@ -2,7 +2,7 @@ import type { CharacterId } from './character'
 import type { EnemyKind, EnemyVariant } from '../config/enemies'
 import type { Difficulty } from '../config/difficulty'
 
-export type GamePhase = 'menu' | 'controls' | 'prologue' | 'countdown' | 'boss-intro' | 'final-intro' | 'playing' | 'paused' | 'ending' | 'victory' | 'defeat'
+export type GamePhase = 'menu' | 'controls' | 'prologue' | 'countdown' | 'boss-intro' | 'final-intro' | 'playing' | 'paused' | 'ending' | 'demo-end' | 'victory' | 'defeat'
 export type EnemyAnimation = 'idle' | 'walk' | 'attack' | 'dead'
 export type BossPhase = 'none' | 'offering' | 'drinking' | 'arrival' | 'prayer' | 'aku-arrival' | 'countdown' | 'fight' | 'complete' | 'defeated' | 'portal' | 'falling' | 'continued'
 export type BossForm = 'normal' | 'monster'
@@ -124,16 +124,34 @@ export interface MeteorState {
   kind: 'shadow' | 'fire'
 }
 
+/**
+ * What a feed toast or portal alert says, kept apart from its text so the HUD
+ * can read it in the player's current language (they may switch mid-run).
+ */
+export type FeedMessage =
+  | { key: 'heroDown'; hero: CharacterId; seconds: number }
+  | { key: 'heroOut'; hero: CharacterId }
+  | { key: 'heroFrozen'; hero: CharacterId }
+  | { key: 'shadowDispelled' }
+
+export type PortalAlertMessage =
+  | { key: 'portalAmbush'; biome: number; count: number }
+  | { key: 'portalOpened' }
+
 export interface FeedItem {
   id: string
+  /** The text in the language it was raised in; the HUD re-reads `message` when there is one. */
   text: string
+  message?: FeedMessage
   tone: 'kill' | 'pickup' | 'system' | 'damage'
   expiresAt: number
 }
 
 export interface PortalAlertState {
+  /** Title and detail in the language the alert was raised in; the HUD re-reads `message`. */
   title: string
   detail: string
+  message: PortalAlertMessage
   expiresAt: number
 }
 

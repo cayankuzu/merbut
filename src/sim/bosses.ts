@@ -138,7 +138,7 @@ export function teleportPlayersThroughAkuPortal(now: number) {
   session.spawnEnemies(ambush)
   game.teleportPlayer('ali', destinationX - 1.05)
   game.teleportPlayer('jack', destinationX + 1.05)
-  session.showPortalAlert('ZAMAN PUSUSU', `${BIOMES[destination]!.title}: ${ambush.length} düşman bekliyor`, now)
+  session.showPortalAlert({ key: 'portalAmbush', biome: destination, count: ambush.length }, now)
   gameEvents.emit({ type: 'portal-ambush', biome: destination, count: ambush.length })
 }
 
@@ -249,7 +249,7 @@ export function runAkuBoss(enemy: EnemyState, now: number, positions: Positions)
     return { ...enemy, animation: 'attack', specialHitMask: mask, nextAuraAt }
   } else if (enemy.special === 'aku-time-portal') {
     trigger(0, 1_020, () => {
-      session.showPortalAlert('ZAMAN PORTALI AÇILDI', 'Temastan kaçın: Aku sizi başka bir diyara savurabilir', now)
+      session.showPortalAlert({ key: 'portalOpened' }, now)
       addAkuProjectile(enemy, 'time-portal', targetX)
     })
     if (enemy.bossForm === 'monster') trigger(1, 1_880, () => addAkuProjectile(enemy, 'time-portal', targetX + randomBetween(-2, 2)))

@@ -1,5 +1,6 @@
 import { Suspense, useEffect } from 'react'
 import { ASSET_PATHS } from '../config/assetPaths'
+import { useStrings } from '../i18n'
 import { Canvas, useThree } from '@react-three/fiber'
 import type { CharacterId } from '../types/character'
 import { RotatingCharacterPreview } from './RotatingCharacterPreview'
@@ -34,11 +35,12 @@ function CharacterPreviewCanvas({ id }: { id: CharacterId }) {
   const qualityFactor = usePerformanceStore((state) => state.qualityFactor)
   const renderDpr = usePerformanceStore((state) => state.renderDpr)
   const profile = PERFORMANCE_PROFILES[tier]
+  const s = useStrings()
   const previewFps = qualityFactor < 0.5 ? 30 : qualityFactor < 0.75 ? 45 : profile.menuFps
   const briefingDistance = id === 'ali' ? 6.5 : 5.55
   const briefingPanX = id === 'ali' ? -0.14 : 0
   return (
-    <div className="character-preview" aria-label={`${id === 'ali' ? 'Hz. Ali' : 'Samuray Jack'} dönen 3B figürü`}>
+    <div className="character-preview" aria-label={s.flow.heroFigureAria(s.common.heroName(id))}>
       <Canvas
         key={`preview-renderer-${profile.antialias ? 'aa' : 'raw'}`}
         frameloop={paused ? 'never' : 'demand'}
@@ -58,12 +60,15 @@ function CharacterPreviewCanvas({ id }: { id: CharacterId }) {
   )
 }
 
-export function CharacterPreview3D({ id, compact = false }: CharacterPreview3DProps) {
-  if (!compact) return <CharacterPreviewCanvas id={id} />
-  const label = id === 'ali' ? 'Hz. Ali' : 'Samuray Jack'
+function CharacterPortrait({ id }: { id: CharacterId }) {
+  const s = useStrings()
   return (
-    <div className="character-preview character-preview--compact" aria-label={`${label} portresi`}>
+    <div className="character-preview character-preview--compact" aria-label={s.flow.heroPortraitAria(s.common.heroName(id))}>
       <img src={HUD_PORTRAITS[id]} alt="" decoding="async" draggable={false} />
     </div>
   )
+}
+
+export function CharacterPreview3D({ id, compact = false }: CharacterPreview3DProps) {
+  return compact ? <CharacterPortrait id={id} /> : <CharacterPreviewCanvas id={id} />
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAudioStore } from '../audio/audioStore'
+import { useStrings, type Strings } from '../i18n'
 import { runtimeRenderDpr, usePerformanceStore, type PerformanceTier } from '../store/performanceStore'
 import { useSessionStore } from '../store/sessionStore'
 import { safeStorage } from '../utils/safeStorage'
@@ -21,14 +22,15 @@ const markSeen = () => {
   }
 }
 
-const TIER_NAMES: Record<PerformanceTier, string> = {
-  minimal: 'AKICI',
-  performance: 'ORTA',
-  balanced: 'YÜKSEK',
-  high: 'ULTRA',
+const TIER_NAME_KEYS: Record<PerformanceTier, keyof Strings['menu'] & `tier${string}`> = {
+  minimal: 'tierMinimal',
+  performance: 'tierPerformance',
+  balanced: 'tierBalanced',
+  high: 'tierHigh',
 }
 
 export function GraphicsAutoNotice() {
+  const s = useStrings()
   const [visible, setVisible] = useState(() => !alreadySeen())
   const preference = usePerformanceStore((state) => state.preference)
   const qualityFactor = usePerformanceStore((state) => state.qualityFactor)
@@ -51,12 +53,12 @@ export function GraphicsAutoNotice() {
     <aside className="graphics-auto-notice" role="status" aria-live="polite">
       <i aria-hidden="true" />
       <div>
-        <small>GRAFİK KALİBRASYONU TAMAMLANDI</small>
-        <strong>{preference === 'auto' ? 'Cihazınız için en akıcı profil otomatik uygulandı.' : 'Kayıtlı grafik tercihiniz uygulandı.'}</strong>
-        <span>{TIER_NAMES[tier]} · İç çözünürlük {effectiveDpr.toFixed(2)}× · Adaptif bütçe %{Math.round(qualityFactor * 100)} · Değiştirmek için Ayarlar’ı açın.</span>
+        <small>{s.menu.graphicsCalibrated}</small>
+        <strong>{preference === 'auto' ? s.menu.graphicsAutoApplied : s.menu.graphicsSavedApplied}</strong>
+        <span>{s.menu.graphicsDetails(s.menu[TIER_NAME_KEYS[tier]], effectiveDpr.toFixed(2), Math.round(qualityFactor * 100))}</span>
       </div>
-      <button type="button" onClick={() => { openSettings(); setVisible(false) }}>GRAFİĞİ DÜZENLE</button>
-      <button className="graphics-auto-notice__close" type="button" aria-label="Grafik bildirimini kapat" onClick={() => setVisible(false)}>×</button>
+      <button type="button" onClick={() => { openSettings(); setVisible(false) }}>{s.menu.graphicsEdit}</button>
+      <button className="graphics-auto-notice__close" type="button" aria-label={s.menu.graphicsClose} onClick={() => setVisible(false)}>×</button>
     </aside>
   )
 }

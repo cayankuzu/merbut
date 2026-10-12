@@ -22,11 +22,13 @@ import { useMechanicsStore } from '../sim/mechanics'
 import { useGameStore } from '../store/gameStore'
 import { usePerformanceStore } from '../store/performanceStore'
 import { ACTIVE_PHASES, useSessionStore } from '../store/sessionStore'
+import { useStrings } from '../i18n'
 import { useSettingsStore } from '../store/settingsStore'
 import { startStoryDirector } from '../story/storyDirector'
 import { isMobileDevice } from '../utils/deviceSupport'
 import { labOff } from '../utils/labFlags'
 import { ErrorBoundary } from './ErrorBoundary'
+import '../styles/fonts.css'
 import '../styles/tokens.css'
 import '../styles/screens/01-shell.css'
 import '../styles/screens/02-menus-overlays.css'
@@ -78,6 +80,14 @@ export default function App() {
   const fracture = useMechanicsStore((state) => state.fracture)
   const inCombat = ACTIVE_PHASES.includes(phase)
   useGameServices()
+  const language = useSettingsStore((state) => state.language)
+  const s = useStrings()
+
+  // Screen readers, hyphenation and the tab title follow the chosen language.
+  useEffect(() => {
+    document.documentElement.lang = language
+    document.title = s.common.documentTitle
+  }, [language, s])
 
   useEffect(() => {
     if (!import.meta.env.DEV) return
@@ -126,12 +136,12 @@ export default function App() {
         <LoadingScreen onReady={handleAssetsReady} />
       </main>
       {showCopyright ? (
-        <footer className="merbut-copyright" aria-label="Telif hakkı ve yapımcı bilgisi">
+        <footer className="merbut-copyright" aria-label={s.menu.copyrightLabel}>
           <span>© {new Date().getFullYear()} MERBUT</span>
           <i aria-hidden="true" />
-          <span><strong>MeMoDe</strong> yapımı</span>
+          <span>{s.menu.madeByBefore}<strong>MeMoDe</strong>{s.menu.madeByAfter}</span>
           <i aria-hidden="true" />
-          <span className="merbut-copyright__version">SÜRÜM <strong>v{APP_VERSION}</strong></span>
+          <span className="merbut-copyright__version">{s.menu.versionWord} <strong>v{APP_VERSION}</strong></span>
         </footer>
       ) : null}
     </ErrorBoundary>

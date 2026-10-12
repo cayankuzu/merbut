@@ -1,4 +1,5 @@
 import { startTransition } from 'react'
+import { useStrings, type Strings } from '../i18n'
 import {
   type GraphicsPreference,
   type PerformanceTier,
@@ -7,6 +8,8 @@ import {
 } from '../store/performanceStore'
 import { useSessionStore } from '../store/sessionStore'
 
+type SettingsStrings = Strings['settings']
+
 interface GraphicsOption {
   detail: string
   id: PerformanceTier
@@ -14,41 +17,19 @@ interface GraphicsOption {
   recommendation: string
 }
 
-const GRAPHICS_OPTIONS: readonly GraphicsOption[] = [
-  {
-    id: 'minimal',
-    label: 'DÜŞÜK',
-    detail: '0,50–0,75× dinamik çözünürlük · gölgesiz · akıcı animasyon',
-    recommendation: '2 çekirdek · 4 GB RAM · Intel HD veya eski mobil GPU',
-  },
-  {
-    id: 'performance',
-    label: 'ORTA',
-    detail: '0,55–1,00× dinamik çözünürlük · kenar yumuşatma · dengeli kalabalık',
-    recommendation: '4 çekirdek · 8 GB RAM · Intel UHD veya AMD Vega',
-  },
-  {
-    id: 'balanced',
-    label: 'YÜKSEK',
-    detail: '0,60–1,15× dinamik çözünürlük · yumuşak temas gölgesi · yoğun efekt bütçesi',
-    recommendation: '6 çekirdek · 8-16 GB RAM · GTX 1650 veya RX 570',
-  },
-  {
-    id: 'high',
-    label: 'ULTRA',
-    detail: '0,60–1,35× dinamik çözünürlük · yumuşak temas gölgesi · yüksek parçacık · yakın tam modeller',
-    recommendation: '8+ çekirdek · 16 GB RAM · RTX 2060, RX 6600 veya Apple M1+',
-  },
-]
+const GRAPHICS_TIERS: readonly PerformanceTier[] = ['minimal', 'performance', 'balanced', 'high']
 
-const TIER_LABELS: Record<PerformanceTier, string> = {
-  minimal: 'DÜŞÜK',
-  performance: 'ORTA',
-  balanced: 'YÜKSEK',
-  high: 'ULTRA',
+function graphicsOption(id: PerformanceTier, s: SettingsStrings): GraphicsOption {
+  switch (id) {
+    case 'minimal': return { id, label: s.tierMinimal, detail: s.tierMinimalDetail, recommendation: s.tierMinimalSpec }
+    case 'performance': return { id, label: s.tierPerformance, detail: s.tierPerformanceDetail, recommendation: s.tierPerformanceSpec }
+    case 'balanced': return { id, label: s.tierBalanced, detail: s.tierBalancedDetail, recommendation: s.tierBalancedSpec }
+    case 'high': return { id, label: s.tierHigh, detail: s.tierHighDetail, recommendation: s.tierHighSpec }
+  }
 }
 
 export function GraphicsSettingsPanel() {
+  const s = useStrings().settings
   const preference = usePerformanceStore((state) => state.preference)
   const tier = usePerformanceStore((state) => state.tier)
   const fps = usePerformanceStore((state) => state.fps)
@@ -67,16 +48,16 @@ export function GraphicsSettingsPanel() {
     <section className="graphics-settings" aria-labelledby="graphics-settings-title">
       <div className="graphics-settings__heading">
         <div>
-          <small>GÖRÜNTÜ KALİTESİ</small>
-          <h3 id="graphics-settings-title">Grafik profili</h3>
+          <small>{s.graphicsEyebrow}</small>
+          <h3 id="graphics-settings-title">{s.graphicsTitle}</h3>
         </div>
-        <output title={`95. yüzdelik kare süresi: ${p95FrameMs.toFixed(1)} ms`}>
-          {Math.round(fps)} FPS · {TIER_LABELS[tier]} · {effectiveDpr.toFixed(2)}×
+        <output title={s.graphicsFrameTime(p95FrameMs.toFixed(1))}>
+          {Math.round(fps)} FPS · {graphicsOption(tier, s).label} · {effectiveDpr.toFixed(2)}×
         </output>
       </div>
 
       <fieldset className="graphics-settings__choices">
-        <legend className="sr-only">Grafik kalitesini seçin</legend>
+        <legend className="sr-only">{s.graphicsLegend}</legend>
         <label className="graphics-settings__auto">
           <input
             type="radio"
@@ -85,11 +66,11 @@ export function GraphicsSettingsPanel() {
             checked={preference === 'auto'}
             onChange={() => selectPreference('auto')}
           />
-          <span><b>OTOMATİK</b><small>Donanımı ve oyun FPS'ini ölçerek kaliteyi yönetir.</small></span>
+          <span><b>{s.graphicsAuto}</b><small>{s.graphicsAutoDetail}</small></span>
         </label>
 
         <div className="graphics-settings__grid">
-          {GRAPHICS_OPTIONS.map((option) => (
+          {GRAPHICS_TIERS.map((id) => graphicsOption(id, s)).map((option) => (
             <label className="graphics-settings__option" data-tier={option.id} key={option.id}>
               <input
                 type="radio"
@@ -101,13 +82,13 @@ export function GraphicsSettingsPanel() {
               <span>
                 <strong>{option.label}</strong>
                 <em>{option.detail}</em>
-                <small>ÖNERİLEN · {option.recommendation}</small>
+                <small>{s.graphicsRecommended(option.recommendation)}</small>
               </span>
             </label>
           ))}
         </div>
       </fieldset>
-      <p>İlk açılışta Otomatik profil kullanılır. Manuel seçiminiz tüm oyuna uygulanır, saklanır ve siz değiştirene kadar sabit kalır.</p>
+      <p>{s.graphicsNote}</p>
     </section>
   )
 }

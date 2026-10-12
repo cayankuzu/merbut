@@ -1,4 +1,5 @@
 import type { BiomeId } from '../config/biomes'
+import { pick, type Locale } from '../i18n/locale'
 import type { EnemyKind, EnemyVariant } from '../config/enemies'
 
 /**
@@ -180,3 +181,69 @@ export const BIOME_CONTENT: readonly BiomeContent[] = [
 ]
 
 export const contentFor = (id: BiomeId) => BIOME_CONTENT.find((content) => content.id === id)!
+
+export interface BiomeText {
+  chapter: string
+  tagline: string
+  mechanicHint: string
+}
+
+/** English chapter card text per realm ("DİYAR I" → "REALM I"). */
+const BIOME_TEXT_EN: Record<BiomeId, BiomeText> = {
+  'aku-city': {
+    chapter: 'REALM I',
+    tagline: 'First steps under the neon',
+    mechanicHint: 'Smash the neon signs: the electricity stuns nearby enemies.',
+  },
+  'sunset-harbor': {
+    chapter: 'REALM II',
+    tagline: 'Waves and lightning',
+    mechanicHint: 'Jump when you see the wave warning. The tide drags enemies along too.',
+  },
+  'hourglass-desert': {
+    chapter: 'REALM III',
+    tagline: 'Sand flows, time waits',
+    mechanicHint: 'Strike an hourglass: time slows around it. Flickering enemies are mirages; one hit turns them back to sand.',
+  },
+  'golden-swamp': {
+    chapter: 'REALM IV',
+    tagline: 'Read your reflection',
+    mechanicHint: 'Water slows you down, so jump across it. Fireflies charge your special ability.',
+  },
+  'beetle-foundry': {
+    chapter: 'REALM V',
+    tagline: 'In the hive of iron',
+    mechanicHint: 'The belts carry you and your enemies alike. Step out of the press’s shadow; any drone caught beneath it is scrap.',
+  },
+  'skull-island': {
+    chapter: 'REALM VI',
+    tagline: 'The ground slips from under your feet',
+    mechanicHint: 'Back away from a glowing crack. The lava also burns any enemy you lure into it.',
+  },
+  'jade-ruins': {
+    chapter: 'REALM VII',
+    tagline: 'Two bells, two heroes',
+    mechanicHint: 'Ghosts in the mist take half damage. Strike both bells at the same moment to clear it.',
+  },
+  'storm-peak': {
+    chapter: 'REALM VIII',
+    tagline: 'A silent sword beneath the thunder',
+    mechanicHint: 'Strike a glowing lightning rod: your blade carries the lightning and your hits chain. If a ring appears on the ground, get clear.',
+  },
+  'skull-field': {
+    chapter: 'REALM IX',
+    tagline: 'Silence is an enemy too',
+    mechanicHint: 'The blizzard pushes you back and the ice sends you sliding. If the snow swells, something is about to climb out.',
+  },
+  'inferno-throne': {
+    chapter: 'REALM X',
+    tagline: 'Where time breaks',
+    mechanicHint: 'The flame vents erupt in turn. As Aku weakens, time begins to fracture.',
+  },
+}
+
+/** The realm's chapter label, tagline and mechanic hint in the player's language. */
+export function biomeText(index: number, locale: Locale): BiomeText {
+  const content = BIOME_CONTENT[index] ?? BIOME_CONTENT[0]!
+  return pick(locale, { chapter: content.chapter, tagline: content.tagline, mechanicHint: content.mechanicHint }, BIOME_TEXT_EN[content.id])
+}

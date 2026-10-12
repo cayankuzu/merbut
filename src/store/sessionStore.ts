@@ -5,10 +5,11 @@ import {
   ALI_FIREBALL_WINDOW_MS,
   JACK_SHIELD_DURATION_MS,
 } from '../config/abilities'
-import { BIOME_INDEX, WORLD_VISUAL_RIGHT } from '../config/biomes'
+import { BIOME_INDEX, biomeTitle, WORLD_VISUAL_RIGHT } from '../config/biomes'
 import { isHeavyVariant } from '../config/enemies'
 import { DIFFICULTIES, type Difficulty } from '../config/difficulty'
 import { WAVES } from '../config/waves'
+import { currentLocale, stringsFor, type Locale } from '../i18n'
 import { getClosedBiomeLeftLimit, getClosedBiomeRightLimit } from '../sim/biomeProgress'
 import { simClock } from '../sim/clock'
 import { gameEvents } from '../sim/events'
@@ -17,7 +18,6 @@ import {
   bossCheckpoint,
   COMBO_WINDOW_MS,
   createPlayer,
-  HERO_NAMES,
   mapPlayers,
   recoverPlayer,
   type PlayerRunStatus,
@@ -29,10 +29,12 @@ import type {
   EnemyProjectileState,
   EnemyState,
   FeedItem,
+  FeedMessage,
   GamePhase,
   ImpactKind,
   MeteorState,
   PickupState,
+  PortalAlertMessage,
   PortalAlertState,
   ProjectileState,
 } from '../types/session'
@@ -77,6 +79,8 @@ interface SessionState {
   startPrologue: () => void
   startCountdown: () => void
   startAtBiome: (biome: number) => void
+  /** The web demo ends at the gate of its last realm. */
+  finishDemo: () => void
   pause: () => void
   resume: () => void
   returnToMenu: () => void
@@ -106,7 +110,7 @@ interface SessionState {
   addPickup: (pickup: PickupState) => void
   collectPickup: (pickupId: string, playerId: CharacterId, now: number) => void
   addFeed: (text: string, tone: FeedItem['tone'], now: number) => void
-  showPortalAlert: (title: string, detail: string, now: number) => void
+  showPortalAlert: (message: PortalAlertMessage, now: number) => void
   startBossEncounter: (bossId: string, now: number) => void
   startFinalEncounter: (bossId: string, now: number) => void
   finishBossEncounter: (now: number) => void
@@ -157,8 +161,29 @@ function appendImpact(impacts: CombatImpactState[], impact: CombatImpactState) {
   return [...impacts.slice(-(budget - 1)), impact]
 }
 
-function toast(text: string, tone: FeedItem['tone'], now: number, lifetime = 4_500): FeedItem {
-  return { id: nextId('feed'), text, tone, expiresAt: now + lifetime }
+/** A feed toast's text in the given language. */
+export function feedText(message: FeedMessage, locale: Locale): string {
+  const { common, messages } = stringsFor(locale)
+  switch (message.key) {
+    case 'heroDown': return messages.heroDown(common.heroName(message.hero), message.seconds)
+    case 'heroOut': return messages.heroOut(common.heroName(message.hero))
+    case 'heroFrozen': return messages.heroFrozen(common.heroName(message.hero))
+    case 'shadowDispelled': return messages.shadowDispelled
+  }
+}
+
+/** A portal alert's title and detail in the given language. */
+export function portalAlertText(message: PortalAlertMessage, locale: Locale): { title: string; detail: string } {
+  const { messages } = stringsFor(locale)
+  return message.key === 'portalAmbush'
+    ? { title: messages.portalAmbushTitle, detail: messages.portalAmbushDetail(biomeTitle(message.biome, locale), message.count) }
+    : { title: messages.portalOpenedTitle, detail: messages.portalOpenedDetail }
+}
+
+/** Game messages keep what they say, so a language switch mid-run re-reads them (see `feedText`). */
+function toast(content: string | FeedMessage, tone: FeedItem['tone'], now: number, lifetime = 4_500): FeedItem {
+  const item = { id: nextId('feed'), tone, expiresAt: now + lifetime }
+  return typeof content === 'string' ? { ...item, text: content } : { ...item, text: feedText(content, currentLocale()), message: content }
 }
 
 /** A countdown into a given biome with every earlier biome already conquered. */
@@ -197,6 +222,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     biomeBannerUntil: simClock.now() + 6_500,
   })),
   startAtBiome: (biome) => set((state) => biomeStartState(state, biome)),
+  finishDemo: () => set({ phase: 'demo-end' }),
   pause: () => set((state) => {
     if (!ACTIVE_PHASES.includes(state.phase)) return state
     return { phase: 'paused', pausedPhase: state.phase as PauseablePhase }
@@ -435,7 +461,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           frozenUntil: 0,
           dodgeUntil: 0,
         } },
-        feed: [...state.feed, toast(lives > 0 ? `${HERO_NAMES[id]} düştü · ${rules.respawnSeconds.toFixed(1)} sn sonra kalkacak` : `${HERO_NAMES[id]} savaş dışı`, 'damage', now)],
+        feed: [...state.feed, toast(lives > 0 ? { key: 'heroDown', hero: id, seconds: rules.respawnSeconds } : { key: 'heroOut', hero: id }, 'damage', now)],
       }
     })
     gameEvents.emit({ type: 'player-hit', id, amount, down: result === 'down', eliminated })
@@ -446,7 +472,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     if (player.dead) return state
     return {
       players: { ...state.players, [id]: { ...player, frozenUntil: Math.max(player.frozenUntil, now + 3_000) } },
-      feed: [...state.feed, toast(`${HERO_NAMES[id]} zaman portalında 3 sn dondu`, 'damage', now, 3_800)],
+      feed: [...state.feed, toast({ key: 'heroFrozen', hero: id }, 'damage', now, 3_800)],
     }
   }),
   startDodge: (id, now) => {
@@ -541,7 +567,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     if (collected) gameEvents.emit({ type: 'pickup', id: playerId })
   },
   addFeed: (text, tone, now) => set((state) => ({ feed: [...state.feed, toast(text, tone, now)] })),
-  showPortalAlert: (title, detail, now) => set({ portalAlert: { title, detail, expiresAt: now + 4_200 } }),
+  showPortalAlert: (message, now) => set({ portalAlert: { ...portalAlertText(message, currentLocale()), message, expiresAt: now + 4_200 } }),
   startBossEncounter: (bossId, now) => set((state) => state.activeBossId ? state : {
     phase: 'boss-intro', bossPhase: 'offering', bossPhaseStartedAt: now, bossCountdown: 3, activeBossId: bossId,
     enemies: state.enemies.filter((enemy) => enemy.id === bossId || enemy.animation === 'dead'),
@@ -571,7 +597,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         abilityShots: 0,
         lastAbilityShotAt: -Infinity,
       })),
-      feed: [...state.feed, toast('Gölge dağıldı · Zemzem kontrol noktası canları tazeledi', 'system', now, 5_000)],
+      feed: [...state.feed, toast({ key: 'shadowDispelled' }, 'system', now, 5_000)],
     }
   }),
   startEnding: (bossId, now) => set((state) => {

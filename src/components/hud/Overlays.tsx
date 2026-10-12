@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { ASSET_PATHS } from '../../config/assetPaths'
-import { BIOMES } from '../../config/biomes'
-import { BIOME_CONTENT } from '../../content/biomeContent'
+import { BIOMES, biomeTitle } from '../../config/biomes'
+import { biomeText } from '../../content/biomeContent'
 import { voiceBlip } from '../../audio/ambience'
+import { useLocale, useStrings } from '../../i18n'
+import { achievementText } from '../../meta/achievements'
 import { dismissAchievementToast, useRunStore } from '../../meta/runTracker'
 import { simClock } from '../../sim/clock'
 import { gameEvents } from '../../sim/events'
-import { useSessionStore } from '../../store/sessionStore'
+import { feedText, portalAlertText, useSessionStore } from '../../store/sessionStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useDialogueStore } from '../../story/dialogueStore'
-import { SPEAKERS } from '../../story/script'
+import { SPEAKERS, scriptFor } from '../../story/script'
 
 const trackNumber = (index: number) => String(index + 1).padStart(2, '0')
 
@@ -21,6 +23,8 @@ export function BiomeTitleCard() {
   const biome = useSessionStore((state) => state.currentBiome)
   const until = useSessionStore((state) => state.biomeBannerUntil)
   const phase = useSessionStore((state) => state.phase)
+  const s = useStrings()
+  const locale = useLocale()
   const [, setTick] = useState(0)
   useEffect(() => {
     const timer = window.setInterval(() => setTick((tick) => tick + 1), 200)
@@ -28,7 +32,7 @@ export function BiomeTitleCard() {
   }, [])
   const visible = until > simClock.now() && (phase === 'playing' || phase === 'countdown')
   if (!visible) return null
-  const content = BIOME_CONTENT[biome]!
+  const content = biomeText(biome, locale)
   const definition = BIOMES[biome]!
   return (
     <section className="title-card" key={biome} role="status" aria-live="polite" style={{ '--accent': definition.accentColor } as React.CSSProperties}>
@@ -37,8 +41,8 @@ export function BiomeTitleCard() {
         <img src={definition.art.cover} alt="" />
       </div>
       <div className="title-card__text">
-        <small>PARÇA {trackNumber(biome)} · {content.chapter}</small>
-        <h1>{definition.title}</h1>
+        <small>{s.hud.trackLabel(trackNumber(biome), content.chapter)}</small>
+        <h1>{biomeTitle(biome, locale)}</h1>
         <em>{content.tagline}</em>
         <p>{content.mechanicHint}</p>
       </div>
@@ -60,6 +64,7 @@ export function DialogueOverlay() {
   const current = useDialogueStore((state) => state.current)
   const next = useDialogueStore((state) => state.next)
   const speed = useSettingsStore((state) => state.dialogueSpeed)
+  const locale = useLocale()
   const [shown, setShown] = useState(0)
   const elapsed = useRef(0)
   const shownRef = useRef(0)
@@ -93,7 +98,7 @@ export function DialogueOverlay() {
   }, [current, next, speed])
 
   if (!current) return null
-  const speaker = SPEAKERS[current.speaker]
+  const speaker = scriptFor(locale).speakers[current.speaker]
   const portrait = PORTRAIT[current.speaker]
   return (
     <div className={`dialogue dialogue--${current.speaker}${current.priority === 'scene' ? ' is-scene' : ''}`} role="log" aria-live="polite" style={{ '--speaker': speaker.color } as React.CSSProperties}>
@@ -106,12 +111,21 @@ export function DialogueOverlay() {
   )
 }
 
-/** One system toast at a time (gates, portal ambush, falls) plus achievements. */
+/**
+ * One system toast at a time (gates, portal ambush, falls) plus achievements.
+ * Each is read in the current language, so a switch from the pause menu
+ * re-renders whatever is still on screen.
+ */
 export function Toasts() {
   const feed = useSessionStore((state) => state.feed)
   const portalAlert = useSessionStore((state) => state.portalAlert)
   const achievements = useRunStore((state) => state.toasts)
+  const s = useStrings()
+  const locale = useLocale()
   const latest = feed.at(-1)
+  const latestText = latest?.message ? feedText(latest.message, locale) : latest?.text
+  const alertText = portalAlert ? portalAlertText(portalAlert.message, locale) : null
+  const achievement = achievements[0] ? achievementText(achievements[0].id, locale) : null
   useEffect(() => {
     if (achievements.length === 0) return
     const first = achievements[0]!
@@ -120,15 +134,15 @@ export function Toasts() {
   }, [achievements])
   return (
     <>
-      {portalAlert ? (
-        <div className="portal-alert" role="alert"><small>AKU · ZAMAN KIRILMASI</small><strong>{portalAlert.title}</strong><span>{portalAlert.detail}</span></div>
+      {alertText ? (
+        <div className="portal-alert" role="alert"><small>{s.hud.portalAlertEyebrow}</small><strong>{alertText.title}</strong><span>{alertText.detail}</span></div>
       ) : latest ? (
-        <div className={`system-toast is-${latest.tone}`} key={latest.id} role="status">{latest.text}</div>
+        <div className={`system-toast is-${latest.tone}`} key={latest.id} role="status">{latestText}</div>
       ) : null}
-      {achievements[0] ? (
+      {achievements[0] && achievement ? (
         <aside className="achievement-toast" key={achievements[0].id} role="status">
           <i aria-hidden="true">★</i>
-          <div><small>BAŞARIM AÇILDI</small><strong>{achievements[0].title}</strong><span>{achievements[0].description}</span></div>
+          <div><small>{s.hud.achievementUnlocked}</small><strong>{achievement.title}</strong><span>{achievement.description}</span></div>
         </aside>
       ) : null}
     </>

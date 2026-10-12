@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useLocale, useStrings } from '../../i18n'
 import { useProgressStore } from '../../meta/progressStore'
 import { useSessionStore } from '../../store/sessionStore'
 import { useSettingsStore } from '../../store/settingsStore'
-import { PROLOGUE, SPEAKERS } from '../../story/script'
+import { scriptFor } from '../../story/script'
 import { KeyCap } from '../ui/KeyCap'
 
 const BEAT_MS = 6_200
@@ -17,6 +18,9 @@ export function PrologueCinematic() {
   const [letters, setLetters] = useState(0)
   const startCountdown = useSessionStore((state) => state.startCountdown)
   const speed = useSettingsStore((state) => state.dialogueSpeed)
+  const locale = useLocale()
+  const s = useStrings()
+  const { prologue, speakers } = scriptFor(locale)
   const finished = useRef(false)
 
   const finish = useCallback(() => {
@@ -26,21 +30,20 @@ export function PrologueCinematic() {
     startCountdown()
   }, [startCountdown])
 
+  // Side effects stay out of the state updater: the last panel starts the run once.
   const advance = useCallback(() => {
-    setBeat((current) => {
-      if (current >= PROLOGUE.length - 1) {
-        finish()
-        return current
-      }
-      return current + 1
-    })
-  }, [finish])
+    if (beat >= prologue.length - 1) {
+      finish()
+      return
+    }
+    setBeat(beat + 1)
+  }, [beat, finish, prologue.length])
 
   useEffect(() => {
     setLetters(0)
     const perSecond = { slow: 24, normal: 36, fast: 60, instant: 500 }[speed]
     const started = performance.now()
-    const text = PROLOGUE[beat]!.text
+    const text = prologue[beat]!.text
     let frame = requestAnimationFrame(function loop(now) {
       setLetters(Math.min(text.length, Math.floor((now - started) / 1_000 * perSecond)))
       frame = requestAnimationFrame(loop)
@@ -50,7 +53,7 @@ export function PrologueCinematic() {
       cancelAnimationFrame(frame)
       window.clearTimeout(timer)
     }
-  }, [advance, beat, speed])
+  }, [advance, beat, prologue, speed])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -68,18 +71,18 @@ export function PrologueCinematic() {
     }
   }, [advance, finish])
 
-  const current = PROLOGUE[beat]!
+  const current = prologue[beat]!
   return (
-    <section className="prologue" aria-label="Prolog" onClick={advance}>
+    <section className="prologue" aria-label={s.flow.prologueAria} onClick={advance}>
       <div className="prologue__image" key={beat} style={{ backgroundImage: `url(${current.image})` }} />
       <div className="prologue__bars" aria-hidden="true"><i /><i /></div>
-      <p className={`prologue__text is-${current.speaker}`} style={{ '--speaker': SPEAKERS[current.speaker].color } as React.CSSProperties}>
-        <small>{SPEAKERS[current.speaker].name}</small>
+      <p className={`prologue__text is-${current.speaker}`} style={{ '--speaker': speakers[current.speaker].color } as React.CSSProperties}>
+        <small>{speakers[current.speaker].name}</small>
         {current.text.slice(0, letters)}<span>{current.text.slice(letters)}</span>
       </p>
       <footer>
-        <span>{beat + 1} / {PROLOGUE.length}</span>
-        <button type="button" onClick={(event) => { event.stopPropagation(); finish() }}>ATLA <KeyCap>Esc</KeyCap></button>
+        <span>{beat + 1} / {prologue.length}</span>
+        <button type="button" onClick={(event) => { event.stopPropagation(); finish() }}>{s.flow.prologueSkip} <KeyCap>Esc</KeyCap></button>
       </footer>
     </section>
   )

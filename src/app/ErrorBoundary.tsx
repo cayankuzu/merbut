@@ -1,7 +1,21 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { useStrings } from '../i18n'
 
 interface State {
   error: Error | null
+}
+
+function CrashScreen({ error }: { error: Error }) {
+  const s = useStrings()
+  return (
+    <section className="crash-screen" role="alert">
+      <small>{s.menu.crashEyebrow}</small>
+      <h1>{s.menu.crashTitle}</h1>
+      <p>{s.menu.crashBody}</p>
+      <code>{error.message}</code>
+      <button className="menu-primary" type="button" onClick={() => window.location.reload()}>{s.menu.crashRestart}</button>
+    </section>
+  )
 }
 
 /**
@@ -16,19 +30,11 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('[MERBUT] Beklenmeyen hata', error, info.componentStack)
+    console.error('[MERBUT] Unexpected error', error, info.componentStack)
   }
 
   render() {
     if (!this.state.error) return this.props.children
-    return (
-      <section className="crash-screen" role="alert">
-        <small>MERBUT · ZAMAN ÇİZGİSİ KIRILDI</small>
-        <h1>Bir şeyler ters gitti</h1>
-        <p>Aku zamanı yine karıştırdı. İlerlemen ve ayarların kayıtlı; sayfayı yenileyerek kaldığın diyardan devam edebilirsin.</p>
-        <code>{this.state.error.message}</code>
-        <button className="menu-primary" type="button" onClick={() => window.location.reload()}>YENİDEN BAŞLAT</button>
-      </section>
-    )
+    return <CrashScreen error={this.state.error} />
   }
 }

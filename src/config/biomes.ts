@@ -1,3 +1,4 @@
+import { pick, type Locale } from '../i18n/locale'
 import { ASSET_PATHS } from './assetPaths'
 
 export const PANEL_WORLD_WIDTH = 18
@@ -234,4 +235,24 @@ export function getBiomeBlend(worldX: number): BiomeBlend {
     Math.max(0, Math.floor((worldX - WORLD_VISUAL_LEFT) / BIOME_WORLD_WIDTH)),
   )
   return { from: BIOMES[biomeIndex], to: BIOMES[biomeIndex], mix: 0 }
+}
+
+/** English realm names; the Turkish ones are each realm's `title`. */
+const BIOME_TITLES_EN: Record<BiomeId, string> = {
+  'aku-city': 'Aku Metropolis',
+  'sunset-harbor': 'Sunset Harbor',
+  'hourglass-desert': 'Hourglass Desert',
+  'golden-swamp': 'Golden Swamp',
+  'beetle-foundry': 'Beetle Foundry',
+  'skull-island': 'Skull Island',
+  'jade-ruins': 'Jade Ruins',
+  'storm-peak': 'Storm Peak',
+  'skull-field': 'Silent Bonefield',
+  'inferno-throne': 'Throne of Flames',
+}
+
+/** A realm's name in the player's language. */
+export function biomeTitle(index: number, locale: Locale) {
+  const biome = BIOMES[index] ?? BIOMES[0]!
+  return pick(locale, biome.title, BIOME_TITLES_EN[biome.id])
 }

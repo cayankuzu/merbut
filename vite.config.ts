@@ -7,7 +7,8 @@ export default defineConfig({
   plugins: [react()],
   server: {
     watch: {
-      ignored: ['**/public/assets/models/**/*.glb'],
+      // Build outputs (and the desktop runtime in release/) are huge and locked while written.
+      ignored: ['**/public/assets/models/**/*.glb', '**/release/**', '**/dist/**'],
     },
   },
   build: {

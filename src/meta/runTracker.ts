@@ -1,8 +1,9 @@
 import { create } from 'zustand'
 import { BIOMES } from '../config/biomes'
+import { currentLocale } from '../i18n'
 import { gameEvents } from '../sim/events'
 import { useSessionStore } from '../store/sessionStore'
-import { achievementById } from './achievements'
+import { achievementById, achievementText } from './achievements'
 import { computeRank, useProgressStore, type Rank } from './progressStore'
 
 /**
@@ -40,11 +41,12 @@ function run() {
 
 function unlock(id: string) {
   if (!useProgressStore.getState().unlock(id)) return
-  const definition = achievementById(id)
-  if (!definition) return
+  if (!achievementById(id)) return
+  // The toast keeps the id too, so the HUD can re-read the text if the language changes.
+  const { title, description } = achievementText(id, currentLocale())
   useRunStore.setState((state) => ({
     unlockedThisRun: [...state.unlockedThisRun, id],
-    toasts: [...state.toasts, { id, title: definition.title, description: definition.description, at: performance.now() }],
+    toasts: [...state.toasts, { id, title, description, at: performance.now() }],
   }))
   gameEvents.emit({ type: 'achievement', id })
 }

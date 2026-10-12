@@ -10,6 +10,7 @@ import {
   Texture,
 } from 'three'
 import { GameWorld } from './GameWorld'
+import { useStrings } from '../i18n'
 import { useSessionStore } from '../store/sessionStore'
 import {
   PERFORMANCE_PROFILES,
@@ -231,6 +232,18 @@ function RuntimePerformanceGovernor({ active, effectiveDpr }: { active: boolean;
   return null
 }
 
+/** Kept apart so a language change re-renders only this panel, not the scene. */
+function ContextLostPanel() {
+  const s = useStrings()
+  return (
+    <div className="context-lost" role="alert">
+      <strong>{s.menu.contextLostTitle}</strong>
+      <span>{s.menu.contextLostBody}</span>
+      <button className="menu-primary" type="button" onClick={() => window.location.reload()}>{s.menu.contextLostReload}</button>
+    </div>
+  )
+}
+
 export function GameScene() {
   const [contextLost, setContextLost] = useState(false)
   const phase = useSessionStore((state) => state.phase)
@@ -254,13 +267,7 @@ export function GameScene() {
   const postprocessing = !showCombatActors && runtimePostprocessing(tier, qualityFactor, enemyCount)
   return (
     <>
-    {contextLost ? (
-      <div className="context-lost" role="alert">
-        <strong>Grafik bağlamı kayboldu</strong>
-        <span>Ekran kartı sürücüsü sıfırlandı. Oyun duraklatıldı; bağlam geri gelince devam edebilirsin.</span>
-        <button className="menu-primary" type="button" onClick={() => window.location.reload()}>YENİDEN YÜKLE</button>
-      </div>
-    ) : null}
+    {contextLost ? <ContextLostPanel /> : null}
     <Canvas
       className="game-canvas"
       data-graphics-tier={tier}

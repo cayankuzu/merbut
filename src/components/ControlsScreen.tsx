@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { gameAudio } from '../audio/gameAudio'
-import { BIOMES } from '../config/biomes'
-import { DIFFICULTIES, DIFFICULTY_ORDER } from '../config/difficulty'
-import { BIOME_CONTENT } from '../content/biomeContent'
+import { biomeTitle } from '../config/biomes'
+import { DIFFICULTIES, DIFFICULTY_ORDER, difficultyText } from '../config/difficulty'
+import { biomeText } from '../content/biomeContent'
+import { useLocale, useStrings, type Strings } from '../i18n'
 import { useProgressStore } from '../meta/progressStore'
 import { useSessionStore } from '../store/sessionStore'
 import { useSettingsStore } from '../store/settingsStore'
@@ -12,23 +13,26 @@ import type { PlayerAction } from '../types/controls'
 import { CharacterPreview3D } from './CharacterPreview3D'
 import { ActionKeys } from './ui/KeyCap'
 
-const MOVES: { action: PlayerAction; both?: PlayerAction; label: Record<CharacterId, string> }[] = [
-  { action: 'left', both: 'right', label: { ali: 'Hareket', jack: 'Hareket' } },
-  { action: 'jump', label: { ali: 'Zıpla · havada bir kez daha', jack: 'Zıpla · havada bir kez daha' } },
-  { action: 'attack', label: { ali: 'Alevli kılıç kesişi', jack: 'Katana kesişi' } },
-  { action: 'dash', label: { ali: 'Kaçınma · kırmızı halkadan sıyrıl', jack: 'Kaçınma · kırmızı halkadan sıyrıl' } },
-  { action: 'ability', label: { ali: 'Alev Penceresi · 4 sn, 9 alev topu', jack: 'Koruyucu Kalkan · 4 sn, takımı korur' } },
-  { action: 'rotateLeft', both: 'rotateRight', label: { ali: '360° dön', jack: '360° dön' } },
+type FlowStrings = Strings['flow']
+
+const MOVES: { action: PlayerAction; both?: PlayerAction; label: (s: FlowStrings, id: CharacterId) => string }[] = [
+  { action: 'left', both: 'right', label: (s) => s.moveMove },
+  { action: 'jump', label: (s) => s.moveJumpTwice },
+  { action: 'attack', label: (s, id) => (id === 'ali' ? s.moveAttackAli : s.moveAttackJack) },
+  { action: 'dash', label: (s) => s.moveDodgeRing },
+  { action: 'ability', label: (s, id) => (id === 'ali' ? s.moveAbilityAli : s.moveAbilityJack) },
+  { action: 'rotateLeft', both: 'rotateRight', label: (s) => s.moveTurn360 },
 ]
 
 function HeroBrief({ id, ready }: { id: CharacterId; ready: boolean }) {
+  const s = useStrings()
   return (
     <article className={`hero-brief hero-brief--${id}`}>
       {ready ? <CharacterPreview3D id={id} /> : <div className="character-preview" aria-hidden="true" />}
       <div className="hero-brief__copy">
-        <h2>{id === 'ali' ? 'Hz. Ali' : 'Samuray Jack'}</h2>
-        <p>{id === 'ali' ? 'Adaletin kılıcı. Ağır ve alevli vurur; dolu güçle bir alev fırtınası salar.' : 'Zamandan sürgün samuray. Hızlı keser; kalkanıyla ikisini birden korur.'}</p>
-        <dl>{MOVES.map((move) => <div key={move.action}><dt><ActionKeys player={id} action={move.action} both={move.both} /></dt><dd>{move.label[id]}</dd></div>)}</dl>
+        <h2>{s.common.heroName(id)}</h2>
+        <p>{id === 'ali' ? s.flow.heroBlurbAli : s.flow.heroBlurbJack}</p>
+        <dl>{MOVES.map((move) => <div key={move.action}><dt><ActionKeys player={id} action={move.action} both={move.both} /></dt><dd>{move.label(s.flow, id)}</dd></div>)}</dl>
       </div>
     </article>
   )
@@ -42,6 +46,8 @@ export function ControlsScreen() {
   const returnToMenu = useSessionStore((state) => state.returnToMenu)
   const showPrologue = useSettingsStore((state) => state.showPrologue)
   const prologueSeen = useProgressStore((state) => state.prologueSeen)
+  const locale = useLocale()
+  const s = useStrings()
 
   useEffect(() => {
     const timer = window.setTimeout(() => setPreviewsReady(true), 180)
@@ -59,34 +65,35 @@ export function ControlsScreen() {
     }
   }
 
-  const content = BIOME_CONTENT[pendingBiome]!
+  const realm = biomeTitle(pendingBiome, locale).toLocaleUpperCase(locale === 'tr' ? 'tr-TR' : 'en-US')
   return (
-    <section className="controls-screen" aria-label="Kontroller ve zorluk seçimi">
+    <section className="controls-screen" aria-label={s.flow.briefingAria}>
       <header>
-        <small>SAVAŞ BRİFİNGİ · {content.chapter} · {BIOMES[pendingBiome]!.title.toLocaleUpperCase('tr-TR')}</small>
-        <h1>Kahramanlarını tanı</h1>
+        <small>{s.flow.briefingKicker(biomeText(pendingBiome, locale).chapter, realm)}</small>
+        <h1>{s.flow.briefingTitle}</h1>
       </header>
       <div className="controls-screen__grid">
         <HeroBrief id="ali" ready={previewsReady} />
         <HeroBrief id="jack" ready={previewsReady} />
       </div>
       <fieldset className="difficulty-select">
-        <legend>ZORLUK · Her kademe bir öncekinden ölçülebilir biçimde zordur</legend>
+        <legend>{s.flow.difficultyLegend}</legend>
         {DIFFICULTY_ORDER.map((id) => {
           const option = DIFFICULTIES[id]
+          const text = difficultyText(id, locale)
           return (
             <button className={difficulty === id ? 'is-selected' : ''} type="button" onClick={() => setDifficulty(id)} aria-pressed={difficulty === id} key={id}>
-              <b>{option.label}</b>
-              <span>{option.description}</span>
-              <em>{option.playerHealth} CAN · {option.playerLives} YAŞAM · DALGA +{option.extraEnemies}</em>
+              <b>{text.label}</b>
+              <span>{text.description}</span>
+              <em>{s.flow.difficultyStats(option.playerHealth, option.playerLives, option.extraEnemies)}</em>
             </button>
           )
         })}
       </fieldset>
-      <p className="controls-screen__note">Düşman saldırmadan önce kırmızı parlar ve ayağının altında bir halka belirir: tam o anda kaçınırsan zaman yavaşlar. Özel yetenekler isabetle dolar.</p>
+      <p className="controls-screen__note">{s.flow.briefingNote}</p>
       <div className="menu-actions">
-        <button type="button" onClick={returnToMenu}>GERİ</button>
-        <button className="menu-primary" type="button" autoFocus onClick={start}>SAVAŞA BAŞLA</button>
+        <button type="button" onClick={returnToMenu}>{s.common.back}</button>
+        <button className="menu-primary" type="button" autoFocus onClick={start}>{s.flow.startBattle}</button>
       </div>
     </section>
   )

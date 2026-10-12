@@ -1,8 +1,10 @@
 import { BIOMES } from '../config/biomes'
+import { currentLocale } from '../i18n'
 import { gameEvents } from '../sim/events'
 import { useSessionStore } from '../store/sessionStore'
-import { useDialogueStore } from './dialogueStore'
-import { BARKS, BIOME_SCENES, SCENES, type Line } from './script'
+import { useSettingsStore } from '../store/settingsStore'
+import { lineDuration, useDialogueStore } from './dialogueStore'
+import { scriptFor, type Line } from './script'
 
 /**
  * Maps game events to story beats. Scenes play once per run; barks are
@@ -16,6 +18,23 @@ let played = new Set<string>()
 let lastBarkAt = -Infinity
 let lastTauntAt = 0
 
+/** Where a line lives in the script, so a queued line can be re-read in another language. */
+interface LineSource {
+  group: 'biomeScenes' | 'scenes' | 'barks'
+  key: string
+  index: number
+}
+type SourcedLine = Line & { source: LineSource }
+
+/** Lines are read in the player's language at the moment they are spoken. */
+function scriptLines(group: LineSource['group'], key: string): readonly Line[] | undefined {
+  return (scriptFor(currentLocale())[group] as Record<string, readonly Line[]>)[key]
+}
+
+function sourced(group: LineSource['group'], key: string): SourcedLine[] | undefined {
+  return scriptLines(group, key)?.map((line, index) => ({ ...line, source: { group, key, index } }))
+}
+
 function freshRun() {
   const current = useSessionStore.getState().sessionToken
   if (current === token) return
@@ -26,18 +45,18 @@ function freshRun() {
   useDialogueStore.getState().clear()
 }
 
-function say(id: string, lines: readonly Line[] | undefined) {
+function say(id: string, lines: readonly SourcedLine[] | undefined) {
   if (played.has(id) || !lines) return
   played.add(id)
   useDialogueStore.getState().say(lines, 'scene')
 }
 
-const scene = (id: string) => say(id, SCENES[id])
+const scene = (id: string) => say(id, sourced('scenes', id))
 
 function bark(id: string, chance = 1, speaker?: Line['speaker']) {
   const now = performance.now()
   if (now - lastBarkAt < BARK_COOLDOWN_MS || Math.random() > chance) return
-  const pool = (BARKS[id] ?? []).filter((line) => !speaker || line.speaker === speaker)
+  const pool = (sourced('barks', id) ?? []).filter((line) => !speaker || line.speaker === speaker)
   if (pool.length === 0) return
   lastBarkAt = now
   useDialogueStore.getState().say([pool[Math.floor(Math.random() * pool.length)]!], 'bark')
@@ -45,21 +64,42 @@ function bark(id: string, chance = 1, speaker?: Line['speaker']) {
 
 /** A warning bark plays the first time each hazard appears in a run. */
 function warnOnce(name: string) {
-  if (played.has(`${name}-warn`) || !BARKS[`${name}-warn`]) return
+  if (played.has(`${name}-warn`) || !scriptLines('barks', `${name}-warn`)) return
   played.add(`${name}-warn`)
   bark(`${name}-warn`)
+}
+
+/** The dialogue store keeps each line's extra fields, so its source survives the queue. */
+function translated<T extends Line>(line: T): T {
+  const source = (line as Partial<SourcedLine>).source
+  const text = source ? scriptLines(source.group, source.key)?.[source.index]?.text : undefined
+  return text === undefined ? line : { ...line, text }
+}
+
+/** A language switch (e.g. from the pause menu) re-reads the line on screen and the ones waiting. */
+function retranslateDialogue() {
+  const { current, queue } = useDialogueStore.getState()
+  if (!current && queue.length === 0) return
+  const line = current && translated(current)
+  useDialogueStore.setState({
+    current: line && line !== current ? { ...line, startedAt: performance.now(), duration: lineDuration(line.text) } : current,
+    queue: queue.map(translated),
+  })
 }
 
 const biomeId = (index: number) => BIOMES[index]?.id
 
 export function startStoryDirector() {
-  return gameEvents.on((event) => {
+  const stopLanguage = useSettingsStore.subscribe((state, previous) => {
+    if (state.language !== previous.language) retranslateDialogue()
+  })
+  const stopEvents = gameEvents.on((event) => {
     freshRun()
     const session = useSessionStore.getState()
     switch (event.type) {
       case 'biome-enter': {
         const id = biomeId(event.biome)
-        if (id) say(`biome-${id}`, BIOME_SCENES[id])
+        if (id) say(`biome-${id}`, sourced('biomeScenes', id))
         break
       }
       case 'gate-open':
@@ -69,7 +109,8 @@ export function startStoryDirector() {
         if (event.name === 'neon') scene('neon-first')
         if (event.name === 'bell' && !played.has('resonance')) scene('bell-hint')
         if (event.name === 'resonance') scene('resonance')
-        if (event.name === 'hourglass') scene('hourglass-first')
+        // Ali says he turned the hourglass, so the hint waits for one he strikes.
+        if (event.name === 'hourglass' && event.id !== 'jack') scene('hourglass-first')
         if (event.name === 'rod') scene('rod-first')
         if (event.name === 'press-kill') scene('press-kill')
         if (event.name === 'team') bark('team', 0.6)
@@ -134,4 +175,8 @@ export function startStoryDirector() {
         break
     }
   })
+  return () => {
+    stopEvents()
+    stopLanguage()
+  }
 }

@@ -1,0 +1,4 @@
+# itch.io app manifest: tells the itch desktop app which file launches the game.
+[[actions]]
+name = "play"
+path = "Merbut.exe"

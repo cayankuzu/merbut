@@ -1,5 +1,22 @@
 # Değişiklik günlüğü
 
+## 3.2.0 · English + masaüstü sürümü (11 Ekim 2026)
+
+### İngilizce dil desteği
+- Oyunun tamamı İngilizce: menüler, ayarlar, HUD, brifing, duraklatma, sonuç ve final ekranları, karakter arşivi, başarımlar, yapımcılar, yama notları ve hikâyenin bütün satırları (prolog, diyar sahneleri, anlık replikler).
+- Oyun ilk açılışta tarayıcı dilini izler (Türkçe tarayıcı → Türkçe, diğerleri → İngilizce). **Ayarlar → Görüntü → Dil** ve ana menüdeki **TR/EN** düğmesiyle istenen an değişir; seçim saklanır.
+- Çeviri tipli sözlüklerle yapıldı (`src/i18n`): İngilizce yarıda eksik ya da fazla anahtar derleme hatasıdır. İçerik verisi (diyarlar, zorluklar, düşman adları, başarımlar, yapımcılar, yama notları, hikâye) dile duyarlı erişim fonksiyonlarıyla okunur.
+- Hz. Ali İngilizcede "Hazrat Ali"; onun replikleri İngilizcede de vakur ve saygılı, mizah Aku'nun üzerinden kalır.
+
+### Web demosu
+- Herkese açık web sürümü (merbut.vercel.app) artık ilk iki diyarlık bir demo (`npm run build:demo`, `.env.demo`). Diyar II'nin kapısından geçince "Demo tamamlandı" ekranı itch.io'daki tam sürüme yönlendirir; ana menüde DEMO rozeti ve "TAM SÜRÜM · itch.io" girişi var, bölüm seçiminde sonraki diyarlar "Tam sürümde" diye kilitli.
+- itch.io HTML5 paketi ve masaüstü sürümleri tam oyundur.
+
+### İndirilebilir masaüstü sürümü (Windows)
+- Electron kabuğu: `npm run package:desktop` → kurulum sihirbazı (`Merbut-<sürüm>-Setup.exe`: klasör seçimi, masaüstü ve Başlat menüsü kısayolu, kaldırıcı, TR/EN kurulum dili) ve taşınabilir zip (`.itch.toml` ile itch.io uygulamasından başlatılır).
+- Tamamen çevrimdışı çalışır: oyun özel `app://` kökeninden sunulur, kayıtlar kullanıcı profilinde kalır; F11 tam ekran; bağlantılar tarayıcıda açılır; çift GPU'lu dizüstülerde güçlü GPU seçilir.
+- Yazı tipleri (Cinzel, Inter · OFL) artık oyunla birlikte geliyor; web sürümü de Google Fonts'a istek atmıyor.
+
 ## 3.1.1 · Buton düzeltmeleri (26 Eylül 2026)
 
 - Arayüz katmanı fareyi varsayılan olarak yok sayar; alt ekranların ortak çerçevesi (`.menu-page`) bunu geri açmadığı için Bölüm Seç, Başarımlar, Yapımcılar ve Yama Notları'nda **GERİ** ve bölüm parçaları tıklanmıyor, tıklama 3B tuvale düşüyordu. Düzeltildi.

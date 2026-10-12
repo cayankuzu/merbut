@@ -13,6 +13,8 @@ export default defineConfig({
     browserName: alternateBrowser,
     channel: alternateBrowser ? undefined : (process.env.PW_CHANNEL ?? 'chrome'),
     viewport: { width: 1280, height: 720 },
+    // The game picks its language from the browser; the suite asserts the Turkish UI.
+    locale: 'tr-TR',
     trace: 'retain-on-failure',
     launchOptions: { args: ['--ignore-gpu-blocklist', '--enable-gpu'] },
   },

@@ -90,6 +90,8 @@ $env:PW_PORT = '5180'; npm run test:e2e
 ## Sanat ve yayın
 
 - `npm run art`: Tüm özgün tabloları yeniden üretir (`public/assets/realms`, `covers`, `story`, `ui/portrait-*`, `assets-src/store`, `public/og-image.jpg`). Belirli bir kısım için önek verilebilir: `node scripts/art/generate-art.mjs storm`.
+- `npm run build:demo`: Herkese açık web sürümü (Vercel) için demo derlemesi: ilk iki diyar, ardından itch.io'daki tam sürüme yönlendiren "Demo tamamlandı" ekranı. `vercel.json` bu komutu kullanır; `npm run dev:demo` demoyu yerelde açar.
+- `npm run package:desktop`: Windows kurulum dosyası ve taşınabilir zip (Electron, tamamen çevrimdışı).
 - `npm run package:itch`: Build alır ve `release/merbut-itch-v<sürüm>.zip` üretir (index.html kökte, tüm yollar göreli). itch.io sayfa metni ve ayarlar: [`docs/ITCH_PAGE.md`](docs/ITCH_PAGE.md).
 - `node scripts/compress-models.mjs`: GLB modellerini `model-optimizations.json` ayarlarıyla sıkıştırır.
 - `npm run prepare:aku`: Masaüstündeki `1.aku` ve `2.aku` klasörlerinden Aku GLB’lerini hazırlar.

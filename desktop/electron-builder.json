@@ -1,0 +1,40 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.memode.merbut",
+  "productName": "Merbut",
+  "copyright": "© 2026 MeMoDe",
+  "directories": { "output": "release/desktop", "buildResources": "desktop/build" },
+  "files": ["dist/**/*", "desktop/main.cjs", "desktop/build/icon.png", "package.json", "!node_modules/**/*"],
+  "asar": true,
+  "npmRebuild": false,
+  "nodeGypRebuild": false,
+  "extraFiles": [{ "from": "desktop/itch.toml", "to": ".itch.toml" }],
+  "win": {
+    "target": [
+      { "target": "nsis", "arch": ["x64"] },
+      { "target": "zip", "arch": ["x64"] }
+    ],
+    "icon": "desktop/build/icon.png",
+    "artifactName": "Merbut-${version}-windows-${arch}.${ext}"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": "always",
+    "createStartMenuShortcut": true,
+    "shortcutName": "Merbut",
+    "uninstallDisplayName": "Merbut",
+    "multiLanguageInstaller": true,
+    "installerLanguages": ["tr_TR", "en_US"],
+    "displayLanguageSelector": true,
+    "runAfterFinish": true,
+    "artifactName": "Merbut-${version}-Setup.exe"
+  },
+  "linux": {
+    "target": [{ "target": "tar.gz", "arch": ["x64"] }],
+    "category": "Game",
+    "icon": "desktop/build/icon.png",
+    "artifactName": "Merbut-${version}-linux-${arch}.${ext}"
+  }
+}

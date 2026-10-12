@@ -409,3 +409,6 @@
 .menu-battle-stage--duel .menu-battle-stage__hero-glow { left: 38%; width: 34%; opacity: .42; }
 .menu-battle-stage__fighter-labels .menu-fighter-name { opacity: 0; transition: opacity .35s ease-out; }
 .menu-battle-stage__fighter-labels .menu-fighter-name.is-ready { opacity: 1; }
+
+/* Language toggle: a two-letter code beside the corner buttons; the padding offsets the trailing letter-spacing. */
+.menu-corner .menu-corner__language { min-width: 44px; padding-left: calc(12px + .2em); }

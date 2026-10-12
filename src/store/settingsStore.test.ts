@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useDialogueStore } from '../story/dialogueStore'
 import { DEFAULT_BINDINGS, useSettingsStore } from './settingsStore'
 
@@ -16,6 +16,43 @@ describe('key rebinding', () => {
     useSettingsStore.getState().setBinding('ali', 'jump', 'KeyQ')
     useSettingsStore.getState().resetBindings()
     expect(useSettingsStore.getState().bindings.ali.jump).toBe(DEFAULT_BINDINGS.ali.jump)
+  })
+})
+
+describe('starting language', () => {
+  const merge = (persisted: unknown) => useSettingsStore.persist.getOptions().merge!(persisted, useSettingsStore.getState()).language
+  const values = new Map<string, string>()
+
+  beforeEach(() => {
+    values.clear()
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => { values.set(key, value) },
+      removeItem: (key: string) => { values.delete(key) },
+    })
+    // An English browser, so a first visit would pick English.
+    Object.defineProperty(window.navigator, 'languages', { value: ['en-US', 'en'], configurable: true })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    Object.defineProperty(window.navigator, 'languages', { value: ['tr-TR', 'tr'], configurable: true })
+  })
+
+  it('follows the browser only on a real first visit', () => {
+    expect(merge(undefined)).toBe('en')
+    values.set('merbut-progress', '{}')
+    expect(merge(undefined)).toBe('tr')
+  })
+
+  it('keeps Turkish for settings saved before the English update', () => {
+    expect(merge({ screenShake: 0.5 })).toBe('tr')
+  })
+
+  it('keeps a saved choice and decides again on an unknown one', () => {
+    expect(merge({ language: 'en' })).toBe('en')
+    expect(merge({ language: 'tr' })).toBe('tr')
+    expect(merge({ language: 'de', screenShake: 0.5 })).toBe('tr')
   })
 })
 

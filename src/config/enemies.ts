@@ -1,5 +1,7 @@
 import { ASSET_PATHS } from './assetPaths'
 
+import { pick, type Locale } from '../i18n/locale'
+
 export type EnemyKind = 1 | 2 | 3 | 4 | 5
 export type EnemyAbility = 'spin' | 'dash' | 'quake' | 'stone' | 'dark-orb'
 
@@ -81,3 +83,34 @@ export const BOSS_DEFINITIONS = {
   swamp: { kind: 4 as EnemyKind, title: 'Aku’nun Gölgesi', health: 950, damage: 28, score: 2_000, bossType: 'shadow' as const },
   final: { kind: 5 as EnemyKind, title: 'Aku, Zamanın Efendisi', health: 1_450, damage: 38, score: 5_000, bossType: 'aku' as const },
 } as const
+
+/** English variant prefixes and drone names; creature names (Myrkhan...) stay as they are. */
+const VARIANT_PREFIX_EN: Record<EnemyVariant, string> = {
+  normal: '',
+  elite: 'Elite',
+  ghost: 'Ghost',
+  giant: 'Bone Giant',
+  mirage: 'Mirage',
+  drone: 'Drone',
+  queen: 'Queen Beetle',
+}
+// Kind 3 never spawns as a drone; it shares the generic name, like the Turkish fallback.
+const DRONE_NAMES_EN: Record<EnemyKind, string> = { 1: 'Beetle Drone', 2: 'Pincer Drone', 3: 'Beetle Drone', 4: 'Artillery Drone', 5: 'Beam Drone' }
+const BOSS_TITLES_EN: Record<keyof typeof BOSS_DEFINITIONS, string> = {
+  swamp: 'Aku’s Shadow',
+  final: 'Aku, Master of Time',
+}
+
+/** The name shown over an enemy, in the player's language. */
+export function enemyName(kind: EnemyKind, variant: EnemyVariant, locale: Locale) {
+  if (locale !== 'en') return enemyDisplayName(kind, variant)
+  const prefix = VARIANT_PREFIX_EN[variant]
+  if (variant === 'giant' || variant === 'queen') return prefix
+  if (variant === 'drone') return DRONE_NAMES_EN[kind]
+  return prefix ? `${prefix} ${ENEMIES[kind].title}` : ENEMIES[kind].title
+}
+
+/** A boss's title card name in the player's language. */
+export function bossTitle(boss: keyof typeof BOSS_DEFINITIONS, locale: Locale) {
+  return pick(locale, BOSS_DEFINITIONS[boss].title, BOSS_TITLES_EN[boss])
+}

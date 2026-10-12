@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { DIFFICULTIES } from '../config/difficulty'
 import type { EnemyState } from '../types/session'
-import { useSessionStore } from './sessionStore'
+import { feedText, portalAlertText, useSessionStore } from './sessionStore'
 import { currentRuntimeImpactBudget } from './performanceStore'
 
 const enemy = (): EnemyState => ({
@@ -200,14 +200,21 @@ describe('session store', () => {
 
   it('shows portal travel information and clears it after the alert window', () => {
     const session = useSessionStore.getState()
-    session.showPortalAlert('ZAMAN YARILDI', 'Yeşim Harabeleri biyomuna savruldunuz', 12_000)
+    session.showPortalAlert({ key: 'portalAmbush', biome: 6, count: 5 }, 12_000)
     expect(useSessionStore.getState().portalAlert).toMatchObject({
-      title: 'ZAMAN YARILDI',
-      detail: 'Yeşim Harabeleri biyomuna savruldunuz',
+      title: 'ZAMAN PUSUSU',
+      detail: 'Yeşim Harabeleri: 5 düşman bekliyor',
       expiresAt: 16_200,
     })
     session.tick(0.1, 16_201)
     expect(useSessionStore.getState().portalAlert).toBeNull()
+  })
+
+  it('keeps what a toast or alert says, so a language switch can re-read it', () => {
+    expect(feedText({ key: 'heroFrozen', hero: 'jack' }, 'tr')).toBe('Samuray Jack zaman portalında 3 sn dondu')
+    expect(feedText({ key: 'heroFrozen', hero: 'jack' }, 'en')).toBe('Samurai Jack is frozen in the time portal for 3s')
+    expect(portalAlertText({ key: 'portalAmbush', biome: 6, count: 1 }, 'en')).toEqual({ title: 'TIME AMBUSH', detail: 'Jade Ruins: 1 enemy lies in wait' })
+    expect(portalAlertText({ key: 'portalOpened' }, 'tr').title).toBe('ZAMAN PORTALI AÇILDI')
   })
 
   it('caps simultaneous combat impacts during chained attacks', () => {

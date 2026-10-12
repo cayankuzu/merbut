@@ -5,8 +5,6 @@ import type { PlayerStatus } from '../types/session'
 export const ABILITY_MAX_CHARGE = 100
 export const COMBO_WINDOW_MS = 2_200
 
-export const HERO_NAMES: Record<CharacterId, string> = { ali: 'Hz. Ali', jack: 'Samuray Jack' }
-
 export interface PlayerRunStatus extends PlayerStatus {
   combo: number
   comboUntil: number

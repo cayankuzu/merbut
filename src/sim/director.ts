@@ -1,6 +1,7 @@
 import { BIOMES, WORLD_VISUAL_LEFT, WORLD_VISUAL_RIGHT } from '../config/biomes'
 import { BOSS_MODEL_SCALES } from '../config/characterTransforms'
 import { DIFFICULTIES } from '../config/difficulty'
+import { demoEndsAfter } from '../config/edition'
 import { BOSS_DEFINITIONS, ENEMIES, ENEMY_VARIANTS, ENEMY_WINDUP_MS, isHeavyVariant } from '../config/enemies'
 import { expandWaveSpawns, getWaveSpawnX, shouldTriggerWave, WAVES, type WaveDefinition } from '../config/waves'
 import { useGameStore } from '../store/gameStore'
@@ -152,6 +153,10 @@ function stepProgression(now: number, progressionX: number) {
     gameEvents.emit({ type: 'gate-open', biome: session.currentBiome, x: gateX })
   }
   if (biomeClear && !lastBiome && progressionX >= gateX + 0.2) {
+    if (demoEndsAfter(session.currentBiome)) {
+      session.finishDemo()
+      return
+    }
     const nextBiome = session.currentBiome + 1
     session.setCurrentBiome(nextBiome, getClosedBiomeRightLimit(nextBiome), now)
   }

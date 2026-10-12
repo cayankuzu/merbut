@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Vector3 } from 'three'
 import { CHARACTERS } from '../../config/gameConfig'
+import { strings } from '../../i18n'
 import { gameEvents } from '../../sim/events'
 import { useGameStore } from '../../store/gameStore'
 import { useSettingsStore } from '../../store/settingsStore'
@@ -18,7 +19,7 @@ interface FloatingText {
 }
 
 /**
- * Pooled DOM numbers projected from world space: damage, kills and "KUSURSUZ"
+ * Pooled DOM numbers projected from world space: damage, kills and perfect
  * dodges. Zero React renders per hit; one small transform write per frame.
  */
 export function DamageNumbers() {
@@ -57,7 +58,7 @@ export function DamageNumbers() {
       }
       if (event.type === 'player-dash' && event.perfect) {
         const [x, y] = useGameStore.getState().positions[event.id]
-        spawn('KUSURSUZ', x, y + 2.6, 'is-perfect')
+        spawn(strings().hud.perfectDodge, x, y + 2.6, 'is-perfect')
       }
     })
     return () => {

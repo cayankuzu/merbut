@@ -433,3 +433,10 @@ html.is-camera-previewing .pause-screen { visibility: hidden; }
 .setting-action--danger:hover, .setting-action--danger:focus-visible { border-color: #ffb3a6; background: rgba(200, 30, 30, 0.5); }
 .save-reset__done { color: var(--gold); }
 @media (max-width: 720px) { .save-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ───────────────────────── Web demo ───────────────────────── */
+.main-menu__demo { display: inline-block; margin-left: 10px; padding: 3px 8px; border: 1px solid rgba(247, 198, 95, 0.6); color: var(--gold); font: 800 10px / 1 var(--font-body); font-style: normal; letter-spacing: 0.24em; vertical-align: middle; }
+.demo-end__buy { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+.demo-end__buy:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+.result-screen.is-demo-end .result-screen__quote { max-width: 620px; margin-inline: auto; }
+.result-screen.is-demo-end h1 { font-size: clamp(40px, 5.2vw, 76px); line-height: 1.05; text-align: center; }

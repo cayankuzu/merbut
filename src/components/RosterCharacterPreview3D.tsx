@@ -38,6 +38,7 @@ import { ASSET_PATHS } from '../config/assetPaths'
 import { SHADOW_WEAPON_TRANSFORM } from '../config/characterTransforms'
 import type { RosterPreview } from '../config/characterRoster'
 import { CHARACTERS } from '../config/gameConfig'
+import { useStrings } from '../i18n'
 import { useDebugStore } from '../store/debugStore'
 import { PERFORMANCE_PROFILES, usePerformanceStore } from '../store/performanceStore'
 import type { CharacterId } from '../types/character'
@@ -323,6 +324,7 @@ export function RosterCharacterPreview3D({ preview, rotation, pan, zoom, label }
   const tier = usePerformanceStore((state) => state.tier)
   const renderDpr = usePerformanceStore((state) => state.renderDpr)
   const profile = PERFORMANCE_PROFILES[tier]
+  const s = useStrings()
   const [fit, setFit] = useState<RosterPreviewFit>({
     center: [0, 0, 0],
     halfHeight: 1.5,
@@ -336,7 +338,7 @@ export function RosterCharacterPreview3D({ preview, rotation, pan, zoom, label }
       data-static-pose="true"
       data-fit-radius={fit.halfHeight.toFixed(3)}
       data-fit-offset={`${fit.modelOffset[0].toFixed(3)},${fit.modelOffset[1].toFixed(3)},${fit.modelOffset[2].toFixed(3)}`}
-      aria-label={`${label} döndürülebilir 3B modeli`}
+      aria-label={s.gallery.previewAria(label)}
     >
       <Canvas
         key={`roster-renderer-${profile.antialias ? 'aa' : 'raw'}`}

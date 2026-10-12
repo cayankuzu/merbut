@@ -1,3 +1,5 @@
+import { pick, type Locale } from '../i18n/locale'
+
 export type Difficulty = 'easy' | 'normal' | 'hard' | 'soulslike'
 
 export interface DifficultyDefinition {
@@ -81,3 +83,15 @@ export const DIFFICULTIES: Record<Difficulty, DifficultyDefinition> = {
 }
 
 export const DIFFICULTY_ORDER: readonly Difficulty[] = ['easy', 'normal', 'hard', 'soulslike']
+
+const DIFFICULTY_TEXT_EN: Record<Difficulty, { label: string; description: string }> = {
+  easy: { label: 'Easy', description: 'Long attack warnings, plenty of Zamzam and forgiving bosses. Made for experiencing the story.' },
+  normal: { label: 'Normal', description: 'One extra enemy per wave and steady boss pressure. The recommended experience.' },
+  hard: { label: 'Hard', description: 'Three extra enemies per wave, short warnings, scarce Zamzam and strong bosses.' },
+  soulslike: { label: 'Merciless', description: 'Four extra enemies per wave, two lives and unforgiving bosses. Every mistake costs you.' },
+}
+
+/** A difficulty's name and one-line description in the player's language. */
+export function difficultyText(id: Difficulty, locale: Locale) {
+  return pick(locale, { label: DIFFICULTIES[id].label, description: DIFFICULTIES[id].description }, DIFFICULTY_TEXT_EN[id])
+}

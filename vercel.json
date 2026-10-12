@@ -1,23 +1,49 @@
 {
+  "buildCommand": "npm run build:demo",
+  "outputDirectory": "dist",
   "headers": [
     {
       "source": "/assets/(.*).(js|css)",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
     },
     {
       "source": "/assets/models/(.*)",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400, s-maxage=31536000, stale-while-revalidate=604800" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, s-maxage=31536000, stale-while-revalidate=604800"
+        }
+      ]
     },
     {
       "source": "/assets/(ui|realms|story|covers)/(.*)",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400, s-maxage=31536000, stale-while-revalidate=604800" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, s-maxage=31536000, stale-while-revalidate=604800"
+        }
+      ]
     },
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), gamepad=(self), fullscreen=(self)" }
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=(), gamepad=(self), fullscreen=(self)"
+        }
       ]
     }
   ]

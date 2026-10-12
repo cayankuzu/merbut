@@ -1,6 +1,7 @@
 import { useSessionStore } from '../store/sessionStore'
 import { BossCinematicOverlay } from './BossCinematicOverlay'
 import { ControlsScreen } from './ControlsScreen'
+import { DemoEndScreen } from './DemoEndScreen'
 import { EndingOverlay } from './EndingOverlay'
 import { CombatHud } from './hud/CombatHud'
 import { BiomeTitleCard, DamageVignette, DialogueOverlay, Toasts } from './hud/Overlays'
@@ -28,6 +29,7 @@ export function GameInterface() {
       {phase === 'paused' ? <PauseMenu /> : null}
       {phase === 'victory' ? <ResultScreen victory /> : null}
       {phase === 'defeat' ? <ResultScreen victory={false} /> : null}
+      {phase === 'demo-end' ? <DemoEndScreen /> : null}
     </div>
   )
 }

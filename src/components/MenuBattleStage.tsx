@@ -15,8 +15,9 @@ import { prepareAnimationClip } from '../animation/animationLoader'
 import { validateClipTargets } from '../animation/animationRetargeting'
 import { ASSET_PATHS } from '../config/assetPaths'
 import { BOSS_MODEL_SCALES } from '../config/characterTransforms'
-import { ENEMIES } from '../config/enemies'
+import { bossTitle, ENEMIES } from '../config/enemies'
 import { CHARACTERS } from '../config/gameConfig'
+import { stringsFor, useLocale, useStrings, type Locale } from '../i18n'
 import type { AnimationState } from '../types/animation'
 import { isSafariWebkitEngine, PERFORMANCE_PROFILES, usePerformanceStore } from '../store/performanceStore'
 import { MenuAttackEffect, type MenuAttackEffectKind } from './MenuAttackEffect'
@@ -81,35 +82,38 @@ interface EnemyShowcaseDefinition {
   id: string
   modelScale: number
   motions: MotionSet
-  name: string
+  /** The fighter's name in the player's language. */
+  name: (locale: Locale) => string
   row: number
   rowCount: number
 }
 
 const repeatMotion = (motion: string): MotionSet => [motion, motion, motion, motion, motion]
+/** Creature names read the same in every language. */
+const fixedName = (name: string) => () => name
 
 const ENEMY_SHOWCASE: readonly EnemyShowcaseDefinition[] = [
   // `base` supplies the skinned mesh. It is never played as locomotion: the
   // action mixer below starts an attack clip immediately after mounting.
-  { id: 'myrkhan', name: 'Myrkhan', row: 0, column: 0, rowCount: 3, base: ENEMIES[1].walk, motions: repeatMotion(ENEMIES[1].attack), modelScale: ENEMIES[1].scale, displayScale: 1, accent: ENEMIES[1].accent, effects: ['impact-ember', 'slash', 'impact-quake', 'shockwave', 'flame'] },
-  { id: 'zorvex', name: 'Zorvex', row: 0, column: 1, rowCount: 3, base: ENEMIES[2].walk, motions: repeatMotion(ENEMIES[2].attack), modelScale: ENEMIES[2].scale, displayScale: 1, accent: ENEMIES[2].accent, effects: ['impact-void', 'slash', 'projectile', 'impact-void', 'shockwave'] },
-  { id: 'kharzul', name: 'Kharzul', row: 0, column: 2, rowCount: 3, base: ENEMIES[3].walk, motions: repeatMotion(ENEMIES[3].attack), modelScale: ENEMIES[3].scale, displayScale: 1, accent: ENEMIES[3].accent, effects: ['impact-quake', 'shockwave', 'slash', 'impact-boss', 'slash'] },
-  { id: 'vhalgor', name: 'Vhalgor', row: 2, column: 0, rowCount: 2, base: ENEMIES[4].walk, motions: repeatMotion(ENEMIES[4].attack), modelScale: ENEMIES[4].scale, displayScale: 1, accent: ENEMIES[4].accent, effects: ['projectile-stone', 'impact-quake', 'projectile-stone', 'shockwave', 'projectile-stone'] },
-  { id: 'nexrath', name: 'Nexrath', row: 2, column: 1, rowCount: 2, base: ENEMIES[5].walk, motions: repeatMotion(ENEMIES[5].attack), modelScale: ENEMIES[5].scale, displayScale: 1, accent: ENEMIES[5].accent, effects: ['projectile-dark-orb', 'impact-void', 'projectile-dark-orb', 'flame', 'projectile-dark-orb'] },
+  { id: 'myrkhan', name: fixedName(ENEMIES[1].title), row: 0, column: 0, rowCount: 3, base: ENEMIES[1].walk, motions: repeatMotion(ENEMIES[1].attack), modelScale: ENEMIES[1].scale, displayScale: 1, accent: ENEMIES[1].accent, effects: ['impact-ember', 'slash', 'impact-quake', 'shockwave', 'flame'] },
+  { id: 'zorvex', name: fixedName(ENEMIES[2].title), row: 0, column: 1, rowCount: 3, base: ENEMIES[2].walk, motions: repeatMotion(ENEMIES[2].attack), modelScale: ENEMIES[2].scale, displayScale: 1, accent: ENEMIES[2].accent, effects: ['impact-void', 'slash', 'projectile', 'impact-void', 'shockwave'] },
+  { id: 'kharzul', name: fixedName(ENEMIES[3].title), row: 0, column: 2, rowCount: 3, base: ENEMIES[3].walk, motions: repeatMotion(ENEMIES[3].attack), modelScale: ENEMIES[3].scale, displayScale: 1, accent: ENEMIES[3].accent, effects: ['impact-quake', 'shockwave', 'slash', 'impact-boss', 'slash'] },
+  { id: 'vhalgor', name: fixedName(ENEMIES[4].title), row: 2, column: 0, rowCount: 2, base: ENEMIES[4].walk, motions: repeatMotion(ENEMIES[4].attack), modelScale: ENEMIES[4].scale, displayScale: 1, accent: ENEMIES[4].accent, effects: ['projectile-stone', 'impact-quake', 'projectile-stone', 'shockwave', 'projectile-stone'] },
+  { id: 'nexrath', name: fixedName(ENEMIES[5].title), row: 2, column: 1, rowCount: 2, base: ENEMIES[5].walk, motions: repeatMotion(ENEMIES[5].attack), modelScale: ENEMIES[5].scale, displayScale: 1, accent: ENEMIES[5].accent, effects: ['projectile-dark-orb', 'impact-void', 'projectile-dark-orb', 'flame', 'projectile-dark-orb'] },
   {
-    id: 'aku-shadow', name: 'Aku’nun Gölgesi', row: 1, column: 0, rowCount: 3,
+    id: 'aku-shadow', name: (locale) => bossTitle('swamp', locale), row: 1, column: 0, rowCount: 3,
     base: ASSET_PATHS.bosses.evilJack.walk,
     motions: [ASSET_PATHS.bosses.evilJack.slash, ASSET_PATHS.bosses.evilJack.doubleCombo, ASSET_PATHS.bosses.evilJack.tripleCombo, ASSET_PATHS.bosses.evilJack.cast, ASSET_PATHS.bosses.evilJack.slash],
     modelScale: BOSS_MODEL_SCALES.shadow, displayScale: 1, accent: '#ff315f', effects: ['shadow-slash', 'shadow-combo', 'shadow-combo', 'shadow-cast', 'shadow-slash'],
   },
   {
-    id: 'aku', name: 'Aku', row: 1, column: 1, rowCount: 3,
+    id: 'aku', name: fixedName('Aku'), row: 1, column: 1, rowCount: 3,
     base: ASSET_PATHS.bosses.aku.normal.walk,
     motions: [ASSET_PATHS.bosses.aku.normal.attack, ASSET_PATHS.bosses.aku.normal.heavy, ASSET_PATHS.bosses.aku.normal.kick, ASSET_PATHS.bosses.aku.normal.triple, ASSET_PATHS.bosses.aku.normal.ranged],
     modelScale: BOSS_MODEL_SCALES.aku, displayScale: 1, accent: '#75ff70', effects: ['impact-boss', 'shockwave', 'slash', 'flame', 'projectile-aku-fire'],
   },
   {
-    id: 'aku-monster', name: 'Aku · Canavar', row: 1, column: 2, rowCount: 3,
+    id: 'aku-monster', name: (locale) => stringsFor(locale).menu.stageAkuMonster, row: 1, column: 2, rowCount: 3,
     base: ASSET_PATHS.bosses.aku.monster.idle,
     motions: [ASSET_PATHS.bosses.aku.monster.slash, ASSET_PATHS.bosses.aku.monster.double, ASSET_PATHS.bosses.aku.monster.triple, ASSET_PATHS.bosses.aku.monster.spin, ASSET_PATHS.bosses.aku.monster.ranged],
     modelScale: BOSS_MODEL_SCALES.aku, displayScale: 1, accent: '#ff244f', effects: ['slash', 'impact-boss', 'shockwave', 'shockwave', 'projectile-aku-fire'],
@@ -600,12 +604,14 @@ function BudgetedMenuFrames({ enabled, fps }: { enabled: boolean; fps: number })
 
 export function MenuBattleStage({ action = 'idle', composition = 'wide', variant = 'menu' }: { action?: MenuStageAction; composition?: MenuStageComposition; variant?: MenuStageVariant }) {
   const splash = variant === 'splash'
+  const s = useStrings()
+  const locale = useLocale()
   const [activeHeroIndex, setActiveHeroIndex] = useState(() => Math.floor(Math.random() * HERO_SHOWCASE.length))
   const [activeEnemyIndex, setActiveEnemyIndex] = useState(() => Math.floor(Math.random() * ENEMY_SHOWCASE.length))
   const [heroMoveNumber, setHeroMoveNumber] = useState(0)
   const [enemyMoveNumber, setEnemyMoveNumber] = useState(0)
-  const activeHeroName = HERO_SHOWCASE[activeHeroIndex] === 'jack' ? 'Samuray Jack' : 'Hz. Ali'
-  const activeEnemyName = (ENEMY_SHOWCASE[activeEnemyIndex] ?? ENEMY_SHOWCASE[0]).name
+  const activeHeroName = s.common.heroName(HERO_SHOWCASE[activeHeroIndex] ?? 'ali')
+  const activeEnemyName = (ENEMY_SHOWCASE[activeEnemyIndex] ?? ENEMY_SHOWCASE[0]).name(locale)
   const tier = usePerformanceStore((state) => state.tier)
   const graphicsPreference = usePerformanceStore((state) => state.preference)
   const qualityFactor = usePerformanceStore((state) => state.qualityFactor)
@@ -635,7 +641,7 @@ export function MenuBattleStage({ action = 'idle', composition = 'wide', variant
   return (
     <div
       className={`menu-battle-stage menu-battle-stage--${variant} menu-battle-stage--${composition} is-${action}`}
-      aria-label="Hz. Ali, Samuray Jack ve Aku lejyonu dikey sütunlarda savaş pozunda"
+      aria-label={s.menu.stageLabel}
       data-enemy-move={enemyMoveNumber}
       data-hero-move={heroMoveNumber}
     >
@@ -666,17 +672,17 @@ export function MenuBattleStage({ action = 'idle', composition = 'wide', variant
         <span className={`menu-fighter-name menu-fighter-name--heroes${heroReady ? ' is-ready' : ''}`}>{activeHeroName}</span>
         <span className={`menu-fighter-name menu-fighter-name--enemies${enemyReady ? ' is-ready' : ''}`}>{activeEnemyName}</span>
       </div>
-      <ul className="sr-only" aria-label="Kahramanlar">
-        {['Hz. Ali', 'Samuray Jack'].map((name) => <li key={name}>{name}</li>)}
+      <ul className="sr-only" aria-label={s.menu.stageHeroes}>
+        {[s.common.heroAli, s.common.heroJack].map((name) => <li key={name}>{name}</li>)}
       </ul>
-      <ul className="sr-only" aria-label="Yakın dövüşçüler">
-        {ENEMY_SHOWCASE.filter((enemy) => enemy.row === 0).map((enemy) => <li key={enemy.id}>{enemy.name}</li>)}
+      <ul className="sr-only" aria-label={s.menu.stageMelee}>
+        {ENEMY_SHOWCASE.filter((enemy) => enemy.row === 0).map((enemy) => <li key={enemy.id}>{enemy.name(locale)}</li>)}
       </ul>
-      <ul className="sr-only" aria-label="Bosslar">
-        {ENEMY_SHOWCASE.filter((enemy) => enemy.row === 1).map((enemy) => <li key={enemy.id}>{enemy.name}</li>)}
+      <ul className="sr-only" aria-label={s.menu.stageBosses}>
+        {ENEMY_SHOWCASE.filter((enemy) => enemy.row === 1).map((enemy) => <li key={enemy.id}>{enemy.name(locale)}</li>)}
       </ul>
-      <ul className="sr-only" aria-label="Uzak dövüşçüler">
-        {ENEMY_SHOWCASE.filter((enemy) => enemy.row === 2).map((enemy) => <li key={enemy.id}>{enemy.name}</li>)}
+      <ul className="sr-only" aria-label={s.menu.stageRanged}>
+        {ENEMY_SHOWCASE.filter((enemy) => enemy.row === 2).map((enemy) => <li key={enemy.id}>{enemy.name(locale)}</li>)}
       </ul>
     </div>
   )

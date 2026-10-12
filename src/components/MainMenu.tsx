@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { gameAudio } from '../audio/gameAudio'
 import { useAudioStore } from '../audio/audioStore'
-import { DIFFICULTIES } from '../config/difficulty'
-import { BIOMES } from '../config/biomes'
-import { BIOME_CONTENT } from '../content/biomeContent'
+import { difficultyText } from '../config/difficulty'
+import { IS_DEMO, isPlayableBiome, openFullGame } from '../config/edition'
+import { biomeTitle } from '../config/biomes'
+import { biomeText } from '../content/biomeContent'
+import { useLocale, useStrings } from '../i18n'
 import { useProgressStore } from '../meta/progressStore'
 import { useSessionStore } from '../store/sessionStore'
+import { useSettingsStore } from '../store/settingsStore'
 import { useUiStore } from '../store/uiStore'
 import { CharacterGallery } from './CharacterGallery'
 import { MenuBattleStage, type MenuStageAction } from './MenuBattleStage'
@@ -13,6 +16,7 @@ import { AchievementsScreen, ChapterSelect, CreditsScreen, PatchNotes } from './
 import { toggleFullscreen } from '../utils/fullscreen'
 
 function TitleScreen({ onContinue }: { onContinue: () => void }) {
+  const s = useStrings()
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.repeat || event.code === 'Tab') return
@@ -28,11 +32,11 @@ function TitleScreen({ onContinue }: { onContinue: () => void }) {
     }
   }, [onContinue])
   return (
-    <button className="title-screen" type="button" onClick={onContinue} aria-label="Başlamak için bir tuşa bas">
-      <small>MEMODE SUNAR</small>
-      <h1 data-title="MERBUT">MERBUT</h1>
-      <em>On Diyar · Tek Kader</em>
-      <span className="title-screen__prompt">Başlamak için bir tuşa bas</span>
+    <button className="title-screen" type="button" onClick={onContinue} aria-label={s.menu.pressAnyKey}>
+      <small>{s.menu.presents}</small>
+      <h1 data-title={s.common.gameTitle}>{s.common.gameTitle}</h1>
+      <em>{s.common.gameSubtitle}</em>
+      <span className="title-screen__prompt">{s.menu.pressAnyKey}</span>
     </button>
   )
 }
@@ -46,6 +50,8 @@ interface MenuEntry {
 }
 
 export function MainMenu() {
+  const s = useStrings()
+  const locale = useLocale()
   const view = useUiStore((state) => state.view)
   const setView = useUiStore((state) => state.setView)
   const setPendingBiome = useUiStore((state) => state.setPendingBiome)
@@ -53,7 +59,9 @@ export function MainMenu() {
   const [stageReady, setStageReady] = useState(false)
   const [focused, setFocused] = useState<string | null>(null)
   const transitionTimer = useRef<number | null>(null)
-  const checkpoint = useProgressStore((state) => state.checkpoint)
+  const savedCheckpoint = useProgressStore((state) => state.checkpoint)
+  // A save from the full game can point past the demo; the demo only continues within its realms.
+  const checkpoint = savedCheckpoint && isPlayableBiome(savedCheckpoint.biome) ? savedCheckpoint : null
   const showControls = useSessionStore((state) => state.showControls)
   const setDifficulty = useSessionStore((state) => state.setDifficulty)
   const openSettings = useAudioStore((state) => state.openPanel)
@@ -85,7 +93,7 @@ export function MainMenu() {
 
   if (view === 'title') {
     return (
-      <section className="menu-screen menu-screen--title" aria-label="Başlık">
+      <section className="menu-screen menu-screen--title" aria-label={s.menu.titleSection}>
         {stageReady ? <MenuBattleStage action="idle" /> : null}
         <TitleScreen onContinue={() => { gameAudio.unlock(); gameAudio.play('ui-confirm'); setView('main') }} />
       </section>
@@ -100,32 +108,33 @@ export function MainMenu() {
   const entries: MenuEntry[] = [
     ...(checkpoint ? [{
       id: 'continue',
-      label: 'DEVAM ET',
-      hint: `${BIOME_CONTENT[checkpoint.biome]!.chapter} · ${BIOMES[checkpoint.biome]!.title} · ${DIFFICULTIES[checkpoint.difficulty].label}`,
+      label: s.menu.continueGame,
+      hint: s.menu.continueHint(biomeText(checkpoint.biome, locale).chapter, biomeTitle(checkpoint.biome, locale), difficultyText(checkpoint.difficulty, locale).label),
       primary: true,
       action: () => {
         setDifficulty(checkpoint.difficulty)
         beginBriefing(checkpoint.biome)
       },
     }] : []),
-    { id: 'new', label: 'YENİ OYUN', hint: 'Prologla başlayan yolculuk: on diyar, iki boss ve bir portal.', primary: !checkpoint, action: () => beginBriefing(0) },
-    { id: 'chapters', label: 'BÖLÜM SEÇ', hint: 'Ulaştığın diyarlardan birinden yeniden başla.', action: () => setView('chapters') },
-    { id: 'characters', label: 'KARAKTERLER', hint: 'Kahramanlar, Aku Lejyonu ve bosslar: 360° arşiv.', action: () => strike('enemies', () => setView('characters')) },
-    { id: 'achievements', label: 'BAŞARIMLAR', hint: 'Açtığın başarımlar, rekorların ve istatistiklerin.', action: () => setView('achievements') },
-    { id: 'settings', label: 'AYARLAR', hint: 'Görüntü, ses, kontroller, oynanış ve erişilebilirlik.', action: openSettings },
-    { id: 'credits', label: 'YAPIMCILAR', hint: 'Merbut’u yapanlar ve teşekkürler.', action: () => setView('credits') },
+    { id: 'new', label: s.menu.newGame, hint: s.menu.newGameHint, primary: !checkpoint, action: () => beginBriefing(0) },
+    ...(IS_DEMO ? [{ id: 'full-game', label: s.menu.fullGame, hint: s.menu.fullGameHint, action: openFullGame }] : []),
+    { id: 'chapters', label: s.menu.chapterSelect, hint: s.menu.chapterSelectHint, action: () => setView('chapters') },
+    { id: 'characters', label: s.menu.characters, hint: s.menu.charactersHint, action: () => strike('enemies', () => setView('characters')) },
+    { id: 'achievements', label: s.menu.achievements, hint: s.menu.achievementsHint, action: () => setView('achievements') },
+    { id: 'settings', label: s.menu.settings, hint: s.menu.settingsHint, action: openSettings },
+    { id: 'credits', label: s.menu.credits, hint: s.menu.creditsHint, action: () => setView('credits') },
   ]
   const hint = entries.find((entry) => entry.id === focused)?.hint ?? entries[0]!.hint
 
   return (
-    <section className={`menu-screen menu-screen--battle is-${transition}`} aria-label="Ana menü">
+    <section className={`menu-screen menu-screen--battle is-${transition}`} aria-label={s.menu.mainMenu}>
       {stageReady ? <MenuBattleStage action={transition} composition="duel" /> : <div className="menu-battle-stage menu-battle-stage--placeholder" aria-hidden="true" />}
       <div className="main-menu">
         <header>
-          <h1 data-title="MERBUT">MERBUT</h1>
-          <em>On Diyar · Tek Kader</em>
+          <h1 data-title={s.common.gameTitle}>{s.common.gameTitle}</h1>
+          <em>{s.common.gameSubtitle}{IS_DEMO ? <span className="main-menu__demo">{s.menu.demoBadge}</span> : null}</em>
         </header>
-        <nav aria-label="Ana menü seçenekleri">
+        <nav aria-label={s.menu.mainMenuOptions}>
           {entries.map((entry, index) => (
             <button
               key={entry.id}
@@ -144,8 +153,16 @@ export function MainMenu() {
         <p className="main-menu__hint" aria-live="polite">{hint}</p>
       </div>
       <div className="menu-corner">
-        <button type="button" onClick={() => setView('patch-notes')}>YAMA NOTLARI</button>
-        <button type="button" onClick={toggleFullscreen} aria-label="Tam ekranı aç veya kapat">⛶ TAM EKRAN</button>
+        <button type="button" onClick={() => setView('patch-notes')}>{s.menu.patchNotes}</button>
+        <button type="button" onClick={toggleFullscreen} aria-label={s.menu.fullscreenLabel}>{s.menu.fullscreen}</button>
+        <button
+          className="menu-corner__language"
+          type="button"
+          aria-label={s.menu.languageToggleLabel}
+          onClick={() => { gameAudio.play('ui-confirm'); useSettingsStore.getState().update({ language: locale === 'tr' ? 'en' : 'tr' }) }}
+        >
+          {s.menu.languageToggle}
+        </button>
       </div>
     </section>
   )

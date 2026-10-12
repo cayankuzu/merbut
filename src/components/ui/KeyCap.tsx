@@ -9,12 +9,12 @@ export function KeyCap({ children, pad = false }: { children: string; pad?: bool
 
 /** The key (and pad button, when a pad is connected) that performs an action. */
 export function ActionKeys({ player, action, both }: { player: CharacterId; action: PlayerAction; both?: PlayerAction }) {
-  const { padCount } = useInputLabels()
+  const { padCount, locale } = useInputLabels()
   const bindings = useSettingsStore((state) => state.bindings[player])
   return (
     <span className="action-keys">
-      <KeyCap>{keyLabel(bindings[action])}</KeyCap>
-      {both ? <><i>/</i><KeyCap>{keyLabel(bindings[both])}</KeyCap></> : null}
+      <KeyCap>{keyLabel(bindings[action], locale)}</KeyCap>
+      {both ? <><i>/</i><KeyCap>{keyLabel(bindings[both], locale)}</KeyCap></> : null}
       {padCount > 0 ? <KeyCap pad>{padLabel(action)}</KeyCap> : null}
     </span>
   )

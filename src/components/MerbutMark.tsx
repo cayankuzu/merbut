@@ -1,10 +1,13 @@
+import { useStrings } from '../i18n'
+
 interface MerbutMarkProps {
   className?: string
 }
 
 export function MerbutMark({ className }: MerbutMarkProps) {
+  const s = useStrings()
   return (
-    <svg className={className} viewBox="0 0 64 64" role="img" aria-label="Merbut amblemi">
+    <svg className={className} viewBox="0 0 64 64" role="img" aria-label={s.menu.emblem}>
       <defs>
         <linearGradient id="merbut-mark-fire" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
           <stop stopColor="#f7c65f" />
